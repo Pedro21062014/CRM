@@ -8,7 +8,8 @@ import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, Store, Settings, 
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
-  ExternalLink, Bell, Image as ImageIcon, Type, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone
+  ExternalLink, Bell, Image as ImageIcon, Type, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
+  Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
@@ -22,14 +23,14 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const AppLogo = ({ collapsed }: { collapsed?: boolean }) => (
-  <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} transition-all duration-300 group`}>
+const AppLogo = ({ collapsed, dark = false }: { collapsed?: boolean, dark?: boolean }) => (
+  <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} transition-all duration-300 group cursor-pointer`}>
     <div className="bg-indigo-600 text-white p-2 rounded-lg shadow-lg shadow-indigo-200 group-hover:bg-indigo-700 transition-all duration-300 transform group-hover:scale-105">
       <Rocket size={20} strokeWidth={2.5} />
     </div>
     {!collapsed && (
       <div className="flex flex-col animate-in fade-in duration-300">
-        <span className="font-bold text-xl text-slate-900 tracking-tight leading-none font-sans">Nova<span className="text-indigo-600">CRM</span></span>
+        <span className={`font-bold text-xl tracking-tight leading-none font-sans ${dark ? 'text-white' : 'text-slate-900'}`}>Nova<span className="text-indigo-500">CRM</span></span>
       </div>
     )}
   </div>
@@ -51,6 +52,205 @@ const IconButton = ({ onClick, icon: Icon, colorClass = "text-slate-500 hover:te
     <Icon size={18} />
   </button>
 );
+
+// --- Landing Page ---
+const LandingPage = () => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 overflow-x-hidden">
+      {/* Navbar */}
+      <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20">
+            <div onClick={() => navigate('/')}>
+               <AppLogo />
+            </div>
+            <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+              <a href="#features" className="hover:text-indigo-600 transition-colors">Funcionalidades</a>
+              <a href="#plans" className="hover:text-indigo-600 transition-colors">Planos</a>
+              <a href="#faq" className="hover:text-indigo-600 transition-colors">FAQ</a>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link to="/login" className="text-sm font-bold text-slate-600 hover:text-indigo-600 hidden sm:block">Entrar</Link>
+              <Link to="/register" className="px-5 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-indigo-600 transition-all shadow-lg shadow-indigo-100">
+                Começar Grátis
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <div className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-indigo-500/10 rounded-full blur-3xl -z-10"></div>
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-xs font-bold uppercase tracking-wider mb-6">
+            <Zap size={14} fill="currentColor"/> Nova Versão 2.0
+          </div>
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-slate-900 mb-6 leading-tight">
+            Crie sua Loja Virtual e <br/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Gerencie Clientes</span> em minutos.
+          </h1>
+          <p className="text-xl text-slate-500 mb-10 max-w-2xl mx-auto leading-relaxed">
+            A ferramenta completa para empreendedores modernos. Monte seu cardápio ou catálogo digital, receba pedidos no WhatsApp ou Painel e fidelize clientes com nosso CRM automático.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link to="/register" className="w-full sm:w-auto px-8 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 hover:scale-105 transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2">
+              <Rocket size={20} /> Criar Minha Loja Agora
+            </Link>
+            <a href="#demo" className="w-full sm:w-auto px-8 py-4 bg-white text-slate-700 font-bold rounded-2xl border border-slate-200 hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+              Ver Demonstração
+            </a>
+          </div>
+          
+          {/* Mockup Preview */}
+          <div className="mt-16 relative mx-auto max-w-5xl">
+            <div className="bg-slate-900 rounded-2xl p-2 shadow-2xl border border-slate-800">
+               <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2426&auto=format&fit=crop" alt="Dashboard Preview" className="rounded-xl opacity-90" />
+            </div>
+            <div className="absolute -bottom-10 -right-10 w-64 md:w-80 bg-white p-4 rounded-2xl shadow-2xl border border-slate-100 hidden md:block animate-in slide-in-from-bottom-10 duration-1000">
+               <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600"><CheckCircle2 size={20}/></div>
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">Novo Pedido #2931</p>
+                    <p className="text-xs text-slate-500">Acabou de chegar!</p>
+                  </div>
+               </div>
+               <div className="w-full bg-slate-100 h-2 rounded-full mb-1"><div className="w-3/4 bg-green-500 h-2 rounded-full"></div></div>
+               <p className="text-xs text-right font-bold text-slate-400">R$ 149,90</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Features Section */}
+      <div id="features" className="py-24 bg-white relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">Tudo o que você precisa para vender mais</h2>
+            <p className="text-slate-500 max-w-2xl mx-auto">Esqueça planilhas e anotações manuais. O NovaCRM centraliza sua operação.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="p-8 rounded-3xl bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-100">
+              <div className="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 mb-6">
+                <Store size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Editor de Loja Arrastar e Soltar</h3>
+              <p className="text-slate-500 leading-relaxed">
+                Personalize sua vitrine com banners, cores e seções. Seus clientes compram por um link bonito e profissional, sem precisar baixar app.
+              </p>
+            </div>
+            <div className="p-8 rounded-3xl bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-100">
+              <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
+                <Users size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">CRM Automático</h3>
+              <p className="text-slate-500 leading-relaxed">
+                Cada venda gera um cadastro de cliente automaticamente. Saiba quem comprou, o que comprou e quando, para fazer remarketing.
+              </p>
+            </div>
+            <div className="p-8 rounded-3xl bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-100">
+              <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 mb-6">
+                <BarChart3 size={28} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">Gestão de Pedidos em Tempo Real</h3>
+              <p className="text-slate-500 leading-relaxed">
+                Receba notificações instantâneas, altere status (preparando, entregue) e deixe seu cliente acompanhar tudo pelo navegador.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pricing Section */}
+      <div id="plans" className="py-24 bg-slate-900 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[100px] -z-10"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+           <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4">Planos que crescem com você</h2>
+            <p className="text-slate-400 max-w-2xl mx-auto">Comece grátis e faça upgrade quando suas vendas decolarem.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+            {/* Free Plan */}
+            <div className="bg-slate-800/50 p-8 rounded-3xl border border-slate-700 hover:border-slate-600 transition-all">
+              <h3 className="text-lg font-bold text-slate-300 mb-2">Start</h3>
+              <div className="flex items-baseline gap-1 mb-6">
+                <span className="text-4xl font-bold text-white">R$ 0</span>
+                <span className="text-slate-400">/mês</span>
+              </div>
+              <ul className="space-y-4 mb-8 text-slate-300 text-sm">
+                <li className="flex items-center gap-3"><Check size={16} className="text-indigo-400"/> 1 Loja Ativa</li>
+                <li className="flex items-center gap-3"><Check size={16} className="text-indigo-400"/> Até 20 Produtos</li>
+                <li className="flex items-center gap-3"><Check size={16} className="text-indigo-400"/> CRM Básico</li>
+                <li className="flex items-center gap-3"><Check size={16} className="text-indigo-400"/> Pedidos no Painel</li>
+              </ul>
+              <Link to="/register" className="block w-full py-3 bg-white/10 hover:bg-white/20 text-white text-center rounded-xl font-bold transition-all">
+                Começar Grátis
+              </Link>
+            </div>
+
+            {/* Pro Plan (Highlighted) */}
+            <div className="bg-indigo-600 p-8 rounded-3xl shadow-2xl scale-105 relative border border-indigo-400">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                Mais Popular
+              </div>
+              <h3 className="text-lg font-bold text-indigo-100 mb-2">Profissional</h3>
+              <div className="flex items-baseline gap-1 mb-6">
+                <span className="text-5xl font-bold text-white">R$ 29</span>
+                <span className="text-indigo-200">/mês</span>
+              </div>
+              <ul className="space-y-4 mb-8 text-white text-sm font-medium">
+                <li className="flex items-center gap-3"><div className="p-1 bg-white/20 rounded-full"><Check size={12}/></div> Produtos Ilimitados</li>
+                <li className="flex items-center gap-3"><div className="p-1 bg-white/20 rounded-full"><Check size={12}/></div> Personalização Avançada</li>
+                <li className="flex items-center gap-3"><div className="p-1 bg-white/20 rounded-full"><Check size={12}/></div> 0% Taxa sobre vendas</li>
+                <li className="flex items-center gap-3"><div className="p-1 bg-white/20 rounded-full"><Check size={12}/></div> Suporte Prioritário</li>
+                <li className="flex items-center gap-3"><div className="p-1 bg-white/20 rounded-full"><Check size={12}/></div> CRM Ilimitado</li>
+              </ul>
+              <Link to="/register" className="block w-full py-4 bg-white text-indigo-600 text-center rounded-xl font-bold hover:bg-slate-50 transition-all shadow-lg">
+                Testar 7 dias Grátis
+              </Link>
+            </div>
+
+            {/* Business Plan */}
+            <div className="bg-slate-800/50 p-8 rounded-3xl border border-slate-700 hover:border-slate-600 transition-all">
+              <h3 className="text-lg font-bold text-slate-300 mb-2">Business</h3>
+              <div className="flex items-baseline gap-1 mb-6">
+                <span className="text-4xl font-bold text-white">R$ 79</span>
+                <span className="text-slate-400">/mês</span>
+              </div>
+              <ul className="space-y-4 mb-8 text-slate-300 text-sm">
+                <li className="flex items-center gap-3"><Check size={16} className="text-indigo-400"/> Múltiplas Lojas</li>
+                <li className="flex items-center gap-3"><Check size={16} className="text-indigo-400"/> Domínio Personalizado</li>
+                <li className="flex items-center gap-3"><Check size={16} className="text-indigo-400"/> Relatórios Avançados</li>
+                <li className="flex items-center gap-3"><Check size={16} className="text-indigo-400"/> API de Integração</li>
+              </ul>
+              <Link to="/register" className="block w-full py-3 bg-white/10 hover:bg-white/20 text-white text-center rounded-xl font-bold transition-all">
+                Falar com Vendas
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="bg-white py-12 border-t border-slate-100">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+            <AppLogo />
+            <div className="text-slate-500 text-sm">
+              © 2024 NovaCRM. Todos os direitos reservados.
+            </div>
+            <div className="flex gap-6">
+               <a href="#" className="text-slate-400 hover:text-indigo-600 transition-colors"><Globe size={20}/></a>
+               <a href="#" className="text-slate-400 hover:text-indigo-600 transition-colors"><Smartphone size={20}/></a>
+            </div>
+         </div>
+      </footer>
+    </div>
+  );
+};
 
 // --- Auth Component ---
 const AuthPage = () => {
@@ -86,6 +286,11 @@ const AuthPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4 font-sans">
+      <div className="absolute top-6 left-6 cursor-pointer" onClick={() => navigate('/')}>
+         <div className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors">
+            <ChevronLeft size={20} /> Voltar para Home
+         </div>
+      </div>
       <div className="max-w-md w-full bg-white rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] p-10 border border-slate-100">
         <div className="flex justify-center mb-8">
           <AppLogo />
@@ -1442,11 +1647,12 @@ const App = () => {
   return (
     <HashRouter>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/register" element={<AuthPage />} />
         <Route path="/dashboard/*" element={<Dashboard />} />
         <Route path="/store/:id" element={<PublicStore />} />
-        <Route path="*" element={<AuthPage />} />
+        <Route path="*" element={<LandingPage />} />
       </Routes>
     </HashRouter>
   );
