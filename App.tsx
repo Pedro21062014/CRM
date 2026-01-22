@@ -1072,8 +1072,12 @@ const PublicStore = () => {
              const merchantDoc = await transaction.get(merchantRef);
              if(merchantDoc.exists()) {
                  const currentConfig = merchantDoc.data().storeConfig || {};
-                 const newCount = (currentConfig.ratingCount || 0) + 1;
-                 const newSum = (currentConfig.ratingSum || 0) + rating;
+                 // Ensure we are working with numbers to prevent NaN errors
+                 const currentCount = Number(currentConfig.ratingCount) || 0;
+                 const currentSum = Number(currentConfig.ratingSum) || 0;
+                 
+                 const newCount = currentCount + 1;
+                 const newSum = currentSum + rating;
                  
                  transaction.update(merchantRef, {
                      "storeConfig.ratingCount": newCount,
@@ -1086,9 +1090,13 @@ const PublicStore = () => {
           // Refresh live orders
           setLiveOrders(prev => prev.map(o => o.id === orderId ? {...o, rating} : o));
           alert("Obrigado pela avaliação!");
-      } catch (e) {
+      } catch (e: any) {
           console.error("Error rating", e);
-          alert("Erro ao enviar avaliação.");
+          if (e.code === 'permission-denied') {
+             alert("Erro de permissão. Por favor, verifique se as regras do Firebase foram atualizadas corretamente.");
+          } else {
+             alert("Erro ao enviar avaliação.");
+          }
       }
   };
 
