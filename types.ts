@@ -59,6 +59,8 @@ export interface Order {
   total: number;
   status: OrderStatus;
   createdAt: any;
+  rating?: number; // 1 to 5
+  review?: string;
 }
 
 // Store Builder Types
@@ -82,4 +84,6 @@ export interface StoreConfig {
   logoUrl?: string;
   bannerUrl?: string; // Capa estilo iFood
   sections: StoreSection[];
+  ratingSum?: number;
+  ratingCount?: number;
 }

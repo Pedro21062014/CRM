@@ -4,11 +4,11 @@ import { auth, googleProvider, db } from './firebase';
 import * as firebaseAuth from 'firebase/auth';
 const { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } = firebaseAuth as any;
 type User = any;
-import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit, runTransaction } from 'firebase/firestore';
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, Store, Settings, 
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
-  ExternalLink, Bell, Image as ImageIcon, Type, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu
+  ExternalLink, Bell, Image as ImageIcon, Type, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
@@ -165,12 +165,15 @@ const StatCard = ({ title, value, icon: Icon, colorFrom, colorTo }: any) => (
 const StoreEditor = ({ user }: { user: User }) => {
   const [config, setConfig] = useState<StoreConfig>({
     storeName: 'Minha Loja',
-    themeColor: '#ea1d2c', // Cor padrão estilo iFood
+    themeColor: '#ea1d2c',
     sections: []
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  
+  // Fake products for preview
+  const [previewProducts, setPreviewProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -180,17 +183,24 @@ const StoreEditor = ({ user }: { user: User }) => {
         if (docSnap.exists() && docSnap.data().storeConfig) {
           setConfig(docSnap.data().storeConfig);
         } else {
-          // Configuração Inicial Padrão
-          const initialConfig: StoreConfig = {
+          // Default Config
+          setConfig({
             storeName: user.displayName || 'Minha Loja',
             description: 'A melhor comida da região! Entregamos rápido.',
             themeColor: '#ea1d2c',
             sections: [
               { id: '2', type: 'products', title: 'Destaques', backgroundColor: '#ffffff' }
             ]
-          };
-          setConfig(initialConfig);
+          });
         }
+        
+        // Fetch a few products for preview
+        const pQuery = query(collection(db, `merchants/${user.uid}/products`), limit(4));
+        const pSnap = await getDocs(pQuery);
+        const pList: Product[] = [];
+        pSnap.forEach(d => pList.push({id: d.id, ...d.data()} as Product));
+        setPreviewProducts(pList);
+
       } catch(e) {
         console.error("Error loading store config", e);
       } finally {
@@ -252,174 +262,192 @@ const StoreEditor = ({ user }: { user: User }) => {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
+    <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
+      {/* Top Bar */}
+      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100 shrink-0">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Editor de Loja</h2>
-          <p className="text-slate-500 text-sm">Personalize a aparência estilo "Delivery App"</p>
+          <h2 className="text-xl font-bold text-slate-800">Editor Visual</h2>
         </div>
-        <div className="flex gap-3 w-full md:w-auto">
-          <a href={publicLink} target="_blank" rel="noopener noreferrer" className="px-4 py-2.5 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 flex-1 md:flex-none">
-            <ExternalLink size={16} /> Ver Loja
+        <div className="flex gap-3">
+          <a href={publicLink} target="_blank" rel="noopener noreferrer" className="px-4 py-2 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 text-sm">
+            <ExternalLink size={14} /> Ver Loja
           </a>
-          <button onClick={saveConfig} disabled={saving} className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-md shadow-indigo-100 disabled:opacity-50 transition-all flex-1 md:flex-none">
-            {saving ? 'Salvando...' : 'Salvar'}
+          <button onClick={saveConfig} disabled={saving} className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-md transition-all text-sm">
+            {saving ? 'Salvando...' : 'Salvar Alterações'}
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
-        {/* Settings Panel */}
-        <div className="lg:col-span-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Identidade da Loja</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nome da Loja</label>
-                <input 
-                  type="text" 
-                  value={config.storeName} 
-                  onChange={e => setConfig({...config, storeName: e.target.value})}
-                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                />
-              </div>
-               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Descrição Curta / Slogan</label>
-                <input 
-                  type="text" 
-                  value={config.description || ''} 
-                  onChange={e => setConfig({...config, description: e.target.value})}
-                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                  placeholder="Ex: Aberto das 18h às 23h"
-                />
-              </div>
-               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">URL do Logo (Quadrado)</label>
-                <input 
-                  type="text" 
-                  value={config.logoUrl || ''} 
-                  onChange={e => setConfig({...config, logoUrl: e.target.value})}
-                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                  placeholder="https://imgur.com/..."
-                />
-              </div>
-               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">URL do Banner de Capa</label>
-                <input 
-                  type="text" 
-                  value={config.bannerUrl || ''} 
-                  onChange={e => setConfig({...config, bannerUrl: e.target.value})}
-                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-                  placeholder="https://imgur.com/..."
-                />
-              </div>
-               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Cor Principal</label>
-                 <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                    <input 
-                    type="color" 
-                    value={config.themeColor || '#ea1d2c'}
-                    onChange={e => setConfig({...config, themeColor: e.target.value})}
-                    className="w-10 h-10 border-none rounded-lg cursor-pointer bg-transparent"
-                    />
-                    <span className="text-sm font-mono text-slate-500 uppercase">{config.themeColor}</span>
-                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Adicionar Seção</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => addSection('products')} className="p-4 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-xs font-medium text-slate-600 group">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg group-hover:scale-110 transition-transform"><LayoutGrid size={20} /></div> Cardápio/Produtos
-              </button>
-              <button onClick={() => addSection('hero')} className="p-4 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-xs font-medium text-slate-600 group">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover:scale-110 transition-transform"><ImageIcon size={20} /></div> Banner Promo
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Organização</h3>
-             <div className="space-y-2">
-               {config.sections.map((section, idx) => (
-                 <div key={section.id} className={`p-3 border rounded-xl flex items-center justify-between transition-all ${activeSectionId === section.id ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
-                    <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => setActiveSectionId(section.id)}>
-                      <span className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">#{idx + 1}</span>
-                      <span className="text-sm font-medium text-slate-700 capitalize">{section.type === 'hero' ? 'Banner' : section.type === 'products' ? 'Cardápio' : 'Texto'}</span>
+      <div className="flex flex-1 gap-6 overflow-hidden">
+        {/* LEFT COLUMN: Controls */}
+        <div className="w-1/2 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar pb-10">
+            
+            {/* Identity Control */}
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Settings size={18}/> Identidade Visual</h3>
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome da Loja</label>
+                        <input className="w-full p-2 border rounded-lg mt-1" value={config.storeName} onChange={e => setConfig({...config, storeName: e.target.value})} />
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => moveSection(idx, 'up')} disabled={idx === 0} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md disabled:opacity-30"><ChevronUp size={14}/></button>
-                      <button onClick={() => moveSection(idx, 'down')} disabled={idx === config.sections.length - 1} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md disabled:opacity-30"><ChevronDown size={14}/></button>
-                      <button onClick={() => removeSection(section.id)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md ml-1"><Trash2 size={14}/></button>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição / Slogan</label>
+                        <input className="w-full p-2 border rounded-lg mt-1" value={config.description || ''} onChange={e => setConfig({...config, description: e.target.value})} />
                     </div>
-                 </div>
-               ))}
-               {config.sections.length === 0 && <div className="text-center py-6 text-sm text-slate-400 italic bg-slate-50 rounded-xl border border-dashed border-slate-200">Nenhuma seção adicionada.</div>}
-             </div>
-          </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cor Principal</label>
+                            <div className="flex items-center gap-2 mt-1 border rounded-lg p-1">
+                                <input type="color" className="w-8 h-8 rounded cursor-pointer border-none bg-transparent" value={config.themeColor} onChange={e => setConfig({...config, themeColor: e.target.value})} />
+                                <span className="text-xs text-slate-500">{config.themeColor}</span>
+                            </div>
+                        </div>
+                         <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Logo & Banner</label>
+                            <div className="flex flex-col gap-2 mt-1">
+                                <input className="w-full p-2 text-xs border rounded-lg" placeholder="URL do Logo" value={config.logoUrl || ''} onChange={e => setConfig({...config, logoUrl: e.target.value})} />
+                                <input className="w-full p-2 text-xs border rounded-lg" placeholder="URL do Banner" value={config.bannerUrl || ''} onChange={e => setConfig({...config, bannerUrl: e.target.value})} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Sections List */}
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                <div className="flex justify-between items-center mb-4">
+                     <h3 className="font-bold text-slate-700 flex items-center gap-2"><LayoutGrid size={18}/> Seções da Loja</h3>
+                     <div className="flex gap-2">
+                         <button onClick={() => addSection('hero')} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-600" title="Add Banner"><ImageIcon size={16}/></button>
+                         <button onClick={() => addSection('products')} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-600" title="Add Produtos"><ShoppingBag size={16}/></button>
+                         <button onClick={() => addSection('text')} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-600" title="Add Texto"><Type size={16}/></button>
+                     </div>
+                </div>
+                
+                <div className="space-y-2">
+                    {config.sections.map((section, idx) => (
+                        <div key={section.id} className={`border rounded-lg transition-all ${activeSectionId === section.id ? 'border-indigo-500 bg-indigo-50/50' : 'border-slate-200 bg-white'}`}>
+                            <div className="flex items-center justify-between p-3 cursor-pointer" onClick={() => setActiveSectionId(activeSectionId === section.id ? null : section.id)}>
+                                <span className="font-medium text-sm text-slate-700">
+                                    {section.type === 'hero' ? 'Banner' : section.type === 'products' ? 'Lista de Produtos' : 'Texto'}
+                                    <span className="text-slate-400 font-normal ml-2 text-xs">#{idx+1}</span>
+                                </span>
+                                <div className="flex items-center gap-1">
+                                    <button onClick={(e) => {e.stopPropagation(); moveSection(idx, 'up')}} className="p-1 hover:bg-slate-200 rounded text-slate-400"><ChevronUp size={14}/></button>
+                                    <button onClick={(e) => {e.stopPropagation(); moveSection(idx, 'down')}} className="p-1 hover:bg-slate-200 rounded text-slate-400"><ChevronDown size={14}/></button>
+                                    <button onClick={(e) => {e.stopPropagation(); removeSection(section.id)}} className="p-1 hover:bg-red-100 text-red-400 rounded"><Trash2 size={14}/></button>
+                                </div>
+                            </div>
+                            
+                            {/* Inline Editor */}
+                            {activeSectionId === section.id && (
+                                <div className="p-3 border-t border-indigo-100 bg-white rounded-b-lg space-y-3 animate-in slide-in-from-top-2">
+                                    <input className="w-full p-2 border rounded text-sm" placeholder="Título da Seção" value={section.title || ''} onChange={e => updateSection(section.id, {title: e.target.value})} />
+                                    {(section.type === 'hero' || section.type === 'text') && (
+                                        <textarea className="w-full p-2 border rounded text-sm" rows={2} placeholder="Conteúdo / Subtítulo" value={section.content || ''} onChange={e => updateSection(section.id, {content: e.target.value})} />
+                                    )}
+                                    {(section.type === 'hero' || section.type === 'image') && (
+                                        <input className="w-full p-2 border rounded text-sm" placeholder="URL da Imagem de Fundo" value={section.imageUrl || ''} onChange={e => updateSection(section.id, {imageUrl: e.target.value})} />
+                                    )}
+                                    <div className="flex gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-[10px] font-bold uppercase text-slate-400">Fundo</label>
+                                            <input type="color" className="w-6 h-6 border-none bg-transparent cursor-pointer" value={section.backgroundColor || '#ffffff'} onChange={e => updateSection(section.id, {backgroundColor: e.target.value})} />
+                                        </div>
+                                         <div className="flex items-center gap-2">
+                                            <label className="text-[10px] font-bold uppercase text-slate-400">Texto</label>
+                                            <input type="color" className="w-6 h-6 border-none bg-transparent cursor-pointer" value={section.textColor || '#000000'} onChange={e => updateSection(section.id, {textColor: e.target.value})} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                    {config.sections.length === 0 && <p className="text-center text-slate-400 text-sm py-4">Nenhuma seção adicionada.</p>}
+                </div>
+            </div>
         </div>
 
-        {/* Detail Editor */}
-        <div className="lg:col-span-2 flex flex-col h-full">
-          {activeSectionId ? (
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-indigo-100 h-full overflow-y-auto animate-in slide-in-from-right-4">
-              <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Edit2 size={18} className="text-indigo-600"/> Editando Detalhes</h3>
-                <button onClick={() => setActiveSectionId(null)} className="text-sm text-slate-500 hover:text-indigo-600 font-medium transition-colors">Concluir</button>
-              </div>
-              
-              {(() => {
-                const section = config.sections.find(s => s.id === activeSectionId);
-                if (!section) return null;
-
-                return (
-                  <div className="space-y-6 max-w-2xl mx-auto">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Título da Seção</label>
-                      <input 
-                        type="text" 
-                        value={section.title || ''} 
-                        onChange={e => updateSection(section.id, { title: e.target.value })}
-                        className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                      />
+        {/* RIGHT COLUMN: Mobile Preview */}
+        <div className="w-1/2 bg-slate-100 rounded-2xl border border-slate-200 flex items-center justify-center p-8 relative overflow-hidden">
+            <div className="absolute top-4 left-4 text-xs font-bold text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded">Preview em Tempo Real</div>
+            
+            {/* Phone Mockup */}
+            <div className="w-[340px] h-[680px] bg-white rounded-[40px] shadow-2xl border-8 border-slate-800 overflow-hidden relative flex flex-col">
+                {/* Phone Notch */}
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-slate-800 rounded-b-2xl z-20"></div>
+                
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto hide-scrollbar bg-gray-50">
+                    {/* Preview Header */}
+                    <div className="bg-white pb-4 shadow-sm relative">
+                        <div className="h-24 w-full bg-cover bg-center" style={{ 
+                            backgroundImage: config.bannerUrl ? `url(${config.bannerUrl})` : 'linear-gradient(to right, #ea1d2c, #b91c1c)',
+                            backgroundColor: config.themeColor 
+                        }}></div>
+                        <div className="px-4 -mt-8 flex gap-3 relative z-10">
+                            <div className="w-16 h-16 rounded-full border-2 border-white bg-white shadow overflow-hidden">
+                                {config.logoUrl ? <img src={config.logoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center" style={{color: config.themeColor}}><Store size={24}/></div>}
+                            </div>
+                            <div className="pt-9">
+                                <h1 className="font-bold text-slate-800 text-sm leading-tight">{config.storeName}</h1>
+                                <p className="text-[10px] text-slate-500 mt-0.5">{config.description}</p>
+                            </div>
+                        </div>
                     </div>
-                    {(section.type === 'hero' || section.type === 'text') && (
-                      <div>
-                         <label className="block text-sm font-medium text-slate-700 mb-1.5">Conteúdo / Subtítulo</label>
-                         <textarea 
-                           rows={4}
-                           value={section.content || ''} 
-                           onChange={e => updateSection(section.id, { content: e.target.value })}
-                           className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                         />
-                      </div>
-                    )}
-                    {(section.type === 'hero' || section.type === 'image') && (
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">URL da Imagem</label>
-                        <input 
-                           type="text" 
-                           placeholder="https://exemplo.com/imagem.jpg"
-                           value={section.imageUrl || ''} 
-                           onChange={e => updateSection(section.id, { imageUrl: e.target.value })}
-                           className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+
+                    {/* Preview Sections */}
+                    <div className="pb-10">
+                        {config.sections.map(section => {
+                            if (section.type === 'products') {
+                                return (
+                                    <div key={section.id} className="p-4">
+                                        <h2 className="font-bold text-slate-800 text-sm mb-3">{section.title || 'Produtos'}</h2>
+                                        <div className="space-y-3">
+                                            {(previewProducts.length > 0 ? previewProducts : [1,2]).map((p: any, i) => (
+                                                <div key={i} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex gap-3">
+                                                    <div className="flex-1">
+                                                        <div className="h-3 w-24 bg-slate-200 rounded mb-2"></div>
+                                                        <div className="h-2 w-full bg-slate-100 rounded mb-1"></div>
+                                                        <div className="h-2 w-16 bg-slate-100 rounded"></div>
+                                                    </div>
+                                                    <div className="w-16 h-16 bg-slate-100 rounded-lg"></div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )
+                            }
+                            if (section.type === 'hero') return (
+                                <div key={section.id} className="mx-4 mt-4 h-32 rounded-xl flex items-center justify-center text-center p-4 bg-cover bg-center" style={{
+                                    backgroundColor: section.backgroundColor, 
+                                    backgroundImage: section.imageUrl ? `linear-gradient(rgba(0,0,0,0.3),rgba(0,0,0,0.3)), url(${section.imageUrl})` : 'none',
+                                    color: section.textColor
+                                }}>
+                                    <div>
+                                        <h2 className="font-bold text-lg leading-tight">{section.title}</h2>
+                                        <p className="text-xs opacity-90">{section.content}</p>
+                                    </div>
+                                </div>
+                            );
+                            if (section.type === 'text') return (
+                                <div key={section.id} className="p-4 text-center" style={{backgroundColor: section.backgroundColor, color: section.textColor}}>
+                                    <h3 className="font-bold mb-1">{section.title}</h3>
+                                    <p className="text-xs">{section.content}</p>
+                                </div>
+                            )
+                            return null;
+                        })}
+                    </div>
+                </div>
+
+                {/* Fake Bottom Bar */}
+                <div className="h-12 bg-white border-t flex justify-around items-center px-4">
+                    <div className="w-6 h-6 rounded-full bg-slate-100"></div>
+                    <div className="w-6 h-6 rounded-full bg-slate-100"></div>
+                    <div className="w-6 h-6 rounded-full bg-slate-100"></div>
+                </div>
             </div>
-          ) : (
-             <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl h-full flex flex-col items-center justify-center text-slate-400 gap-4">
-               <div className="p-4 bg-white rounded-full shadow-sm">
-                 <Edit2 size={32} className="text-slate-300" />
-               </div>
-               <p className="font-medium">Selecione uma seção à esquerda para editar</p>
-             </div>
-          )}
         </div>
       </div>
     </div>
@@ -692,6 +720,11 @@ const OrdersManager = ({ user }: { user: User }) => {
                   <span className="font-mono text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">#{order.id.slice(-6)}</span>
                   {getStatusBadge(order.status)}
                   <span className="text-xs text-slate-400 flex items-center gap-1">• {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleString() : ''}</span>
+                  {order.rating && (
+                     <div className="flex items-center gap-1 ml-2 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-100">
+                        <Star size={12} className="text-amber-500 fill-amber-500"/> <span className="text-xs font-bold text-amber-600">{order.rating}</span>
+                     </div>
+                  )}
                 </div>
                 <h4 className="font-bold text-slate-800 text-lg">{order.customerName}</h4>
                  <div className="text-sm text-slate-500 mb-3 flex flex-col">
@@ -958,14 +991,15 @@ const PublicStore = () => {
     street: '', number: '', neighborhood: '', city: '', zip: '', complement: ''
   });
 
-  const [myOrders, setMyOrders] = useState<any[]>([]);
+  const [localOrderHistory, setLocalOrderHistory] = useState<any[]>([]); // Static local storage data
+  const [liveOrders, setLiveOrders] = useState<Order[]>([]); // Data fetched from firestore
 
   useEffect(() => {
     if (!id) return;
     
     // Load local history
     const saved = localStorage.getItem(`my_orders_${id}`);
-    if(saved) setMyOrders(JSON.parse(saved));
+    if(saved) setLocalOrderHistory(JSON.parse(saved));
 
     const fetchData = async () => {
       // 1. Get Store Config
@@ -988,6 +1022,29 @@ const PublicStore = () => {
     fetchData();
   }, [id]);
 
+  // Fetch live order status when modal is open
+  useEffect(() => {
+    if (isOrdersOpen && localOrderHistory.length > 0 && id) {
+        const fetchStatus = async () => {
+            const ordersList: Order[] = [];
+            for (const localOrder of localOrderHistory) {
+                try {
+                    const docSnap = await getDoc(doc(db, `merchants/${id}/orders`, localOrder.id));
+                    if(docSnap.exists()) {
+                        ordersList.push({ id: docSnap.id, ...docSnap.data() } as Order);
+                    }
+                } catch(e) {
+                    console.error("Error fetching order status", e);
+                }
+            }
+            // Sort by date desc
+            ordersList.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds);
+            setLiveOrders(ordersList);
+        };
+        fetchStatus();
+    }
+  }, [isOrdersOpen, localOrderHistory, id]);
+
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(item => item.product.id === product.id);
@@ -1000,6 +1057,39 @@ const PublicStore = () => {
 
   const removeFromCart = (productId: string) => {
     setCart(prev => prev.filter(item => item.product.id !== productId));
+  };
+
+  const handleRating = async (orderId: string, rating: number) => {
+      if(!id) return;
+      try {
+          await runTransaction(db, async (transaction) => {
+             // 1. Update Order
+             const orderRef = doc(db, `merchants/${id}/orders`, orderId);
+             transaction.update(orderRef, { rating });
+
+             // 2. Update Merchant Stats
+             const merchantRef = doc(db, 'merchants', id);
+             const merchantDoc = await transaction.get(merchantRef);
+             if(merchantDoc.exists()) {
+                 const currentConfig = merchantDoc.data().storeConfig || {};
+                 const newCount = (currentConfig.ratingCount || 0) + 1;
+                 const newSum = (currentConfig.ratingSum || 0) + rating;
+                 
+                 transaction.update(merchantRef, {
+                     "storeConfig.ratingCount": newCount,
+                     "storeConfig.ratingSum": newSum
+                 });
+                 // Update local config state to reflect change immediately
+                 setConfig(prev => prev ? ({...prev, ratingCount: newCount, ratingSum: newSum}) : null);
+             }
+          });
+          // Refresh live orders
+          setLiveOrders(prev => prev.map(o => o.id === orderId ? {...o, rating} : o));
+          alert("Obrigado pela avaliação!");
+      } catch (e) {
+          console.error("Error rating", e);
+          alert("Erro ao enviar avaliação.");
+      }
   };
 
   const handleCheckout = async (e: React.FormEvent) => {
@@ -1065,8 +1155,8 @@ const PublicStore = () => {
       }
 
       // 3. Local History
-      const newHistory = [{ id: orderRef.id, date: new Date().toISOString(), status: 'new', total }, ...myOrders];
-      setMyOrders(newHistory);
+      const newHistory = [{ id: orderRef.id, date: new Date().toISOString(), status: 'new', total }, ...localOrderHistory];
+      setLocalOrderHistory(newHistory);
       localStorage.setItem(`my_orders_${id}`, JSON.stringify(newHistory));
 
       alert('Pedido realizado com sucesso!');
@@ -1080,6 +1170,8 @@ const PublicStore = () => {
   };
 
   if (!config) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-indigo-600" size={40}/></div>;
+
+  const averageRating = (config.ratingSum && config.ratingCount) ? (config.ratingSum / config.ratingCount).toFixed(1) : '5.0';
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-20">
@@ -1106,12 +1198,12 @@ const PublicStore = () => {
                  <div className="flex-1 pt-2 md:pt-0">
                      <h1 className="text-2xl md:text-3xl font-bold text-slate-800">{config.storeName}</h1>
                      <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mt-1">
-                        <span className="flex items-center gap-1 text-amber-500 font-bold"><Star size={14} fill="currentColor" /> 4.8</span>
+                        <span className="flex items-center gap-1 text-amber-500 font-bold"><Star size={14} fill="currentColor" /> {averageRating}</span>
                         <span>• {config.description || 'Lanches • Bebidas • Sobremesas'}</span>
                      </div>
                  </div>
                  <div className="mt-4 md:mt-0 flex gap-2 w-full md:w-auto">
-                    {myOrders.length > 0 && (
+                    {localOrderHistory.length > 0 && (
                         <button onClick={() => setIsOrdersOpen(true)} className="flex-1 md:flex-none px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
                             <History size={18}/> Pedidos
                         </button>
@@ -1271,20 +1363,45 @@ const PublicStore = () => {
                       <h3 className="font-bold text-slate-800">Meus Pedidos Recentes</h3>
                       <button onClick={() => setIsOrdersOpen(false)}><X size={20} className="text-gray-400"/></button>
                   </div>
-                  <div className="p-4 overflow-y-auto space-y-3">
-                      {myOrders.length === 0 ? (
-                          <p className="text-center text-gray-500 py-8">Você ainda não fez pedidos neste navegador.</p>
+                  <div className="p-4 overflow-y-auto space-y-3 bg-gray-50">
+                      {liveOrders.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-10">
+                              <Loader2 className="animate-spin text-slate-300 mb-2"/>
+                              <p className="text-center text-gray-400 text-sm">Buscando status...</p>
+                          </div>
                       ) : (
-                          myOrders.map((o, i) => (
-                              <div key={i} className="p-4 border border-slate-100 rounded-xl bg-white shadow-sm">
+                          liveOrders.map((o) => (
+                              <div key={o.id} className="p-4 border border-slate-100 rounded-xl bg-white shadow-sm">
                                   <div className="flex justify-between mb-2">
                                       <span className="font-mono text-xs text-slate-400">#{o.id.slice(-6)}</span>
-                                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 uppercase">{o.status || 'Enviado'}</span>
+                                      {o.status === OrderStatus.NEW && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-600">ENVIADO</span>}
+                                      {o.status === OrderStatus.PROCESSING && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-600">PREPARANDO</span>}
+                                      {o.status === OrderStatus.COMPLETED && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600">ENTREGUE</span>}
+                                      {o.status === OrderStatus.CANCELLED && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">CANCELADO</span>}
                                   </div>
-                                  <div className="flex justify-between items-end">
-                                      <p className="text-sm text-slate-500">{new Date(o.date).toLocaleDateString()}</p>
+                                  <div className="flex justify-between items-end mb-2">
+                                      <p className="text-sm text-slate-500">{new Date(o.createdAt.seconds * 1000).toLocaleDateString()}</p>
                                       <p className="font-bold text-slate-800">R$ {o.total.toFixed(2)}</p>
                                   </div>
+                                  
+                                  {/* RATING AREA */}
+                                  {o.status === OrderStatus.COMPLETED && !o.rating && (
+                                      <div className="mt-3 pt-3 border-t border-dashed border-gray-100">
+                                          <p className="text-xs text-center text-slate-500 mb-2">Avalie sua experiência:</p>
+                                          <div className="flex justify-center gap-2">
+                                              {[1,2,3,4,5].map(star => (
+                                                  <button key={star} onClick={() => handleRating(o.id, star)} className="p-1 hover:scale-110 transition-transform">
+                                                      <Star size={20} className="text-slate-300 hover:text-amber-400 hover:fill-amber-400"/>
+                                                  </button>
+                                              ))}
+                                          </div>
+                                      </div>
+                                  )}
+                                  {o.rating && (
+                                     <div className="mt-2 text-center text-xs text-amber-500 font-bold flex items-center justify-center gap-1">
+                                         <Star size={12} fill="currentColor"/> Você avaliou com {o.rating} estrelas
+                                     </div>
+                                  )}
                               </div>
                           ))
                       )}
