@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import * as firebaseAuth from "firebase/auth";
+const { getAuth, GoogleAuthProvider } = firebaseAuth as any;
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {

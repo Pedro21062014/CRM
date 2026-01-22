@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import * as firebaseAuth from 'firebase/auth';
+const { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } = firebaseAuth as any;
+type User = any;
 import { collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, Store, Settings, 
@@ -452,16 +454,18 @@ const ProductsManager = ({ user }: { user: User }) => {
         updatedAt: serverTimestamp()
       };
 
-      if (editing) {
+      // CORRECTION: Check if editing.id exists explicitly. 
+      // Checking only (editing) is true for empty objects {}, leading to undefined ID errors.
+      if (editing && editing.id) {
         await updateDoc(doc(db, `merchants/${user.uid}/products`, editing.id), payload);
       } else {
         await addDoc(collection(db, `merchants/${user.uid}/products`), { ...payload, createdAt: serverTimestamp() });
       }
       setEditing(null);
       setFormData({});
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Erro ao salvar produto');
+      alert(`Erro ao salvar produto: ${err.message}`);
     }
   };
 
@@ -746,7 +750,7 @@ const Dashboard = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser: any) => {
       if (!currentUser) navigate('/login');
       else setUser(currentUser);
     });
