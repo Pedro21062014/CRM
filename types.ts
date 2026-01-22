@@ -6,6 +6,8 @@ export interface Product {
   category: string;
   imageUrl?: string;
   stock: number;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface Client {
@@ -13,7 +15,16 @@ export interface Client {
   name: string;
   email: string;
   phone: string;
-  notes?: string;
+  address?: {
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    zip: string;
+    complement?: string;
+  };
+  lastOrderDate?: any;
+  totalOrders?: number;
   createdAt: any;
 }
 
@@ -26,13 +37,24 @@ export enum OrderStatus {
 
 export interface Order {
   id: string;
+  merchantId?: string; // Para rastreamento local
   customerName: string;
   customerEmail: string;
+  customerPhone: string;
+  deliveryAddress: {
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    zip: string;
+    complement?: string;
+  };
   items: Array<{
     productId: string;
     productName: string;
     quantity: number;
     price: number;
+    imageUrl?: string;
   }>;
   total: number;
   status: OrderStatus;
@@ -55,7 +77,9 @@ export interface StoreSection {
 
 export interface StoreConfig {
   storeName: string;
+  description?: string; // Slogan ou info extra (ex: "Aberto das 18h as 23h")
   themeColor: string;
   logoUrl?: string;
+  bannerUrl?: string; // Capa estilo iFood
   sections: StoreSection[];
 }

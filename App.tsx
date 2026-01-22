@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
 import * as firebaseAuth from 'firebase/auth';
 const { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } = firebaseAuth as any;
 type User = any;
-import { collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit } from 'firebase/firestore';
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, Store, Settings, 
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
-  ExternalLink, Bell, Image as ImageIcon, Type, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag
+  ExternalLink, Bell, Image as ImageIcon, Type, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
@@ -24,13 +24,12 @@ const LoadingSpinner = () => (
 
 const AppLogo = ({ collapsed }: { collapsed?: boolean }) => (
   <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} transition-all duration-300 group`}>
-    <div className="bg-gradient-to-br from-indigo-600 to-violet-600 text-white p-2.5 rounded-xl shadow-lg shadow-indigo-200 group-hover:shadow-indigo-300 transition-all duration-300 transform group-hover:scale-105">
-      <Rocket size={22} strokeWidth={2.5} />
+    <div className="bg-indigo-600 text-white p-2 rounded-lg shadow-lg shadow-indigo-200 group-hover:bg-indigo-700 transition-all duration-300 transform group-hover:scale-105">
+      <Rocket size={20} strokeWidth={2.5} />
     </div>
     {!collapsed && (
       <div className="flex flex-col animate-in fade-in duration-300">
         <span className="font-bold text-xl text-slate-900 tracking-tight leading-none font-sans">Nova<span className="text-indigo-600">CRM</span></span>
-        <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mt-0.5">Store Builder</span>
       </div>
     )}
   </div>
@@ -41,7 +40,7 @@ const PrimaryButton = ({ children, onClick, className, disabled, type = 'button'
     type={type}
     onClick={onClick}
     disabled={disabled}
-    className={`bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 px-5 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${className}`}
+    className={`bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${className}`}
   >
     {children}
   </button>
@@ -166,7 +165,7 @@ const StatCard = ({ title, value, icon: Icon, colorFrom, colorTo }: any) => (
 const StoreEditor = ({ user }: { user: User }) => {
   const [config, setConfig] = useState<StoreConfig>({
     storeName: 'Minha Loja',
-    themeColor: '#0f172a',
+    themeColor: '#ea1d2c', // Cor padrão estilo iFood
     sections: []
   });
   const [saving, setSaving] = useState(false);
@@ -181,12 +180,13 @@ const StoreEditor = ({ user }: { user: User }) => {
         if (docSnap.exists() && docSnap.data().storeConfig) {
           setConfig(docSnap.data().storeConfig);
         } else {
+          // Configuração Inicial Padrão
           const initialConfig: StoreConfig = {
-            storeName: 'Nova Loja',
-            themeColor: '#0f172a',
+            storeName: user.displayName || 'Minha Loja',
+            description: 'A melhor comida da região! Entregamos rápido.',
+            themeColor: '#ea1d2c',
             sections: [
-              { id: '1', type: 'hero', title: 'Bem Vindo', content: 'Os melhores produtos para você', backgroundColor: '#1e293b', textColor: '#ffffff' },
-              { id: '2', type: 'products', title: 'Produtos em Destaque', backgroundColor: '#f8fafc' }
+              { id: '2', type: 'products', title: 'Destaques', backgroundColor: '#ffffff' }
             ]
           };
           setConfig(initialConfig);
@@ -215,7 +215,7 @@ const StoreEditor = ({ user }: { user: User }) => {
     const newSection: StoreSection = {
       id: Date.now().toString(),
       type,
-      title: type === 'hero' ? 'Novo Banner' : type === 'products' ? 'Meus Produtos' : 'Nova Seção de Texto',
+      title: type === 'hero' ? 'Novo Banner' : type === 'products' ? 'Cardápio / Produtos' : 'Nova Seção de Texto',
       content: type === 'text' ? 'Digite seu texto aqui...' : 'Subtítulo do banner',
       backgroundColor: '#ffffff',
       textColor: '#000000'
@@ -256,7 +256,7 @@ const StoreEditor = ({ user }: { user: User }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Editor de Loja</h2>
-          <p className="text-slate-500 text-sm">Personalize a aparência da sua loja virtual</p>
+          <p className="text-slate-500 text-sm">Personalize a aparência estilo "Delivery App"</p>
         </div>
         <div className="flex gap-3 w-full md:w-auto">
           <a href={publicLink} target="_blank" rel="noopener noreferrer" className="px-4 py-2.5 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2 flex-1 md:flex-none">
@@ -272,7 +272,7 @@ const StoreEditor = ({ user }: { user: User }) => {
         {/* Settings Panel */}
         <div className="lg:col-span-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Geral</h3>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Identidade da Loja</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Nome da Loja</label>
@@ -283,32 +283,71 @@ const StoreEditor = ({ user }: { user: User }) => {
                   className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
                 />
               </div>
+               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Descrição Curta / Slogan</label>
+                <input 
+                  type="text" 
+                  value={config.description || ''} 
+                  onChange={e => setConfig({...config, description: e.target.value})}
+                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                  placeholder="Ex: Aberto das 18h às 23h"
+                />
+              </div>
+               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">URL do Logo (Quadrado)</label>
+                <input 
+                  type="text" 
+                  value={config.logoUrl || ''} 
+                  onChange={e => setConfig({...config, logoUrl: e.target.value})}
+                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                  placeholder="https://imgur.com/..."
+                />
+              </div>
+               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">URL do Banner de Capa</label>
+                <input 
+                  type="text" 
+                  value={config.bannerUrl || ''} 
+                  onChange={e => setConfig({...config, bannerUrl: e.target.value})}
+                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                  placeholder="https://imgur.com/..."
+                />
+              </div>
+               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Cor Principal</label>
+                 <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                    <input 
+                    type="color" 
+                    value={config.themeColor || '#ea1d2c'}
+                    onChange={e => setConfig({...config, themeColor: e.target.value})}
+                    className="w-10 h-10 border-none rounded-lg cursor-pointer bg-transparent"
+                    />
+                    <span className="text-sm font-mono text-slate-500 uppercase">{config.themeColor}</span>
+                 </div>
+              </div>
             </div>
           </div>
 
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Adicionar Elemento</h3>
-            <div className="grid grid-cols-3 gap-3">
-              <button onClick={() => addSection('hero')} className="p-4 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-xs font-medium text-slate-600 group">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover:scale-110 transition-transform"><ImageIcon size={20} /></div> Banner
-              </button>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Adicionar Seção</h3>
+            <div className="grid grid-cols-2 gap-3">
               <button onClick={() => addSection('products')} className="p-4 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-xs font-medium text-slate-600 group">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg group-hover:scale-110 transition-transform"><LayoutGrid size={20} /></div> Produtos
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg group-hover:scale-110 transition-transform"><LayoutGrid size={20} /></div> Cardápio/Produtos
               </button>
-              <button onClick={() => addSection('text')} className="p-4 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-xs font-medium text-slate-600 group">
-                <div className="p-2 bg-amber-50 text-amber-600 rounded-lg group-hover:scale-110 transition-transform"><Type size={20} /></div> Texto
+              <button onClick={() => addSection('hero')} className="p-4 border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 hover:shadow-sm transition-all flex flex-col items-center gap-2 text-xs font-medium text-slate-600 group">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover:scale-110 transition-transform"><ImageIcon size={20} /></div> Banner Promo
               </button>
             </div>
           </div>
 
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Camadas</h3>
+             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Organização</h3>
              <div className="space-y-2">
                {config.sections.map((section, idx) => (
                  <div key={section.id} className={`p-3 border rounded-xl flex items-center justify-between transition-all ${activeSectionId === section.id ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'}`}>
                     <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => setActiveSectionId(section.id)}>
                       <span className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">#{idx + 1}</span>
-                      <span className="text-sm font-medium text-slate-700 capitalize">{section.type === 'hero' ? 'Banner' : section.type === 'products' ? 'Grade Produtos' : 'Texto'}</span>
+                      <span className="text-sm font-medium text-slate-700 capitalize">{section.type === 'hero' ? 'Banner' : section.type === 'products' ? 'Cardápio' : 'Texto'}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <button onClick={() => moveSection(idx, 'up')} disabled={idx === 0} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md disabled:opacity-30"><ChevronUp size={14}/></button>
@@ -322,7 +361,7 @@ const StoreEditor = ({ user }: { user: User }) => {
           </div>
         </div>
 
-        {/* Live Preview / Detail Editor */}
+        {/* Detail Editor */}
         <div className="lg:col-span-2 flex flex-col h-full">
           {activeSectionId ? (
             <div className="bg-white p-6 rounded-2xl shadow-lg border border-indigo-100 h-full overflow-y-auto animate-in slide-in-from-right-4">
@@ -359,48 +398,16 @@ const StoreEditor = ({ user }: { user: User }) => {
                     )}
                     {(section.type === 'hero' || section.type === 'image') && (
                       <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">URL da Imagem de Fundo</label>
-                        <div className="flex gap-2">
-                            <div className="relative flex-1">
-                                <ImageIcon size={16} className="absolute left-3 top-3.5 text-slate-400" />
-                                <input 
-                                type="text" 
-                                placeholder="https://exemplo.com/imagem.jpg"
-                                value={section.imageUrl || ''} 
-                                onChange={e => updateSection(section.id, { imageUrl: e.target.value })}
-                                className="w-full pl-10 p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                />
-                            </div>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-2">Recomendamos usar imagens hospedadas (ex: Imgur, Unsplash).</p>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">URL da Imagem</label>
+                        <input 
+                           type="text" 
+                           placeholder="https://exemplo.com/imagem.jpg"
+                           value={section.imageUrl || ''} 
+                           onChange={e => updateSection(section.id, { imageUrl: e.target.value })}
+                           className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                        />
                       </div>
                     )}
-                    <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-100">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Cor de Fundo</label>
-                        <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                          <input 
-                            type="color" 
-                            value={section.backgroundColor || '#ffffff'}
-                            onChange={e => updateSection(section.id, { backgroundColor: e.target.value })}
-                            className="w-10 h-10 border-none rounded-lg cursor-pointer bg-transparent"
-                          />
-                          <span className="text-sm font-mono text-slate-500 uppercase">{section.backgroundColor}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Cor do Texto</label>
-                         <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
-                          <input 
-                            type="color" 
-                            value={section.textColor || '#000000'}
-                            onChange={e => updateSection(section.id, { textColor: e.target.value })}
-                            className="w-10 h-10 border-none rounded-lg cursor-pointer bg-transparent"
-                          />
-                          <span className="text-sm font-mono text-slate-500 uppercase">{section.textColor}</span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 );
               })()}
@@ -454,8 +461,6 @@ const ProductsManager = ({ user }: { user: User }) => {
         updatedAt: serverTimestamp()
       };
 
-      // CORRECTION: Check if editing.id exists explicitly. 
-      // Checking only (editing) is true for empty objects {}, leading to undefined ID errors.
       if (editing && editing.id) {
         await updateDoc(doc(db, `merchants/${user.uid}/products`, editing.id), payload);
       } else {
@@ -494,7 +499,7 @@ const ProductsManager = ({ user }: { user: User }) => {
           <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Nome</label>
-                <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Camiseta Básica" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} required />
+                <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: X-Burguer" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} required />
             </div>
             <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Preço (R$)</label>
@@ -502,11 +507,7 @@ const ProductsManager = ({ user }: { user: User }) => {
             </div>
             <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Categoria</label>
-                <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Roupas" value={formData.category || ''} onChange={e => setFormData({...formData, category: e.target.value})} />
-            </div>
-            <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Estoque</label>
-                <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" type="number" placeholder="0" value={formData.stock || ''} onChange={e => setFormData({...formData, stock: Number(e.target.value)})} />
+                <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Lanches" value={formData.category || ''} onChange={e => setFormData({...formData, category: e.target.value})} />
             </div>
             <div className="md:col-span-2 space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">URL da Imagem</label>
@@ -514,7 +515,7 @@ const ProductsManager = ({ user }: { user: User }) => {
             </div>
             <div className="md:col-span-2 space-y-1">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Descrição</label>
-                <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" rows={3} placeholder="Detalhes do produto..." value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
+                <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" rows={3} placeholder="Pão, carne, queijo..." value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
             </div>
             <div className="md:col-span-2 flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
               <button type="button" onClick={() => setEditing(null)} className="px-6 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors">Cancelar</button>
@@ -535,7 +536,6 @@ const ProductsManager = ({ user }: { user: User }) => {
                   <th className="p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Produto</th>
                   <th className="p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Categoria</th>
                   <th className="p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Preço</th>
-                  <th className="p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Estoque</th>
                   <th className="p-5 font-bold text-xs text-slate-500 uppercase tracking-wider text-right">Ações</th>
                 </tr>
               </thead>
@@ -554,12 +554,6 @@ const ProductsManager = ({ user }: { user: User }) => {
                          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium border border-slate-200">{p.category}</span>
                      </td>
                      <td className="p-5 text-slate-900 font-bold">R$ {p.price.toFixed(2)}</td>
-                     <td className="p-5">
-                        <div className="flex items-center gap-2">
-                             <div className={`w-2 h-2 rounded-full ${p.stock > 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-                             <span className="text-slate-600 text-sm">{p.stock} unid.</span>
-                        </div>
-                     </td>
                      <td className="p-5 text-right">
                        <IconButton onClick={() => { setEditing(p); setFormData(p); }} icon={Edit2} colorClass="text-indigo-500 hover:bg-indigo-50" />
                        <IconButton onClick={() => handleDelete(p.id)} icon={Trash2} colorClass="text-red-500 hover:bg-red-50" />
@@ -567,7 +561,7 @@ const ProductsManager = ({ user }: { user: User }) => {
                    </tr>
                  ))}
                  {products.length === 0 && (
-                   <tr><td colSpan={5} className="p-12 text-center text-slate-400 italic">Nenhum produto cadastrado. Clique em "Novo Produto" para começar.</td></tr>
+                   <tr><td colSpan={5} className="p-12 text-center text-slate-400 italic">Nenhum produto cadastrado.</td></tr>
                  )}
               </tbody>
             </table>
@@ -615,18 +609,18 @@ const ClientsManager = ({ user }: { user: User }) => {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-800 text-lg group-hover:text-indigo-700 transition-colors">{client.name}</h4>
-                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Cliente desde {new Date(client.createdAt?.seconds * 1000).toLocaleDateString()}</p>
+                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Cliente desde {client.createdAt ? new Date(client.createdAt.seconds * 1000).toLocaleDateString() : '-'}</p>
                 </div>
               </div>
               <div className="pt-4 border-t border-slate-50 space-y-3">
                 <div className="flex items-center gap-3 text-slate-600 bg-slate-50 p-2 rounded-lg">
-                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-400 shadow-sm">@</div>
-                    <span className="text-sm">{client.email}</span>
+                    <span className="text-sm">📧 {client.email}</span>
                 </div>
-                <div className="flex items-center gap-3 text-slate-600 bg-slate-50 p-2 rounded-lg">
-                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-400 shadow-sm">#</div>
-                    <span className="text-sm">{client.phone || 'Sem telefone'}</span>
-                </div>
+                {client.address && (
+                    <div className="flex items-start gap-3 text-slate-600 bg-slate-50 p-2 rounded-lg">
+                        <span className="text-sm">📍 {client.address.street}, {client.address.number} - {client.address.neighborhood}</span>
+                    </div>
+                )}
               </div>
             </div>
           ))}
@@ -666,8 +660,8 @@ const OrdersManager = ({ user }: { user: User }) => {
   const getStatusBadge = (status: string) => {
     switch(status) {
       case OrderStatus.NEW: return <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200">NOVO</span>;
-      case OrderStatus.PROCESSING: return <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-200">EM ANDAMENTO</span>;
-      case OrderStatus.COMPLETED: return <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200">CONCLUÍDO</span>;
+      case OrderStatus.PROCESSING: return <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-200">PREPARANDO</span>;
+      case OrderStatus.COMPLETED: return <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200">ENTREGUE</span>;
       case OrderStatus.CANCELLED: return <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200">CANCELADO</span>;
       default: return null;
     }
@@ -697,10 +691,15 @@ const OrdersManager = ({ user }: { user: User }) => {
                 <div className="flex items-center gap-3 mb-2">
                   <span className="font-mono text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">#{order.id.slice(-6)}</span>
                   {getStatusBadge(order.status)}
-                  <span className="text-xs text-slate-400 flex items-center gap-1">• {new Date(order.createdAt?.seconds * 1000).toLocaleString()}</span>
+                  <span className="text-xs text-slate-400 flex items-center gap-1">• {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleString() : ''}</span>
                 </div>
                 <h4 className="font-bold text-slate-800 text-lg">{order.customerName}</h4>
-                <p className="text-sm text-slate-500 mb-3">{order.customerEmail}</p>
+                 <div className="text-sm text-slate-500 mb-3 flex flex-col">
+                    <span>{order.customerPhone}</span>
+                    {order.deliveryAddress && (
+                        <span className="flex items-center gap-1"><MapPin size={12}/> {order.deliveryAddress.street}, {order.deliveryAddress.number} - {order.deliveryAddress.neighborhood}</span>
+                    )}
+                </div>
                 <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 inline-block min-w-[300px]">
                   {order.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between py-1 border-b border-slate-200 last:border-0">
@@ -729,13 +728,6 @@ const OrdersManager = ({ user }: { user: User }) => {
               </div>
             </div>
           ))}
-          {orders.length === 0 && (
-              <div className="p-16 text-center bg-white rounded-2xl border border-dashed border-slate-200 flex flex-col items-center">
-                 <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-300 mb-6 animate-pulse"><ShoppingCart size={40}/></div>
-                 <h3 className="text-xl font-bold text-slate-800">Nenhuma venda ainda</h3>
-                 <p className="text-slate-500 mb-6 max-w-sm">Compartilhe o link da sua loja nas redes sociais para começar a receber pedidos!</p>
-              </div>
-            )}
         </div>
       )}
     </div>
@@ -772,8 +764,11 @@ const Dashboard = () => {
 
   const currentPath = location.pathname.split('/').pop() || 'overview';
 
+  // FIX: Absolute paths to prevent nesting errors
   const NavItem = ({ to, pathName, icon: Icon, label }: any) => {
-    const isActive = currentPath === pathName || (pathName === 'overview' && currentPath === 'dashboard');
+    // Check if the current path ENDS with the pathName (handling trailing slashes or sub-routes)
+    const isActive = location.pathname === to || (to === '/dashboard' && location.pathname === '/dashboard');
+    
     return (
       <Link 
         to={to} 
@@ -788,9 +783,6 @@ const Dashboard = () => {
         {!collapsed && <span>{label}</span>}
         {!collapsed && pathName === 'sales' && notificationCount > 0 && (
           <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm shadow-rose-200">{notificationCount}</span>
-        )}
-        {collapsed && pathName === 'sales' && notificationCount > 0 && (
-          <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-slate-50"></span>
         )}
       </Link>
     );
@@ -818,12 +810,13 @@ const Dashboard = () => {
         </button>
 
         <nav className="flex-1 px-4 space-y-2 mt-2">
+          {/* USANDO CAMINHOS ABSOLUTOS PARA CORRIGIR ERRO DE ROTA */}
           <NavItem to="/dashboard" pathName="overview" icon={LayoutDashboard} label="Visão Geral" />
-          <NavItem to="products" pathName="products" icon={Package} label="Produtos" />
-          <NavItem to="sales" pathName="sales" icon={ShoppingCart} label="Vendas" />
-          <NavItem to="clients" pathName="clients" icon={Users} label="Clientes" />
+          <NavItem to="/dashboard/products" pathName="products" icon={Package} label="Produtos" />
+          <NavItem to="/dashboard/sales" pathName="sales" icon={ShoppingCart} label="Vendas" />
+          <NavItem to="/dashboard/clients" pathName="clients" icon={Users} label="Clientes" />
           <div className="my-4 border-t border-slate-200/60 mx-2"></div>
-          <NavItem to="store-editor" pathName="store-editor" icon={Store} label="Editor Loja" />
+          <NavItem to="/dashboard/store-editor" pathName="store-editor" icon={Store} label="Editor Loja" />
         </nav>
         
         <div className="p-4 mx-4 mb-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
@@ -860,7 +853,7 @@ const Dashboard = () => {
         <div className="md:hidden flex justify-between items-center mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
           <AppLogo collapsed={true} />
           <div className="flex gap-4 items-center">
-             <Link to="sales" className="relative p-2 rounded-full hover:bg-slate-50">
+             <Link to="/dashboard/sales" className="relative p-2 rounded-full hover:bg-slate-50">
                <Bell size={24} className="text-slate-600"/>
                {notificationCount > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>}
              </Link>
@@ -868,12 +861,12 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Dynamic Mobile Nav */}
+        {/* Dynamic Mobile Nav - Absolute Paths */}
         <div className="md:hidden flex overflow-x-auto gap-2 mb-6 pb-2 hide-scrollbar">
            <Link to="/dashboard" className="px-5 py-2.5 bg-white rounded-xl text-sm font-medium shadow-sm whitespace-nowrap border border-slate-100 text-slate-600 active:bg-indigo-50 active:text-indigo-600 active:border-indigo-200">Visão Geral</Link>
-           <Link to="products" className="px-5 py-2.5 bg-white rounded-xl text-sm font-medium shadow-sm whitespace-nowrap border border-slate-100 text-slate-600 active:bg-indigo-50 active:text-indigo-600 active:border-indigo-200">Produtos</Link>
-           <Link to="sales" className="px-5 py-2.5 bg-white rounded-xl text-sm font-medium shadow-sm whitespace-nowrap border border-slate-100 text-slate-600 active:bg-indigo-50 active:text-indigo-600 active:border-indigo-200">Vendas</Link>
-           <Link to="store-editor" className="px-5 py-2.5 bg-white rounded-xl text-sm font-medium shadow-sm whitespace-nowrap border border-slate-100 text-slate-600 active:bg-indigo-50 active:text-indigo-600 active:border-indigo-200">Editor</Link>
+           <Link to="/dashboard/products" className="px-5 py-2.5 bg-white rounded-xl text-sm font-medium shadow-sm whitespace-nowrap border border-slate-100 text-slate-600 active:bg-indigo-50 active:text-indigo-600 active:border-indigo-200">Produtos</Link>
+           <Link to="/dashboard/sales" className="px-5 py-2.5 bg-white rounded-xl text-sm font-medium shadow-sm whitespace-nowrap border border-slate-100 text-slate-600 active:bg-indigo-50 active:text-indigo-600 active:border-indigo-200">Vendas</Link>
+           <Link to="/dashboard/store-editor" className="px-5 py-2.5 bg-white rounded-xl text-sm font-medium shadow-sm whitespace-nowrap border border-slate-100 text-slate-600 active:bg-indigo-50 active:text-indigo-600 active:border-indigo-200">Editor</Link>
         </div>
 
         <Routes>
@@ -908,49 +901,31 @@ const Overview = ({ user }: { user: User }) => {
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Olá, {user.displayName?.split(' ')[0] || 'Lojista'} 👋</h1>
             <p className="text-slate-500 mt-1">Aqui está o resumo do desempenho da sua loja hoje.</p>
         </div>
-        <div className="text-right hidden md:block">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Receita Total" value={`R$ ${stats.revenue.toFixed(2)}`} icon={ShoppingCart} colorFrom="from-emerald-400" colorTo="to-emerald-600" />
         <StatCard title="Vendas Realizadas" value={stats.orders} icon={Package} colorFrom="from-indigo-400" colorTo="to-indigo-600" />
-        <StatCard title="Novos Clientes" value="0" icon={Users} colorFrom="from-violet-400" colorTo="to-violet-600" />
+        <StatCard title="Novos Clientes" value="-" icon={Users} colorFrom="from-violet-400" colorTo="to-violet-600" />
         <StatCard title="Visitas Loja" value="-" icon={Store} colorFrom="from-amber-400" colorTo="to-amber-600" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-slate-400 min-h-[400px] relative overflow-hidden">
-           <div className="absolute top-0 right-0 p-32 bg-indigo-50 rounded-full blur-3xl opacity-50 -mr-20 -mt-20"></div>
-           <div className="relative z-10 text-center">
-                <div className="bg-slate-50 p-4 rounded-full inline-block mb-4"><LayoutGrid size={32} className="text-slate-300"/></div>
-                <h3 className="text-lg font-bold text-slate-700">Gráfico de Desempenho</h3>
-                <p className="text-sm">Os dados aparecerão aqui conforme você realizar vendas.</p>
-           </div>
-        </div>
-
         <div className="lg:col-span-1 space-y-6">
             <div className="bg-slate-900 text-white p-8 rounded-3xl shadow-xl shadow-slate-200 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-700"></div>
                 <div className="relative z-10">
                     <h3 className="text-xl font-bold mb-2">Configure sua Loja</h3>
-                    <p className="text-slate-400 text-sm mb-6 leading-relaxed">Personalize cores, banners e produtos para deixar sua loja incrível.</p>
-                    <Link to="store-editor" className="inline-flex items-center gap-2 bg-white text-slate-900 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors">
+                    <p className="text-slate-400 text-sm mb-6 leading-relaxed">Adicione um banner e logo para passar mais credibilidade.</p>
+                    <Link to="/dashboard/store-editor" className="inline-flex items-center gap-2 bg-white text-slate-900 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors">
                         Abrir Editor <ArrowRight size={16}/>
                     </Link>
                 </div>
             </div>
-
+            
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                 <h3 className="font-bold text-slate-800 mb-4">Acesso Rápido</h3>
                 <div className="space-y-3">
-                    <Link to="products" className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-all group cursor-pointer border border-transparent hover:border-slate-100">
-                        <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                            <Plus size={20} />
-                        </div>
-                        <span className="font-medium text-slate-600 group-hover:text-slate-900">Adicionar Produto</span>
-                    </Link>
                     <button className="w-full flex items-center gap-4 p-3 hover:bg-slate-50 rounded-xl transition-all group cursor-pointer border border-transparent hover:border-slate-100 text-left" onClick={() => {
                         navigator.clipboard.writeText(`${window.location.origin}/#/store/${user.uid}`);
                         alert('Link copiado!');
@@ -968,7 +943,6 @@ const Overview = ({ user }: { user: User }) => {
   );
 };
 
-
 // --- PUBLIC STORE FRONT ---
 const PublicStore = () => {
   const { id } = useParams(); // Merchant ID
@@ -976,19 +950,30 @@ const PublicStore = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<{product: Product, qty: number}[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [customerInfo, setCustomerInfo] = useState({ name: '', email: '', phone: '' });
+  const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+  
+  // Checkout & Customer State
+  const [customerInfo, setCustomerInfo] = useState({ 
+    name: '', email: '', phone: '',
+    street: '', number: '', neighborhood: '', city: '', zip: '', complement: ''
+  });
+
+  const [myOrders, setMyOrders] = useState<any[]>([]);
 
   useEffect(() => {
     if (!id) return;
     
+    // Load local history
+    const saved = localStorage.getItem(`my_orders_${id}`);
+    if(saved) setMyOrders(JSON.parse(saved));
+
     const fetchData = async () => {
       // 1. Get Store Config
       const merchantDoc = await getDoc(doc(db, 'merchants', id));
       if (merchantDoc.exists() && merchantDoc.data().storeConfig) {
         setConfig(merchantDoc.data().storeConfig);
       } else {
-         // Fallback default
-         setConfig({ storeName: 'Loja', themeColor: '#000', sections: [] });
+         setConfig({ storeName: 'Loja', themeColor: '#ea1d2c', sections: [] });
       }
 
       // 2. Get Products
@@ -998,7 +983,7 @@ const PublicStore = () => {
         snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() } as Product));
         setProducts(items);
       });
-      return unsubscribe; // clean up listener
+      return unsubscribe; 
     };
     fetchData();
   }, [id]);
@@ -1011,11 +996,10 @@ const PublicStore = () => {
       }
       return [...prev, { product, qty: 1 }];
     });
-    const btn = document.getElementById('cart-btn');
-    if(btn) {
-      btn.classList.add('scale-110');
-      setTimeout(() => btn.classList.remove('scale-110'), 200);
-    }
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCart(prev => prev.filter(item => item.product.id !== productId));
   };
 
   const handleCheckout = async (e: React.FormEvent) => {
@@ -1025,31 +1009,70 @@ const PublicStore = () => {
     try {
       const total = cart.reduce((acc, item) => acc + (item.product.price * item.qty), 0);
       
-      await addDoc(collection(db, `merchants/${id}/orders`), {
+      const orderPayload = {
+        merchantId: id,
         customerName: customerInfo.name,
         customerEmail: customerInfo.email,
         customerPhone: customerInfo.phone,
+        deliveryAddress: {
+            street: customerInfo.street,
+            number: customerInfo.number,
+            neighborhood: customerInfo.neighborhood,
+            city: customerInfo.city,
+            zip: customerInfo.zip,
+            complement: customerInfo.complement || ''
+        },
         items: cart.map(i => ({ 
           productId: i.product.id, 
           productName: i.product.name, 
           quantity: i.qty, 
-          price: i.product.price 
+          price: i.product.price,
+          imageUrl: i.product.imageUrl || ''
         })),
         total,
         status: 'new',
         createdAt: serverTimestamp()
-      });
+      };
 
-      await addDoc(collection(db, `merchants/${id}/clients`), {
-        name: customerInfo.name,
-        email: customerInfo.email,
-        phone: customerInfo.phone,
-        createdAt: serverTimestamp()
-      });
+      // 1. Create Order
+      const orderRef = await addDoc(collection(db, `merchants/${id}/orders`), orderPayload);
 
-      alert('Pedido realizado com sucesso! O lojista entrará em contato.');
+      // 2. Handle Client (Deduplication)
+      const clientsRef = collection(db, `merchants/${id}/clients`);
+      const q = query(clientsRef, where("email", "==", customerInfo.email), limit(1));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        // Update existing client
+        const clientDoc = querySnapshot.docs[0];
+        await updateDoc(doc(db, `merchants/${id}/clients`, clientDoc.id), {
+          lastOrderDate: serverTimestamp(),
+          phone: customerInfo.phone, // Update contact info
+          address: orderPayload.deliveryAddress,
+          totalOrders: (clientDoc.data().totalOrders || 0) + 1
+        });
+      } else {
+        // Create new client
+        await addDoc(clientsRef, {
+            name: customerInfo.name,
+            email: customerInfo.email,
+            phone: customerInfo.phone,
+            address: orderPayload.deliveryAddress,
+            createdAt: serverTimestamp(),
+            lastOrderDate: serverTimestamp(),
+            totalOrders: 1
+        });
+      }
+
+      // 3. Local History
+      const newHistory = [{ id: orderRef.id, date: new Date().toISOString(), status: 'new', total }, ...myOrders];
+      setMyOrders(newHistory);
+      localStorage.setItem(`my_orders_${id}`, JSON.stringify(newHistory));
+
+      alert('Pedido realizado com sucesso!');
       setCart([]);
       setIsCheckoutOpen(false);
+      setIsOrdersOpen(true); // Open orders view to show confirmation
     } catch (err) {
       console.error(err);
       alert('Erro ao processar pedido.');
@@ -1059,97 +1082,232 @@ const PublicStore = () => {
   if (!config) return <div className="h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-indigo-600" size={40}/></div>;
 
   return (
-    <div className="min-h-screen bg-white font-sans">
-      {/* Store Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm transition-all">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-             {config.logoUrl && <img src={config.logoUrl} alt="Logo" className="h-10 w-auto rounded-lg" />}
-             <span className="font-bold text-2xl tracking-tight" style={{ color: config.themeColor }}>{config.storeName}</span>
+    <div className="min-h-screen bg-gray-50 font-sans pb-20">
+      {/* Header Style iFood */}
+      <div className="bg-white shadow-sm">
+          {/* Banner */}
+          <div className="h-32 md:h-48 w-full bg-cover bg-center relative" style={{ 
+              backgroundImage: config.bannerUrl ? `url(${config.bannerUrl})` : 'linear-gradient(to right, #ea1d2c, #b91c1c)',
+              backgroundColor: config.themeColor 
+          }}>
+             <div className="absolute inset-0 bg-black/10"></div>
           </div>
-          <button 
-            id="cart-btn"
-            onClick={() => setIsCheckoutOpen(true)}
-            className="relative p-3 rounded-full hover:bg-gray-50 transition-all duration-300 group"
-          >
-            <ShoppingCart size={26} color={config.themeColor} className="group-hover:scale-110 transition-transform" />
-            {cart.length > 0 && (
-              <span className="absolute top-1 right-0 bg-slate-900 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-md border-2 border-white transform translate-x-1 -translate-y-1">
-                {cart.reduce((a, b) => a + b.qty, 0)}
-              </span>
-            )}
-          </button>
-        </div>
-      </header>
+          
+          {/* Store Info */}
+          <div className="max-w-5xl mx-auto px-4 pb-6 relative">
+             <div className="flex flex-col md:flex-row items-start md:items-end gap-4 -mt-10 md:-mt-12 relative z-10">
+                 <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white shadow-md bg-white overflow-hidden flex items-center justify-center">
+                    {config.logoUrl ? (
+                        <img src={config.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                    ) : (
+                        <Store size={40} style={{ color: config.themeColor }} />
+                    )}
+                 </div>
+                 <div className="flex-1 pt-2 md:pt-0">
+                     <h1 className="text-2xl md:text-3xl font-bold text-slate-800">{config.storeName}</h1>
+                     <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 mt-1">
+                        <span className="flex items-center gap-1 text-amber-500 font-bold"><Star size={14} fill="currentColor" /> 4.8</span>
+                        <span>• {config.description || 'Lanches • Bebidas • Sobremesas'}</span>
+                     </div>
+                 </div>
+                 <div className="mt-4 md:mt-0 flex gap-2 w-full md:w-auto">
+                    {myOrders.length > 0 && (
+                        <button onClick={() => setIsOrdersOpen(true)} className="flex-1 md:flex-none px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+                            <History size={18}/> Pedidos
+                        </button>
+                    )}
+                 </div>
+             </div>
+          </div>
+      </div>
 
-      {/* Render Sections */}
-      <main>
+      {/* Main Content */}
+      <main className="max-w-5xl mx-auto px-4 py-8">
+        {/* Search */}
+        <div className="relative mb-8">
+            <Search className="absolute left-3 top-3 text-slate-400" size={20} />
+            <input className="w-full p-3 pl-10 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-200" placeholder="Buscar no cardápio..." />
+        </div>
+
+        {/* Sections */}
         {config.sections.map(section => {
-          if (section.type === 'hero' || section.type === 'image') return <HeroSection key={section.id} section={section} />;
+          // Custom Product Grid for iFood style
+          if (section.type === 'products') {
+             return (
+                 <div key={section.id} className="mb-10">
+                     <h2 className="text-xl font-bold text-slate-800 mb-4">{section.title || 'Produtos'}</h2>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         {products.map(product => (
+                             <div key={product.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex justify-between gap-4 group cursor-pointer" onClick={() => addToCart(product)}>
+                                 <div className="flex flex-col justify-between flex-1">
+                                     <div>
+                                         <h3 className="font-bold text-slate-800 mb-1">{product.name}</h3>
+                                         <p className="text-sm text-slate-500 line-clamp-2">{product.description}</p>
+                                     </div>
+                                     <p className="font-medium text-slate-900 mt-2">R$ {product.price.toFixed(2)}</p>
+                                 </div>
+                                 <div className="w-28 h-24 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0 relative">
+                                     {product.imageUrl ? (
+                                         <img src={product.imageUrl} className="w-full h-full object-cover" alt={product.name} />
+                                     ) : (
+                                         <div className="w-full h-full flex items-center justify-center text-slate-300"><ImageIcon size={24} /></div>
+                                     )}
+                                     <div className="absolute bottom-0 right-0 p-1.5 bg-white rounded-tl-lg shadow-sm">
+                                         <Plus size={16} color={config.themeColor} />
+                                     </div>
+                                 </div>
+                             </div>
+                         ))}
+                     </div>
+                 </div>
+             )
+          }
+          if (section.type === 'hero') return <div className="mb-8 rounded-2xl overflow-hidden"><HeroSection key={section.id} section={section} /></div>;
           if (section.type === 'text') return <TextSection key={section.id} section={section} />;
-          if (section.type === 'products') return <ProductGridSection key={section.id} section={section} products={products} onAddToCart={addToCart} />;
           return null;
         })}
-        {config.sections.length === 0 && (
-          <div className="py-24 text-center bg-slate-50">
-            <h2 className="text-4xl font-bold mb-4 text-slate-900">Nossos Produtos</h2>
-            <p className="text-slate-500 mb-12 max-w-2xl mx-auto">Confira nossa seleção exclusiva abaixo.</p>
-            <ProductGridSection section={{id:'default', type:'products', backgroundColor: 'transparent'}} products={products} onAddToCart={addToCart} />
-          </div>
+
+        {config.sections.length === 0 && products.length > 0 && (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {products.map(product => (
+                    <div key={product.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between gap-4" onClick={() => addToCart(product)}>
+                        <div className="flex flex-col justify-between flex-1">
+                            <div>
+                                <h3 className="font-bold text-slate-800 mb-1">{product.name}</h3>
+                                <p className="text-sm text-slate-500 line-clamp-2">{product.description}</p>
+                            </div>
+                            <p className="font-medium text-slate-900 mt-2">R$ {product.price.toFixed(2)}</p>
+                        </div>
+                        <div className="w-28 h-24 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
+                            {product.imageUrl ? (
+                                <img src={product.imageUrl} className="w-full h-full object-cover" alt={product.name} />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-300"><ImageIcon size={24} /></div>
+                            )}
+                        </div>
+                    </div>
+                ))}
+             </div>
         )}
       </main>
 
+      {/* Floating Cart Button (Mobile) */}
+      {cart.length > 0 && (
+          <div className="fixed bottom-4 left-4 right-4 z-40">
+              <button 
+                onClick={() => setIsCheckoutOpen(true)}
+                className="w-full bg-red-600 text-white p-4 rounded-xl shadow-lg flex justify-between items-center font-bold"
+                style={{ backgroundColor: config.themeColor }}
+              >
+                  <span className="bg-black/20 px-3 py-1 rounded-full text-sm">{cart.reduce((a,b) => a + b.qty, 0)}</span>
+                  <span>Ver Sacola</span>
+                  <span>R$ {cart.reduce((acc, item) => acc + (item.product.price * item.qty), 0).toFixed(2)}</span>
+              </button>
+          </div>
+      )}
+
       {/* Checkout Modal */}
       {isCheckoutOpen && (
-        <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <h3 className="text-xl font-bold text-slate-800">Seu Carrinho</h3>
-              <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-white rounded-full transition-all"><X size={24}/></button>
+        <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center animate-in fade-in duration-300">
+          <div className="bg-white rounded-t-3xl md:rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-10 duration-300 flex flex-col">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="text-lg font-bold text-slate-800">Finalizar Pedido</h3>
+              <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-slate-50 rounded-full"><X size={24}/></button>
             </div>
             
-            <div className="p-8 space-y-8">
-              {cart.length === 0 ? (
-                <div className="text-center py-10">
-                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
-                        <ShoppingBag size={32}/>
-                    </div>
-                    <p className="text-gray-500 font-medium">Seu carrinho está vazio.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-6">
-                    {cart.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center">
-                        <div>
-                          <p className="font-bold text-slate-800">{item.product.name}</p>
-                          <p className="text-sm text-slate-500 font-medium">{item.qty}x R$ {item.product.price.toFixed(2)}</p>
-                        </div>
-                        <p className="font-bold text-slate-900 text-lg">R$ {(item.product.price * item.qty).toFixed(2)}</p>
+            <div className="p-6 space-y-6 overflow-y-auto">
+              {cart.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-start border-b border-gray-50 pb-4">
+                  <div className="flex gap-3">
+                      <span className="font-bold text-slate-500">{item.qty}x</span>
+                      <div>
+                        <p className="font-medium text-slate-800">{item.product.name}</p>
+                        <p className="text-sm text-slate-500">R$ {item.product.price.toFixed(2)}</p>
                       </div>
-                    ))}
-                    <div className="border-t border-dashed border-gray-300 pt-6 flex justify-between items-center">
-                      <span className="text-slate-500 font-medium">Total a pagar</span>
-                      <span className="text-2xl font-bold text-slate-900">R$ {cart.reduce((acc, item) => acc + (item.product.price * item.qty), 0).toFixed(2)}</span>
-                    </div>
                   </div>
+                  <div className="flex flex-col items-end gap-2">
+                       <span className="font-medium text-slate-900">R$ {(item.product.price * item.qty).toFixed(2)}</span>
+                       <button onClick={() => removeFromCart(item.product.id)} className="text-xs text-red-500 font-medium">Remover</button>
+                  </div>
+                </div>
+              ))}
 
-                  <form onSubmit={handleCheckout} className="space-y-4 pt-6">
-                    <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wide mb-2">Dados para Entrega</h4>
-                    <input className="w-full p-3.5 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-slate-800 outline-none transition-all" placeholder="Seu Nome Completo" required value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} />
-                    <input className="w-full p-3.5 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-slate-800 outline-none transition-all" type="email" placeholder="Seu Email" required value={customerInfo.email} onChange={e => setCustomerInfo({...customerInfo, email: e.target.value})} />
-                    <input className="w-full p-3.5 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-slate-800 outline-none transition-all" type="tel" placeholder="Seu WhatsApp (com DDD)" required value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} />
-                    
-                    <button type="submit" className="w-full py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-black hover:scale-[1.02] transition-all shadow-lg shadow-slate-200 mt-4">
-                      Finalizar Pedido
-                    </button>
-                  </form>
-                </>
-              )}
+              <div className="flex justify-between items-center py-2">
+                 <span className="font-bold text-lg">Total</span>
+                 <span className="font-bold text-xl text-slate-900">R$ {cart.reduce((acc, item) => acc + (item.product.price * item.qty), 0).toFixed(2)}</span>
+              </div>
+
+              <form onSubmit={handleCheckout} className="space-y-4 pt-2">
+                <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2"><Users size={16}/> Seus Dados</h4>
+                <div className="grid grid-cols-1 gap-3">
+                   <input className="input-field" placeholder="Nome Completo" required value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} />
+                   <input className="input-field" type="email" placeholder="Email" required value={customerInfo.email} onChange={e => setCustomerInfo({...customerInfo, email: e.target.value})} />
+                   <input className="input-field" type="tel" placeholder="Telefone / WhatsApp" required value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} />
+                </div>
+
+                <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2 mt-4"><MapPin size={16}/> Endereço de Entrega</h4>
+                <div className="grid grid-cols-4 gap-3">
+                   <input className="input-field col-span-3" placeholder="Rua / Avenida" required value={customerInfo.street} onChange={e => setCustomerInfo({...customerInfo, street: e.target.value})} />
+                   <input className="input-field col-span-1" placeholder="Nº" required value={customerInfo.number} onChange={e => setCustomerInfo({...customerInfo, number: e.target.value})} />
+                   <input className="input-field col-span-2" placeholder="Bairro" required value={customerInfo.neighborhood} onChange={e => setCustomerInfo({...customerInfo, neighborhood: e.target.value})} />
+                   <input className="input-field col-span-2" placeholder="Cidade" required value={customerInfo.city} onChange={e => setCustomerInfo({...customerInfo, city: e.target.value})} />
+                   <input className="input-field col-span-4" placeholder="Complemento (Opcional)" value={customerInfo.complement} onChange={e => setCustomerInfo({...customerInfo, complement: e.target.value})} />
+                </div>
+                
+                <button type="submit" className="w-full py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 hover:scale-[1.02] transition-all shadow-lg shadow-green-100 mt-4 text-lg">
+                  Fazer Pedido
+                </button>
+              </form>
             </div>
           </div>
         </div>
       )}
+
+      {/* My Orders Modal */}
+      {isOrdersOpen && (
+          <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+                  <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                      <h3 className="font-bold text-slate-800">Meus Pedidos Recentes</h3>
+                      <button onClick={() => setIsOrdersOpen(false)}><X size={20} className="text-gray-400"/></button>
+                  </div>
+                  <div className="p-4 overflow-y-auto space-y-3">
+                      {myOrders.length === 0 ? (
+                          <p className="text-center text-gray-500 py-8">Você ainda não fez pedidos neste navegador.</p>
+                      ) : (
+                          myOrders.map((o, i) => (
+                              <div key={i} className="p-4 border border-slate-100 rounded-xl bg-white shadow-sm">
+                                  <div className="flex justify-between mb-2">
+                                      <span className="font-mono text-xs text-slate-400">#{o.id.slice(-6)}</span>
+                                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 uppercase">{o.status || 'Enviado'}</span>
+                                  </div>
+                                  <div className="flex justify-between items-end">
+                                      <p className="text-sm text-slate-500">{new Date(o.date).toLocaleDateString()}</p>
+                                      <p className="font-bold text-slate-800">R$ {o.total.toFixed(2)}</p>
+                                  </div>
+                              </div>
+                          ))
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      <style>{`
+        .input-field {
+            width: 100%;
+            padding: 12px;
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .input-field:focus {
+            border-color: ${config.themeColor};
+            box-shadow: 0 0 0 2px ${config.themeColor}20;
+        }
+      `}</style>
     </div>
   );
 };
