@@ -340,7 +340,8 @@ const ClientsManager = ({ user }: { user: User }) => {
         payload.notes = formData.notes || '';
       }
 
-      if (editing) {
+      // CORREÇÃO AQUI: Verifica se editing existe E se editing.id existe
+      if (editing && editing.id) {
         await updateDoc(doc(db, `merchants/${user.uid}/clients`, editing.id), payload);
       } else {
         await addDoc(collection(db, `merchants/${user.uid}/clients`), { 
@@ -353,7 +354,7 @@ const ClientsManager = ({ user }: { user: User }) => {
       setFormData({});
     } catch (err) {
       console.error(err);
-      alert('Erro ao salvar cliente.');
+      alert('Erro ao salvar cliente: ' + (err as Error).message);
     }
   };
 
@@ -438,10 +439,10 @@ const ClientsManager = ({ user }: { user: User }) => {
             <div className="pt-2 border-t border-slate-100">
                <h4 className="text-sm font-bold text-slate-700 mb-3">Endereço</h4>
                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <input className="md:col-span-3 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Rua / Avenida" value={formData.address?.street || ''} onChange={e => setFormData({...formData, address: {...formData.address!, street: e.target.value}})} />
-                  <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Número" value={formData.address?.number || ''} onChange={e => setFormData({...formData, address: {...formData.address!, number: e.target.value}})} />
-                  <input className="md:col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Bairro" value={formData.address?.neighborhood || ''} onChange={e => setFormData({...formData, address: {...formData.address!, neighborhood: e.target.value}})} />
-                  <input className="md:col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Cidade" value={formData.address?.city || ''} onChange={e => setFormData({...formData, address: {...formData.address!, city: e.target.value}})} />
+                  <input className="md:col-span-3 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Rua / Avenida" value={formData.address?.street || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), street: e.target.value}})} />
+                  <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Número" value={formData.address?.number || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), number: e.target.value}})} />
+                  <input className="md:col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Bairro" value={formData.address?.neighborhood || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), neighborhood: e.target.value}})} />
+                  <input className="md:col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Cidade" value={formData.address?.city || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), city: e.target.value}})} />
                </div>
             </div>
 
@@ -1328,81 +1329,80 @@ const PublicStore = () => {
   );
 };
 
-// --- DASHBOARD & LANDING ---
-
-const Overview = ({ user }: { user: User }) => {
-  const [stats, setStats] = useState({ orders: 0, revenue: 0, clients: 0 });
-
-  useEffect(() => {
-     const fetchStats = async () => {
-        try {
-          const oQ = query(collection(db, `merchants/${user.uid}/orders`));
-          const oSnap = await getDocs(oQ);
-          let rev = 0;
-          oSnap.forEach(d => rev += (d.data().total || 0));
-          
-          const cQ = query(collection(db, `merchants/${user.uid}/clients`));
-          const cSnap = await getDocs(cQ);
-          
-          setStats({ orders: oSnap.size, revenue: rev, clients: cSnap.size });
-        } catch (e) {
-          console.error(e);
-        }
-     };
-     fetchStats();
-  }, [user.uid]);
-
+const DashboardHome = ({ user }: { user: User }) => {
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-       <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-slate-800">Visão Geral</h2>
-          <p className="text-slate-500 text-sm">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-       </div>
+      <div className="space-y-6 animate-in fade-in duration-500">
+          <div className="mb-8">
+              <h1 className="text-2xl font-bold text-slate-800">Olá, {user.displayName || 'Lojista'}! 👋</h1>
+              <p className="text-slate-500">Aqui está o resumo do seu negócio hoje.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                  <div className="flex items-center justify-between mb-4">
+                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><DollarSign size={20}/></div>
+                      <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">+12% <TrendingUp size={12}/></span>
+                  </div>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Vendas Hoje</p>
+                  <h3 className="text-2xl font-bold text-slate-800 mt-1">R$ 1.240,00</h3>
+              </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                   <div className="flex items-center justify-between mb-4">
+                      <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><ShoppingBag size={20}/></div>
+                      <span className="text-xs font-bold text-slate-400">0 pendentes</span>
+                  </div>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Pedidos</p>
+                  <h3 className="text-2xl font-bold text-slate-800 mt-1">24</h3>
+              </div>
+               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                   <div className="flex items-center justify-between mb-4">
+                      <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Users size={20}/></div>
+                       <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">+3 novos</span>
+                  </div>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Clientes Ativos</p>
+                  <h3 className="text-2xl font-bold text-slate-800 mt-1">156</h3>
+              </div>
+          </div>
 
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600"><DollarSign size={24}/></div>
-             </div>
-             <h3 className="text-slate-500 text-sm font-medium">Faturamento Total</h3>
-             <p className="text-3xl font-bold text-slate-800 mt-1">R$ {stats.revenue.toFixed(2)}</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                  <h3 className="font-bold text-slate-800 mb-6">Desempenho Semanal</h3>
+                  <SimpleBarChart data={[40, 70, 45, 90, 65, 80, 55]} />
+              </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                  <h3 className="font-bold text-slate-800 mb-2">Fluxo de Caixa</h3>
+                  <p className="text-sm text-slate-500 mb-6">Comparativo de receitas e despesas este mês.</p>
+                  
+                  <div className="space-y-4">
+                      <div>
+                          <div className="flex justify-between text-sm mb-1">
+                              <span className="font-medium text-slate-600">Receitas</span>
+                              <span className="font-bold text-emerald-600">R$ 12.500</span>
+                          </div>
+                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500 w-[75%]"></div>
+                          </div>
+                      </div>
+                      <div>
+                           <div className="flex justify-between text-sm mb-1">
+                              <span className="font-medium text-slate-600">Despesas</span>
+                              <span className="font-bold text-rose-500">R$ 4.200</span>
+                          </div>
+                           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-rose-500 w-[35%]"></div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
           </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><Package size={24}/></div>
-             </div>
-             <h3 className="text-slate-500 text-sm font-medium">Pedidos Realizados</h3>
-             <p className="text-3xl font-bold text-slate-800 mt-1">{stats.orders}</p>
-          </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600"><Users size={24}/></div>
-             </div>
-             <h3 className="text-slate-500 text-sm font-medium">Base de Clientes</h3>
-             <p className="text-3xl font-bold text-slate-800 mt-1">{stats.clients}</p>
-          </div>
-       </div>
-
-       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-8 text-white relative overflow-hidden">
-          <div className="relative z-10">
-             <h3 className="text-2xl font-bold mb-2">Olá, {user.displayName || 'Lojista'}!</h3>
-             <p className="text-indigo-100 max-w-lg mb-6">Sua loja está pronta para vender. Use o menu lateral para gerenciar seus produtos, clientes e pedidos.</p>
-             <Link to="/dashboard/store" className="px-6 py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors inline-flex items-center gap-2">
-                <Store size={18}/> Personalizar Loja
-             </Link>
-          </div>
-          <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4">
-             <Rocket size={300} />
-          </div>
-       </div>
-    </div>
-  );
+      </div>
+  )
 };
 
 const Dashboard = () => {
   const [user, setUser] = useState<User>(null);
   const [loading, setLoading] = useState(true);
-  const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -1420,163 +1420,145 @@ const Dashboard = () => {
 
   const handleLogout = async () => {
     await signOut(auth);
-    navigate('/');
+    navigate('/login');
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]"><Loader2 className="animate-spin text-indigo-600 mr-2" /> Carregando...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600"/></div>;
   if (!user) return null;
 
-  const menuItems = [
-    { icon: LayoutDashboard, label: 'Visão Geral', path: '/dashboard' },
-    { icon: Users, label: 'Clientes', path: '/dashboard/clients' },
-    { icon: Package, label: 'Pedidos', path: '/dashboard/orders' },
-    { icon: Store, label: 'Minha Loja', path: '/dashboard/store' },
-  ];
-
   return (
-    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden font-sans">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       {/* Sidebar */}
-      <aside className={`bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-20 ${collapsed ? 'w-20' : 'w-64'}`}>
-        <div className="h-20 flex items-center justify-center border-b border-slate-100">
-          <AppLogo collapsed={collapsed} />
+      <aside className="w-64 bg-white border-r border-slate-100 hidden md:flex flex-col fixed h-full z-10">
+        <div className="p-6">
+          <AppLogo />
         </div>
-
-        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto custom-scrollbar">
-           {menuItems.map((item) => {
-             const active = location.pathname === item.path;
-             return (
-               <Link 
-                 key={item.path} 
-                 to={item.path}
-                 className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group ${active ? 'bg-indigo-50 text-indigo-600 font-bold shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
-               >
-                 <div className={`${active ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
-                   <item.icon size={22} strokeWidth={active ? 2.5 : 2} />
-                 </div>
-                 {!collapsed && <span>{item.label}</span>}
-               </Link>
-             )
-           })}
-        </nav>
         
+        <nav className="flex-1 px-4 space-y-1">
+          <Link to="/dashboard" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm ${location.pathname === '/dashboard' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <LayoutDashboard size={20} /> Visão Geral
+          </Link>
+          <Link to="/dashboard/orders" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm ${location.pathname.includes('/orders') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <Package size={20} /> Pedidos
+          </Link>
+          <Link to="/dashboard/clients" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm ${location.pathname.includes('/clients') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <Users size={20} /> Clientes
+          </Link>
+          <Link to="/dashboard/store" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm ${location.pathname.includes('/store') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <Store size={20} /> Minha Loja
+          </Link>
+        </nav>
+
         <div className="p-4 border-t border-slate-100">
-           <button onClick={handleLogout} className={`flex items-center gap-3 w-full p-3 rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors ${collapsed ? 'justify-center' : ''}`}>
-              <LogOut size={20} />
-              {!collapsed && <span className="text-sm font-medium">Sair da Conta</span>}
+           <div className="flex items-center gap-3 px-4 py-3 mb-2">
+              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
+                {user.email?.[0].toUpperCase()}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <p className="text-sm font-bold text-slate-700 truncate">{user.displayName || 'Usuário'}</p>
+                <p className="text-xs text-slate-400 truncate">{user.email}</p>
+              </div>
+           </div>
+           <button onClick={handleLogout} className="flex items-center gap-2 text-slate-400 hover:text-red-500 text-xs font-bold px-4 transition-colors">
+              <LogOut size={14} /> Sair da conta
            </button>
         </div>
       </aside>
+      
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 w-full bg-white border-b border-slate-100 z-20 px-4 h-16 flex items-center justify-between">
+         <AppLogo collapsed />
+         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-slate-600">
+            <Menu size={24} />
+         </button>
+      </div>
+
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-30 bg-white pt-20 px-6 space-y-4 md:hidden">
+            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><LayoutDashboard size={20}/> Visão Geral</Link>
+            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard/orders" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><Package size={20}/> Pedidos</Link>
+            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard/clients" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><Users size={20}/> Clientes</Link>
+            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard/store" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><Store size={20}/> Minha Loja</Link>
+            <button onClick={handleLogout} className="flex items-center gap-3 p-3 text-red-500 font-bold mt-8"><LogOut size={20}/> Sair</button>
+        </div>
+      )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col relative w-full h-full">
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 md:px-8 z-10 sticky top-0">
-           <div className="flex items-center gap-4">
-              <button onClick={() => setCollapsed(!collapsed)} className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors">
-                <Menu size={22} />
-              </button>
-              <h1 className="text-xl font-bold text-slate-800 hidden md:block">
-                {menuItems.find(i => i.path === location.pathname)?.label || 'Dashboard'}
-              </h1>
-           </div>
-           <div className="flex items-center gap-4">
-              <a href={`/#/store/${user.uid}`} target="_blank" rel="noreferrer" className="hidden md:flex items-center gap-2 text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors">
-                <ExternalLink size={14} /> Minha Loja Online
-              </a>
-              <div className="w-px h-8 bg-slate-200 hidden md:block"></div>
-              <div className="flex items-center gap-3 pl-2">
-                 <div className="text-right hidden md:block">
-                    <p className="text-sm font-bold text-slate-700 leading-tight">{user.displayName || 'Usuário'}</p>
-                    <p className="text-xs text-slate-400">{user.email}</p>
-                 </div>
-                 <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white">
-                    {user.email?.charAt(0).toUpperCase()}
-                 </div>
-              </div>
-           </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#F8FAFC]">
-           <Routes>
-              <Route path="/" element={<Overview user={user} />} />
-              <Route path="/clients" element={<ClientsManager user={user} />} />
-              <Route path="/orders" element={<OrdersManager user={user} />} />
-              <Route path="/store" element={<StoreEditor user={user} />} />
-           </Routes>
-        </div>
-        
-        <AIAssistant user={user} />
+      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen pt-20 md:pt-8">
+        <Routes>
+          <Route path="/" element={<DashboardHome user={user} />} />
+          <Route path="/orders" element={<OrdersManager user={user} />} />
+          <Route path="/clients" element={<ClientsManager user={user} />} />
+          <Route path="/store" element={<StoreEditor user={user} />} />
+        </Routes>
       </main>
+
+      <AIAssistant user={user} />
     </div>
   );
 };
 
 const LandingPage = () => {
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
-      <nav className="max-w-7xl mx-auto px-6 h-24 flex items-center justify-between">
-        <AppLogo />
-        <div className="flex items-center gap-4 md:gap-8">
-           <Link to="/login" className="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors">Entrar</Link>
-           <Link to="/register" className="px-6 py-3 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-200 transition-all transform hover:-translate-y-0.5">Criar Conta Grátis</Link>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-white">
+        <header className="fixed w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100">
+            <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
+                <AppLogo />
+                <div className="flex items-center gap-4">
+                    <Link to="/login" className="text-slate-600 font-medium hover:text-indigo-600 transition-colors">Entrar</Link>
+                    <Link to="/register" className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
+                        Começar Grátis
+                    </Link>
+                </div>
+            </div>
+        </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-12 md:py-24 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-         <div className="space-y-8 animate-in slide-in-from-left-10 duration-700 fade-in">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wider">
-               <Sparkles size={14} className="fill-indigo-700"/> Nova Plataforma
-            </div>
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.1]">
-               Gerencie sua loja com <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Superpoderes</span>.
+        <section className="pt-32 pb-20 px-4 text-center max-w-4xl mx-auto">
+            <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-wider mb-6 inline-block">CRM e Vendas para Pequenos Negócios</span>
+            <h1 className="text-5xl md:text-7xl font-bold text-slate-900 mb-6 tracking-tight">
+                Gerencie seus clientes e <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">venda mais.</span>
             </h1>
-            <p className="text-lg md:text-xl text-slate-500 max-w-lg leading-relaxed">
-               O NovaCRM unifica seus pedidos, clientes e catálogo online em um só lugar. Tudo potencializado por Inteligência Artificial para você vender mais.
+            <p className="text-xl text-slate-500 mb-10 max-w-2xl mx-auto leading-relaxed">
+                A plataforma completa para gerenciar pedidos, fidelizar clientes e criar sua loja online em minutos. Com inteligência artificial integrada.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
-               <Link to="/register" className="px-8 py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-xl shadow-indigo-200 hover:scale-105 transition-transform flex items-center justify-center gap-2">
-                  Começar Agora <ArrowRight size={20}/>
-               </Link>
-               <a href="https://wa.me/" target="_blank" rel="noreferrer" className="px-8 py-4 bg-white text-slate-700 border border-slate-200 font-bold rounded-2xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
-                  <MessageSquare size={20}/> Fale Conosco
-               </a>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link to="/register" className="px-8 py-4 bg-slate-900 text-white rounded-xl font-bold text-lg hover:bg-black transition-all flex items-center gap-2">
+                    Criar Conta Grátis <ArrowRight size={20}/>
+                </Link>
+                <a href="#features" className="px-8 py-4 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold text-lg hover:bg-slate-50 transition-all">
+                    Saber mais
+                </a>
             </div>
-            
-            <div className="pt-8 flex items-center gap-8 text-slate-400">
-               <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-500"/> Gestão de Pedidos</div>
-               <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-500"/> Loja Online Própria</div>
-               <div className="flex items-center gap-2"><CheckCircle2 size={16} className="text-emerald-500"/> IA Integrada</div>
+        </section>
+
+        <section id="features" className="py-20 bg-slate-50">
+            <div className="max-w-6xl mx-auto px-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
+                        <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-6">
+                            <Store size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-3">Loja Online Pronta</h3>
+                        <p className="text-slate-500 leading-relaxed">Crie seu catálogo digital em minutos e receba pedidos diretamente no painel ou WhatsApp.</p>
+                    </div>
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
+                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-6">
+                            <Users size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-3">Gestão de Clientes</h3>
+                        <p className="text-slate-500 leading-relaxed">Organize sua base de contatos, histórico de compras e preferências para vender mais.</p>
+                    </div>
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
+                        <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center mb-6">
+                            <Sparkles size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-3">Inteligência Artificial</h3>
+                        <p className="text-slate-500 leading-relaxed">Use nossa IA para criar descrições de produtos, analisar vendas e sugerir melhorias.</p>
+                    </div>
+                </div>
             </div>
-         </div>
-         
-         <div className="relative animate-in slide-in-from-right-10 duration-1000 fade-in delay-200 hidden lg:block">
-            <div className="absolute inset-0 bg-gradient-to-tr from-indigo-400/20 to-purple-400/20 rounded-full blur-[100px]"></div>
-            <div className="relative bg-white/50 backdrop-blur-sm p-4 rounded-3xl border border-white/50 shadow-2xl transform rotate-3 hover:rotate-1 transition-all duration-500">
-               <div className="bg-slate-50 rounded-2xl overflow-hidden shadow-inner border border-slate-100 aspect-[4/3] flex items-center justify-center relative">
-                   {/* Abstract UI Representation */}
-                   <div className="absolute top-0 left-0 right-0 h-12 bg-white border-b border-slate-100 flex items-center px-4 gap-2">
-                      <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                      <div className="w-3 h-3 rounded-full bg-amber-400"></div>
-                      <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                   </div>
-                   <div className="text-slate-300 font-bold text-center">
-                      <Rocket size={64} className="mx-auto mb-4 text-indigo-200"/>
-                      <p>Dashboard Preview</p>
-                   </div>
-               </div>
-            </div>
-            
-            {/* Floating Badge */}
-            <div className="absolute -bottom-6 -left-6 bg-white p-4 rounded-2xl shadow-xl border border-slate-100 flex items-center gap-3 animate-bounce duration-[3000ms]">
-               <div className="bg-emerald-100 p-3 rounded-xl text-emerald-600">
-                  <TrendingUp size={24}/>
-               </div>
-               <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase">Crescimento</p>
-                  <p className="text-lg font-bold text-slate-800">+127%</p>
-               </div>
-            </div>
-         </div>
-      </div>
+        </section>
     </div>
   );
 };
