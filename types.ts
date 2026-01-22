@@ -1,3 +1,4 @@
+
 export interface Product {
   id: string;
   name: string;
@@ -10,10 +11,13 @@ export interface Product {
   updatedAt?: any;
 }
 
+export type ClientType = 'common' | 'commercial';
+
 export interface Client {
   id: string;
-  name: string;
-  email: string;
+  clientType: ClientType; // 'common' or 'commercial'
+  name: string; // Nome do Cliente ou Razão Social
+  email?: string;
   phone: string;
   address?: {
     street: string;
@@ -23,6 +27,14 @@ export interface Client {
     zip: string;
     complement?: string;
   };
+  // Campos específicos para Pontos Comerciais
+  contactPerson?: string; // Responsável pela compra
+  purchasePotential?: number; // Potencial de compra
+  bestBuyDay?: string; // Melhor dia de compra
+  lastVisit?: string; // Data da última visita (ISO string YYYY-MM-DD para simplificar formulários)
+  nextVisit?: string; // Data da próxima visita (Programação)
+  notes?: string; // Observações
+  
   lastOrderDate?: any;
   totalOrders?: number;
   createdAt: any;
