@@ -1330,73 +1330,88 @@ const PublicStore = () => {
 };
 
 const DashboardHome = ({ user }: { user: User }) => {
+  const [stats, setStats] = useState({ orders: 0, revenue: 0, clients: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+     const fetchStats = async () => {
+        try {
+          // Fetch Orders
+          const oQ = query(collection(db, `merchants/${user.uid}/orders`));
+          const oSnap = await getDocs(oQ);
+          let rev = 0;
+          oSnap.forEach(d => rev += (d.data().total || 0));
+          
+          // Fetch Clients
+          const cQ = query(collection(db, `merchants/${user.uid}/clients`));
+          const cSnap = await getDocs(cQ);
+          
+          setStats({ orders: oSnap.size, revenue: rev, clients: cSnap.size });
+        } catch (e) {
+          console.error("Error fetching stats:", e);
+        } finally {
+          setLoading(false);
+        }
+     };
+     fetchStats();
+  }, [user.uid]);
+
+  if (loading) return <LoadingSpinner />;
+
   return (
-      <div className="space-y-6 animate-in fade-in duration-500">
-          <div className="mb-8">
-              <h1 className="text-2xl font-bold text-slate-800">Olá, {user.displayName || 'Lojista'}! 👋</h1>
-              <p className="text-slate-500">Aqui está o resumo do seu negócio hoje.</p>
+    <div className="space-y-6 animate-in fade-in duration-500">
+       <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Visão Geral</h2>
+            <p className="text-slate-500 text-sm">Resumo do seu negócio em tempo real</p>
+          </div>
+          <div className="text-right hidden sm:block">
+             <p className="text-sm font-bold text-slate-700">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          </div>
+       </div>
+
+       {/* Cards com Dados Reais */}
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all group">
+             <div className="flex justify-between items-start mb-4">
+                <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors"><DollarSign size={24}/></div>
+             </div>
+             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Faturamento Total</h3>
+             <p className="text-3xl font-bold text-slate-800 mt-1">R$ {stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                  <div className="flex items-center justify-between mb-4">
-                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><DollarSign size={20}/></div>
-                      <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">+12% <TrendingUp size={12}/></span>
-                  </div>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Vendas Hoje</p>
-                  <h3 className="text-2xl font-bold text-slate-800 mt-1">R$ 1.240,00</h3>
-              </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                   <div className="flex items-center justify-between mb-4">
-                      <div className="p-2 bg-orange-50 text-orange-600 rounded-lg"><ShoppingBag size={20}/></div>
-                      <span className="text-xs font-bold text-slate-400">0 pendentes</span>
-                  </div>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Pedidos</p>
-                  <h3 className="text-2xl font-bold text-slate-800 mt-1">24</h3>
-              </div>
-               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                   <div className="flex items-center justify-between mb-4">
-                      <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Users size={20}/></div>
-                       <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">+3 novos</span>
-                  </div>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Clientes Ativos</p>
-                  <h3 className="text-2xl font-bold text-slate-800 mt-1">156</h3>
-              </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all group">
+             <div className="flex justify-between items-start mb-4">
+                <div className="p-3 bg-blue-50 rounded-xl text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors"><Package size={24}/></div>
+             </div>
+             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Pedidos Realizados</h3>
+             <p className="text-3xl font-bold text-slate-800 mt-1">{stats.orders}</p>
           </div>
+          
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all group">
+             <div className="flex justify-between items-start mb-4">
+                <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><Users size={24}/></div>
+             </div>
+             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Base de Clientes</h3>
+             <p className="text-3xl font-bold text-slate-800 mt-1">{stats.clients}</p>
+          </div>
+       </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                  <h3 className="font-bold text-slate-800 mb-6">Desempenho Semanal</h3>
-                  <SimpleBarChart data={[40, 70, 45, 90, 65, 80, 55]} />
-              </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                  <h3 className="font-bold text-slate-800 mb-2">Fluxo de Caixa</h3>
-                  <p className="text-sm text-slate-500 mb-6">Comparativo de receitas e despesas este mês.</p>
-                  
-                  <div className="space-y-4">
-                      <div>
-                          <div className="flex justify-between text-sm mb-1">
-                              <span className="font-medium text-slate-600">Receitas</span>
-                              <span className="font-bold text-emerald-600">R$ 12.500</span>
-                          </div>
-                          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-emerald-500 w-[75%]"></div>
-                          </div>
-                      </div>
-                      <div>
-                           <div className="flex justify-between text-sm mb-1">
-                              <span className="font-medium text-slate-600">Despesas</span>
-                              <span className="font-bold text-rose-500">R$ 4.200</span>
-                          </div>
-                           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-rose-500 w-[35%]"></div>
-                          </div>
-                      </div>
-                  </div>
-              </div>
+       {/* Banner "UI boa de antes" */}
+       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-8 text-white relative overflow-hidden shadow-lg shadow-indigo-200">
+          <div className="relative z-10">
+             <h3 className="text-2xl font-bold mb-2">Olá, {user.displayName || 'Lojista'}! 🚀</h3>
+             <p className="text-indigo-100 max-w-lg mb-6 text-sm leading-relaxed">Sua loja está pronta para vender. Use o menu lateral para gerenciar seus produtos, clientes e pedidos. Acompanhe suas métricas em tempo real.</p>
+             <Link to="/dashboard/store" className="px-6 py-3 bg-white text-indigo-600 font-bold text-sm rounded-xl hover:bg-indigo-50 transition-colors inline-flex items-center gap-2 shadow-md">
+                <Store size={18}/> Personalizar Loja
+             </Link>
           </div>
-      </div>
-  )
+          <div className="absolute -right-10 -bottom-10 opacity-20 transform rotate-12">
+             <Rocket size={250} />
+          </div>
+       </div>
+    </div>
+  );
 };
 
 const Dashboard = () => {
