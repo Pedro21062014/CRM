@@ -4,14 +4,16 @@ import { auth, googleProvider, db } from './firebase';
 import * as firebaseAuth from 'firebase/auth';
 const { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } = firebaseAuth as any;
 type User = any;
-import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit, runTransaction } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit, runTransaction, writeBatch } from 'firebase/firestore';
 import { GoogleGenAI, Type, FunctionDeclaration, Schema } from "@google/genai";
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, Store, Settings, 
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
-  Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList
+  Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
+  Download, Upload
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
 
@@ -290,6 +292,8 @@ const ClientsManager = ({ user }: { user: User }) => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Client | null>(null);
   const [formData, setFormData] = useState<Partial<Client>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, `merchants/${user.uid}/clients`));
@@ -368,6 +372,130 @@ const ClientsManager = ({ user }: { user: User }) => {
     setFormData({ clientType: activeTab });
   };
 
+  // --- EXPORT TO EXCEL ---
+  const handleExport = () => {
+    if (clients.length === 0) {
+      alert("Nenhum cliente para exportar.");
+      return;
+    }
+
+    const exportData = clients.map(client => ({
+      'Tipo': client.clientType === 'commercial' ? 'Comercial' : 'Consumidor',
+      'Nome': client.name,
+      'Email': client.email || '',
+      'Telefone': client.phone,
+      'Responsável': client.contactPerson || '',
+      'Potencial (R$)': client.purchasePotential || '',
+      'Rua': client.address?.street || '',
+      'Número': client.address?.number || '',
+      'Bairro': client.address?.neighborhood || '',
+      'Cidade': client.address?.city || '',
+      'CEP': client.address?.zip || '',
+      'Complemento': client.address?.complement || '',
+      'Última Visita': client.lastVisit || '',
+      'Próxima Visita': client.nextVisit || '',
+      'Notas': client.notes || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Clientes");
+    
+    XLSX.writeFile(workbook, `Clientes_NovaCRM_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // --- IMPORT FROM EXCEL ---
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingFile(true);
+    
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+      if (jsonData.length === 0) {
+        alert("A planilha está vazia.");
+        setIsProcessingFile(false);
+        return;
+      }
+
+      // Firestore Batch Limit is 500
+      const batchSize = 450;
+      let batches = [];
+      let currentBatch = writeBatch(db);
+      let count = 0;
+
+      for (const row of jsonData) {
+        // Map common columns (trying to be flexible with names)
+        const name = row['Nome'] || row['Nome Completo'] || row['name'];
+        if (!name) continue; // Skip invalid rows
+
+        const isCommercial = (row['Tipo'] || '').toLowerCase().includes('comercial');
+        
+        const newClientData = {
+          name: String(name),
+          email: String(row['Email'] || row['email'] || ''),
+          phone: String(row['Telefone'] || row['phone'] || row['Celular'] || ''),
+          clientType: isCommercial ? 'commercial' : 'common',
+          address: {
+            street: String(row['Rua'] || row['Endereço'] || row['street'] || ''),
+            number: String(row['Número'] || row['Numero'] || row['number'] || ''),
+            neighborhood: String(row['Bairro'] || row['neighborhood'] || ''),
+            city: String(row['Cidade'] || row['city'] || ''),
+            zip: String(row['CEP'] || row['zip'] || ''),
+            complement: String(row['Complemento'] || row['complement'] || ''),
+          },
+          // Commercial fields
+          contactPerson: String(row['Responsável'] || row['contactPerson'] || ''),
+          purchasePotential: Number(row['Potencial (R$)'] || row['Potencial'] || 0),
+          lastVisit: row['Última Visita'] || '',
+          nextVisit: row['Próxima Visita'] || '',
+          notes: String(row['Notas'] || row['Observações'] || ''),
+          
+          createdAt: serverTimestamp(),
+          totalOrders: 0
+        };
+
+        const docRef = doc(collection(db, `merchants/${user.uid}/clients`));
+        currentBatch.set(docRef, newClientData);
+        count++;
+
+        if (count % batchSize === 0) {
+          batches.push(currentBatch);
+          currentBatch = writeBatch(db);
+        }
+      }
+
+      // Add final batch
+      if (count % batchSize !== 0) {
+        batches.push(currentBatch);
+      }
+
+      // Commit all
+      await Promise.all(batches.map(b => b.commit()));
+      
+      alert(`${count} clientes importados com sucesso!`);
+      
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao processar o arquivo. Verifique se é um Excel válido.");
+    } finally {
+      setIsProcessingFile(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
@@ -375,9 +503,36 @@ const ClientsManager = ({ user }: { user: User }) => {
           <h2 className="text-2xl font-bold text-slate-800">Gerenciar Clientes</h2>
           <p className="text-slate-500 text-sm">Gerencie consumidores e pontos comerciais</p>
         </div>
-        <PrimaryButton onClick={openNew}>
-          <Plus size={18} /> Novo Cliente
-        </PrimaryButton>
+        <div className="flex flex-wrap gap-2">
+           {/* Hidden File Input */}
+           <input 
+              type="file" 
+              accept=".xlsx, .xls, .csv" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleFileChange}
+           />
+           
+           <button 
+              onClick={handleImportClick} 
+              disabled={isProcessingFile}
+              className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-indigo-600 font-medium py-2.5 px-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm shadow-sm"
+           >
+              {isProcessingFile ? <Loader2 className="animate-spin" size={16}/> : <Upload size={16} />} 
+              Importar
+           </button>
+           
+           <button 
+              onClick={handleExport}
+              className="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 font-medium py-2.5 px-4 rounded-lg transition-all flex items-center justify-center gap-2 text-sm shadow-sm"
+           >
+              <Download size={16} /> Exportar
+           </button>
+           
+           <PrimaryButton onClick={openNew}>
+             <Plus size={18} /> Novo Cliente
+           </PrimaryButton>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -575,7 +730,7 @@ const OrdersManager = ({ user }: { user: User }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, `merchants/${user.uid}/orders`), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, `merchants/${user.uid}/orders`), orderBy('createdAt', 'desc'), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items: Order[] = [];
       snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() } as Order));
@@ -585,1011 +740,121 @@ const OrdersManager = ({ user }: { user: User }) => {
     return unsubscribe;
   }, [user.uid]);
 
-  const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
-    await updateDoc(doc(db, `merchants/${user.uid}/orders`, orderId), { status: newStatus });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch(status) {
-      case OrderStatus.NEW: return <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200">NOVO</span>;
-      case OrderStatus.PROCESSING: return <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-200">PREPARANDO</span>;
-      case OrderStatus.COMPLETED: return <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200">ENTREGUE</span>;
-      case OrderStatus.CANCELLED: return <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200">CANCELADO</span>;
-      default: return null;
-    }
-  };
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <h2 className="text-2xl font-bold text-slate-800">Vendas</h2>
-        <p className="text-slate-500 text-sm">Acompanhe e gerencie os pedidos da sua loja</p>
-      </div>
-
-      {loading ? (
-        <LoadingSpinner />
-      ) : (
-        <div className="space-y-4">
-          {orders.map(order => (
-            <div key={order.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between md:items-center gap-6 hover:shadow-md transition-all relative overflow-hidden">
-               <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                   order.status === OrderStatus.NEW ? 'bg-blue-500' : 
-                   order.status === OrderStatus.COMPLETED ? 'bg-emerald-500' :
-                   order.status === OrderStatus.PROCESSING ? 'bg-amber-500' : 'bg-red-400'
-               }`}></div>
-               
-              <div className="pl-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="font-mono text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">#{order.id.slice(-6)}</span>
-                  {getStatusBadge(order.status)}
-                  <span className="text-xs text-slate-400 flex items-center gap-1">• {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleString() : ''}</span>
-                  {order.rating && (
-                     <div className="flex items-center gap-1 ml-2 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-100">
-                        <Star size={12} className="text-amber-500 fill-amber-500"/> <span className="text-xs font-bold text-amber-600">{order.rating}</span>
-                     </div>
-                  )}
-                </div>
-                <h4 className="font-bold text-slate-800 text-lg">{order.customerName}</h4>
-                 <div className="text-sm text-slate-500 mb-3 flex flex-col">
-                    <span>{order.customerPhone}</span>
-                    {order.deliveryAddress && (
-                        <span className="flex items-center gap-1"><MapPin size={12}/> {order.deliveryAddress.street}, {order.deliveryAddress.number} - {order.deliveryAddress.neighborhood}</span>
-                    )}
-                </div>
-                <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 inline-block min-w-[300px]">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between py-1 border-b border-slate-200 last:border-0">
-                        <span>{item.quantity}x {item.productName}</span>
-                        <span className="font-medium text-slate-900">R$ {(item.price * item.quantity).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-3 pl-4 md:border-l md:border-slate-100 md:pl-8">
-                <div className="text-right">
-                    <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Total do Pedido</p>
-                    <span className="text-3xl font-bold text-slate-900">R$ {order.total.toFixed(2)}</span>
-                </div>
-                <div className="flex gap-2">
-                  {order.status === OrderStatus.NEW && (
-                    <button onClick={() => updateStatus(order.id, OrderStatus.PROCESSING)} className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all">Aceitar Pedido</button>
-                  )}
-                  {order.status === OrderStatus.PROCESSING && (
-                    <button onClick={() => updateStatus(order.id, OrderStatus.COMPLETED)} className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 shadow-md shadow-emerald-200 transition-all">Concluir Entrega</button>
-                  )}
-                  {(order.status === OrderStatus.NEW || order.status === OrderStatus.PROCESSING) && (
-                    <button onClick={() => updateStatus(order.id, OrderStatus.CANCELLED)} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 hover:text-red-600 transition-all">Cancelar</button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const StoreEditor = ({ user }: { user: User }) => {
-  const [config, setConfig] = useState<StoreConfig>({
-    storeName: 'Minha Loja',
-    themeColor: '#ea1d2c',
-    sections: []
-  });
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
-  
-  const [previewProducts, setPreviewProducts] = useState<Product[]>([]);
-
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const docRef = doc(db, 'merchants', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists() && docSnap.data().storeConfig) {
-          setConfig(docSnap.data().storeConfig);
-        } else {
-          setConfig({
-            storeName: user.displayName || 'Minha Loja',
-            description: 'A melhor comida da região! Entregamos rápido.',
-            themeColor: '#ea1d2c',
-            sections: [
-              { id: '2', type: 'products', title: 'Destaques', backgroundColor: '#ffffff' }
-            ]
-          });
-        }
-        
-        const pQuery = query(collection(db, `merchants/${user.uid}/products`), limit(4));
-        const pSnap = await getDocs(pQuery);
-        const pList: Product[] = [];
-        pSnap.forEach(d => pList.push({id: d.id, ...d.data()} as Product));
-        setPreviewProducts(pList);
-
-      } catch(e) {
-        console.error("Error loading store config", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchConfig();
-  }, [user.uid]);
-
-  const saveConfig = async () => {
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, 'merchants', user.uid), { storeConfig: config });
-    } catch (e) {
-      await setDoc(doc(db, 'merchants', user.uid), { storeConfig: config }, { merge: true });
-    }
-    setSaving(false);
-    alert('Loja atualizada com sucesso!');
-  };
-
-  const addSection = (type: 'hero' | 'products' | 'text') => {
-    const newSection: StoreSection = {
-      id: Date.now().toString(),
-      type,
-      title: type === 'hero' ? 'Novo Banner' : type === 'products' ? 'Cardápio / Produtos' : 'Nova Seção de Texto',
-      content: type === 'text' ? 'Digite seu texto aqui...' : 'Subtítulo do banner',
-      backgroundColor: '#ffffff',
-      textColor: '#000000'
-    };
-    setConfig(prev => ({ ...prev, sections: [...prev.sections, newSection] }));
-  };
-
-  const updateSection = (id: string, updates: Partial<StoreSection>) => {
-    setConfig(prev => ({
-      ...prev,
-      sections: prev.sections.map(s => s.id === id ? { ...s, ...updates } : s)
-    }));
-  };
-
-  const moveSection = (index: number, direction: 'up' | 'down') => {
-    const newSections = [...config.sections];
-    if (direction === 'up' && index > 0) {
-      [newSections[index], newSections[index - 1]] = [newSections[index - 1], newSections[index]];
-    } else if (direction === 'down' && index < newSections.length - 1) {
-      [newSections[index], newSections[index + 1]] = [newSections[index + 1], newSections[index]];
-    }
-    setConfig(prev => ({ ...prev, sections: newSections }));
-  };
-
-  const removeSection = (id: string) => {
-    if(confirm('Remover esta seção?')) {
-      setConfig(prev => ({ ...prev, sections: prev.sections.filter(s => s.id !== id) }));
-      if(activeSectionId === id) setActiveSectionId(null);
-    }
-  };
-
-  const publicLink = `${window.location.origin}/#/store/${user.uid}`;
-
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100 shrink-0">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800">Editor Visual</h2>
-        </div>
-        <div className="flex gap-3">
-          <a href={publicLink} target="_blank" rel="noopener noreferrer" className="px-4 py-2 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 text-sm">
-            <ExternalLink size={14} /> Ver Loja
-          </a>
-          <button onClick={saveConfig} disabled={saving} className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-md transition-all text-sm">
-            {saving ? 'Salvando...' : 'Salvar Alterações'}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-1 gap-6 overflow-hidden">
-        <div className="w-1/2 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar pb-10">
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
-                <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Settings size={18}/> Identidade Visual</h3>
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome da Loja</label>
-                        <input className="w-full p-2 border rounded-lg mt-1" value={config.storeName} onChange={e => setConfig({...config, storeName: e.target.value})} />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição / Slogan</label>
-                        <input className="w-full p-2 border rounded-lg mt-1" value={config.description || ''} onChange={e => setConfig({...config, description: e.target.value})} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cor Principal</label>
-                            <div className="flex items-center gap-2 mt-1 border rounded-lg p-1">
-                                <input type="color" className="w-8 h-8 rounded cursor-pointer border-none bg-transparent" value={config.themeColor} onChange={e => setConfig({...config, themeColor: e.target.value})} />
-                                <span className="text-xs text-slate-500">{config.themeColor}</span>
-                            </div>
-                        </div>
-                         <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Logo & Banner</label>
-                            <div className="flex flex-col gap-2 mt-1">
-                                <input className="w-full p-2 text-xs border rounded-lg" placeholder="URL do Logo" value={config.logoUrl || ''} onChange={e => setConfig({...config, logoUrl: e.target.value})} />
-                                <input className="w-full p-2 text-xs border rounded-lg" placeholder="URL do Banner" value={config.bannerUrl || ''} onChange={e => setConfig({...config, bannerUrl: e.target.value})} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <div className="space-y-6 animate-in fade-in">
+       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h2 className="text-2xl font-bold text-slate-800">Pedidos</h2>
+          <p className="text-slate-500 text-sm">Gerencie seus pedidos recentes</p>
+       </div>
+       <div className="grid gap-4">
+         {orders.length === 0 && <p className="text-slate-500 text-center py-10">Nenhum pedido encontrado.</p>}
+         {orders.map(order => (
+            <div key={order.id} className="bg-white p-5 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+               <div>
+                  <h3 className="font-bold text-slate-800">#{order.id.slice(-6).toUpperCase()}</h3>
+                  <p className="text-sm text-slate-500">{order.customerName} • {new Date(order.createdAt?.seconds * 1000).toLocaleDateString()}</p>
+                  <p className="font-bold text-indigo-600 mt-1">R$ {order.total.toFixed(2)}</p>
+               </div>
+               <div className="flex items-center gap-3">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    order.status === OrderStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 
+                    order.status === OrderStatus.NEW ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {order.status === OrderStatus.NEW ? 'Novo' : order.status === OrderStatus.COMPLETED ? 'Concluído' : order.status}
+                  </span>
+               </div>
             </div>
-
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
-                <div className="flex justify-between items-center mb-4">
-                     <h3 className="font-bold text-slate-700 flex items-center gap-2"><LayoutGrid size={18}/> Seções da Loja</h3>
-                     <div className="flex gap-2">
-                         <button onClick={() => addSection('hero')} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-600" title="Add Banner"><ImageIcon size={16}/></button>
-                         <button onClick={() => addSection('products')} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-600" title="Add Produtos"><ShoppingBag size={16}/></button>
-                         <button onClick={() => addSection('text')} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-600" title="Add Texto"><TypeIcon size={16}/></button>
-                     </div>
-                </div>
-                
-                <div className="space-y-2">
-                    {config.sections.map((section, idx) => (
-                        <div key={section.id} className={`border rounded-lg transition-all ${activeSectionId === section.id ? 'border-indigo-500 bg-indigo-50/50' : 'border-slate-200 bg-white'}`}>
-                            <div className="flex items-center justify-between p-3 cursor-pointer" onClick={() => setActiveSectionId(activeSectionId === section.id ? null : section.id)}>
-                                <span className="font-medium text-sm text-slate-700">
-                                    {section.type === 'hero' ? 'Banner' : section.type === 'products' ? 'Lista de Produtos' : 'Texto'}
-                                    <span className="text-slate-400 font-normal ml-2 text-xs">#{idx+1}</span>
-                                </span>
-                                <div className="flex items-center gap-1">
-                                    <button onClick={(e) => {e.stopPropagation(); moveSection(idx, 'up')}} className="p-1 hover:bg-slate-200 rounded text-slate-400"><ChevronUp size={14}/></button>
-                                    <button onClick={(e) => {e.stopPropagation(); moveSection(idx, 'down')}} className="p-1 hover:bg-slate-200 rounded text-slate-400"><ChevronDown size={14}/></button>
-                                    <button onClick={(e) => {e.stopPropagation(); removeSection(section.id)}} className="p-1 hover:bg-red-100 text-red-400 rounded"><Trash2 size={14}/></button>
-                                </div>
-                            </div>
-                            
-                            {activeSectionId === section.id && (
-                                <div className="p-3 border-t border-indigo-100 bg-white rounded-b-lg space-y-3 animate-in slide-in-from-top-2">
-                                    <input className="w-full p-2 border rounded text-sm" placeholder="Título da Seção" value={section.title || ''} onChange={e => updateSection(section.id, {title: e.target.value})} />
-                                    {(section.type === 'hero' || section.type === 'text') && (
-                                        <textarea className="w-full p-2 border rounded text-sm" rows={2} placeholder="Conteúdo / Subtítulo" value={section.content || ''} onChange={e => updateSection(section.id, {content: e.target.value})} />
-                                    )}
-                                    {(section.type === 'hero' || section.type === 'image') && (
-                                        <input className="w-full p-2 border rounded text-sm" placeholder="URL da Imagem de Fundo" value={section.imageUrl || ''} onChange={e => updateSection(section.id, {imageUrl: e.target.value})} />
-                                    )}
-                                    <div className="flex gap-4">
-                                        <div className="flex items-center gap-2">
-                                            <label className="text-[10px] font-bold uppercase text-slate-400">Fundo</label>
-                                            <input type="color" className="w-6 h-6 border-none bg-transparent cursor-pointer" value={section.backgroundColor || '#ffffff'} onChange={e => updateSection(section.id, {backgroundColor: e.target.value})} />
-                                        </div>
-                                         <div className="flex items-center gap-2">
-                                            <label className="text-[10px] font-bold uppercase text-slate-400">Texto</label>
-                                            <input type="color" className="w-6 h-6 border-none bg-transparent cursor-pointer" value={section.textColor || '#000000'} onChange={e => updateSection(section.id, {textColor: e.target.value})} />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                    {config.sections.length === 0 && <p className="text-center text-slate-400 text-sm py-4">Nenhuma seção adicionada.</p>}
-                </div>
-            </div>
-        </div>
-
-        <div className="w-1/2 bg-slate-100 rounded-2xl border border-slate-200 flex items-center justify-center p-8 relative overflow-hidden">
-            <div className="absolute top-4 left-4 text-xs font-bold text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded">Preview em Tempo Real</div>
-            
-            <div className="w-[340px] h-[680px] bg-white rounded-[40px] shadow-2xl border-8 border-slate-800 overflow-hidden relative flex flex-col">
-                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-slate-800 rounded-b-2xl z-20"></div>
-                
-                <div className="flex-1 overflow-y-auto hide-scrollbar bg-gray-50">
-                    <div className="bg-white pb-4 shadow-sm relative">
-                        <div className="h-24 w-full bg-cover bg-center" style={{ 
-                            backgroundImage: config.bannerUrl ? `url(${config.bannerUrl})` : 'linear-gradient(to right, #ea1d2c, #b91c1c)',
-                            backgroundColor: config.themeColor 
-                        }}></div>
-                        <div className="px-4 -mt-8 flex gap-3 relative z-10">
-                            <div className="w-16 h-16 rounded-full border-2 border-white bg-white shadow overflow-hidden">
-                                {config.logoUrl ? <img src={config.logoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center" style={{color: config.themeColor}}><Store size={24}/></div>}
-                            </div>
-                            <div className="pt-9">
-                                <h1 className="font-bold text-slate-800 text-sm leading-tight">{config.storeName}</h1>
-                                <p className="text-[10px] text-slate-500 mt-0.5">{config.description}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="pb-10">
-                        {config.sections.map(section => {
-                            if (section.type === 'products') {
-                                return (
-                                    <div key={section.id} className="p-4">
-                                        <h2 className="font-bold text-slate-800 text-sm mb-3">{section.title || 'Produtos'}</h2>
-                                        <div className="space-y-3">
-                                            {(previewProducts.length > 0 ? previewProducts : [1,2]).map((p: any, i) => (
-                                                <div key={i} className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex gap-3">
-                                                    <div className="flex-1">
-                                                        <div className="h-3 w-24 bg-slate-200 rounded mb-2"></div>
-                                                        <div className="h-2 w-full bg-slate-100 rounded mb-1"></div>
-                                                        <div className="h-2 w-16 bg-slate-100 rounded"></div>
-                                                    </div>
-                                                    <div className="w-16 h-16 bg-slate-100 rounded-lg"></div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )
-                            }
-                            // ... other preview sections ...
-                            return null;
-                        })}
-                    </div>
-                </div>
-
-                <div className="h-12 bg-white border-t flex justify-around items-center px-4">
-                    <div className="w-6 h-6 rounded-full bg-slate-100"></div>
-                    <div className="w-6 h-6 rounded-full bg-slate-100"></div>
-                    <div className="w-6 h-6 rounded-full bg-slate-100"></div>
-                </div>
-            </div>
-        </div>
-      </div>
+         ))}
+       </div>
     </div>
   );
 };
 
-const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+const Dashboard = ({ user }: { user: User }) => {
+  return (
+    <div className="p-8 text-center">
+       <h2 className="text-3xl font-bold text-slate-800 mb-4">Bem-vindo ao NovaCRM</h2>
+       <p className="text-slate-500">Selecione uma opção no menu para começar.</p>
+    </div>
+  );
+};
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    try {
-      if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
-      } else {
-        await createUserWithEmailAndPassword(auth, email, password);
-      }
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError("Erro na autenticação. Verifique seus dados.");
-    }
-  };
-
-  const handleGoogle = async () => {
+const Login = () => {
+  const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao fazer login");
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4 font-sans">
-      <div className="absolute top-6 left-6 cursor-pointer" onClick={() => navigate('/')}>
-         <div className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors">
-            <ChevronLeft size={20} /> Voltar para Home
-         </div>
-      </div>
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] p-10 border border-slate-100">
-        <div className="flex justify-center mb-8">
-          <AppLogo />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-800 text-center mb-2">{isLogin ? 'Bem-vindo de volta' : 'Crie sua conta'}</h2>
-        <p className="text-slate-500 mb-8 text-center text-sm">Gerencie seus clientes e vendas em um só lugar.</p>
-        
-        {error && <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm flex items-center gap-2"><X size={16}/> {error}</div>}
-        
-        <form onSubmit={handleAuth} className="space-y-5">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Email</label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-              placeholder="seu@email.com"
-              required 
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Senha</label>
-            <input 
-              type="password" 
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-              placeholder="••••••••"
-              required 
-            />
-          </div>
-          <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-xl font-semibold hover:shadow-lg hover:from-black hover:to-slate-900 transition-all duration-300 transform hover:-translate-y-0.5">
-            {isLogin ? 'Entrar na Plataforma' : 'Criar Conta Grátis'}
-          </button>
-        </form>
-
-        <div className="my-8 flex items-center">
-          <div className="flex-1 border-t border-slate-100"></div>
-          <span className="px-4 text-slate-400 text-xs uppercase tracking-widest font-medium">ou continue com</span>
-          <div className="flex-1 border-t border-slate-100"></div>
-        </div>
-
-        <button onClick={handleGoogle} className="w-full py-3.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-3">
-          <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
-          Google
-        </button>
-
-        <p className="mt-8 text-center text-sm text-slate-500">
-          {isLogin ? 'Ainda não tem uma conta?' : 'Já tem uma conta?'}
-          <button onClick={() => setIsLogin(!isLogin)} className="ml-2 text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">
-            {isLogin ? 'Cadastre-se' : 'Entrar'}
-          </button>
-        </p>
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+      <div className="mb-8"><AppLogo /></div>
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+         <h2 className="text-2xl font-bold text-slate-800 mb-2">Acesso ao Sistema</h2>
+         <p className="text-slate-500 mb-8">Faça login para gerenciar sua loja</p>
+         <button onClick={handleLogin} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-3">
+            <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.2-7.27 3.09 0 4.9 1.97 4.9 1.97L19 4.72S16.56 2 12.1 2C6.42 2 2.03 6.8 2.03 12c0 5.05 4.13 10 10.22 10 5.35 0 9.25-3.67 9.25-9.09 0-1.15-.15-2.15-.15-2.15z"/></svg>
+            Entrar com Google
+         </button>
       </div>
     </div>
   );
 };
 
-// --- PUBLIC STORE ---
-const PublicStore = () => {
-  const { id } = useParams();
-  const [config, setConfig] = useState<StoreConfig | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Cart & Checkout
-  const [cart, setCart] = useState<{product: Product, quantity: number}[]>([]);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [customerInfo, setCustomerInfo] = useState({ 
-    name: '', email: '', phone: '',
-    street: '', number: '', neighborhood: '', city: '', zip: '', complement: ''
-  });
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!id) return;
-      try {
-        const docRef = doc(db, 'merchants', id);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists() && docSnap.data().storeConfig) {
-          setConfig(docSnap.data().storeConfig);
-        } else {
-            setConfig({
-                storeName: 'Loja não encontrada',
-                themeColor: '#000000',
-                sections: []
-            });
-        }
-
-        const q = query(collection(db, `merchants/${id}/products`));
-        const querySnapshot = await getDocs(q);
-        const prods: Product[] = [];
-        querySnapshot.forEach((doc) => {
-          prods.push({ id: doc.id, ...doc.data() } as Product);
-        });
-        setProducts(prods);
-
-      } catch (error) {
-        console.error("Error loading store", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [id]);
-
-  const addToCart = (product: Product) => {
-    setCart(prev => {
-        const existing = prev.find(p => p.product.id === product.id);
-        if(existing) {
-            return prev.map(p => p.product.id === product.id ? {...p, quantity: p.quantity + 1} : p);
-        }
-        return [...prev, {product, quantity: 1}];
-    });
-    // Optional: Toast notification here
-  };
-
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
-  };
-
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.product.id === productId) {
-        return { ...item, quantity: Math.max(1, item.quantity + delta) };
-      }
-      return item;
-    }));
-  };
-
-  const handleCheckout = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id || cart.length === 0) return;
-
-    try {
-      const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
-      
-      const orderPayload = {
-        merchantId: id,
-        customerName: customerInfo.name,
-        customerEmail: customerInfo.email,
-        customerPhone: customerInfo.phone,
-        deliveryAddress: {
-            street: customerInfo.street,
-            number: customerInfo.number,
-            neighborhood: customerInfo.neighborhood,
-            city: customerInfo.city,
-            zip: customerInfo.zip,
-            complement: customerInfo.complement || ''
-        },
-        items: cart.map(i => ({ 
-          productId: i.product.id, 
-          productName: i.product.name, 
-          quantity: i.quantity, 
-          price: i.product.price,
-          imageUrl: i.product.imageUrl || ''
-        })),
-        total,
-        status: 'new',
-        createdAt: serverTimestamp()
-      };
-
-      // 1. Create Order
-      const orderRef = await addDoc(collection(db, `merchants/${id}/orders`), orderPayload);
-
-      // 2. Handle Client (Deduplication)
-      const clientsRef = collection(db, `merchants/${id}/clients`);
-      const q = query(clientsRef, where("email", "==", customerInfo.email), limit(1));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        // Update existing client
-        const clientDoc = querySnapshot.docs[0];
-        await updateDoc(doc(db, `merchants/${id}/clients`, clientDoc.id), {
-          lastOrderDate: serverTimestamp(),
-          phone: customerInfo.phone, // Update contact info
-          address: orderPayload.deliveryAddress,
-          totalOrders: (clientDoc.data().totalOrders || 0) + 1
-        });
-      } else {
-        // Create new client
-        await addDoc(clientsRef, {
-            name: customerInfo.name,
-            email: customerInfo.email,
-            phone: customerInfo.phone,
-            address: orderPayload.deliveryAddress,
-            createdAt: serverTimestamp(),
-            lastOrderDate: serverTimestamp(),
-            totalOrders: 1,
-            clientType: 'common' // Default for online orders
-        });
-      }
-
-      alert('Pedido realizado com sucesso!');
-      setCart([]);
-      setIsCheckoutOpen(false);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao processar pedido.');
-    }
-  };
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600"/></div>;
-  if (!config) return <div className="min-h-screen flex items-center justify-center">Loja não encontrada.</div>;
-
-  const cartTotal = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
-  const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-
-  return (
-    <div className="min-h-screen bg-white font-sans text-slate-900 pb-24">
-         {/* Simple Header */}
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md shadow-sm border-b border-slate-100">
-             <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    {config.logoUrl ? (
-                         <img src={config.logoUrl} alt={config.storeName} className="w-10 h-10 rounded-full object-cover shadow-sm" />
-                    ) : (
-                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">
-                             {config.storeName.charAt(0)}
-                         </div>
-                    )}
-                    <div>
-                        <h1 className="font-bold text-slate-900 leading-tight">{config.storeName}</h1>
-                        {config.description && <p className="text-xs text-slate-500 hidden sm:block">{config.description}</p>}
-                    </div>
-                </div>
-                
-                <button 
-                  onClick={() => setIsCheckoutOpen(true)}
-                  className="relative p-2 text-slate-600 hover:bg-slate-50 rounded-full transition-colors"
-                >
-                    <ShoppingBag size={24} />
-                    {cartCount > 0 && (
-                        <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
-                            {cartCount}
-                        </span>
-                    )}
-                </button>
-             </div>
-        </header>
-
-        {config.bannerUrl && (
-             <div className="w-full h-48 md:h-64 bg-cover bg-center relative" style={{ backgroundImage: `url(${config.bannerUrl})` }}>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-             </div>
-        )}
-
-        {config.sections.map((section) => {
-            if(section.type === 'hero') return <HeroSection key={section.id} section={section} />;
-            if(section.type === 'text') return <TextSection key={section.id} section={section} />;
-            if(section.type === 'products') return <ProductGridSection key={section.id} section={section} products={products} onAddToCart={addToCart} />;
-            return null;
-        })}
-        
-        {config.sections.length === 0 && (
-             <div className="py-20 text-center text-slate-400">
-                 <p>Esta loja ainda não configurou suas seções.</p>
-             </div>
-        )}
-
-        <footer className="mt-20 border-t border-slate-100 py-10 text-center">
-            <p className="text-sm text-slate-400">Powered by <span className="font-bold text-slate-600">NovaCRM</span></p>
-        </footer>
-
-        {/* Floating Cart Button (Mobile) */}
-        {cartCount > 0 && (
-          <div className="fixed bottom-4 left-4 right-4 z-40 md:hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
-              <button 
-                onClick={() => setIsCheckoutOpen(true)}
-                className="w-full bg-slate-900 text-white p-4 rounded-xl shadow-xl flex justify-between items-center font-bold hover:scale-[1.02] transition-transform"
-                style={{ backgroundColor: config.themeColor || '#0f172a' }}
-              >
-                  <span className="bg-white/20 px-3 py-1 rounded-full text-sm">{cartCount}</span>
-                  <span>Ver Sacola</span>
-                  <span>R$ {cartTotal.toFixed(2)}</span>
-              </button>
-          </div>
-        )}
-
-        {/* Checkout Modal */}
-        {isCheckoutOpen && (
-          <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
-            <div className="bg-white w-full max-w-lg h-[90vh] md:h-auto md:max-h-[90vh] rounded-t-3xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 duration-300">
-              {/* Modal Header */}
-              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                <h3 className="text-lg font-bold text-slate-800">Finalizar Pedido</h3>
-                <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-slate-50 rounded-full"><X size={24}/></button>
-              </div>
-              
-              {/* Modal Content */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {cart.length === 0 ? (
-                  <div className="text-center py-10 text-slate-400">
-                    <ShoppingBag size={48} className="mx-auto mb-4 opacity-20"/>
-                    <p>Sua sacola está vazia.</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-4">
-                      {cart.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-start border-b border-gray-50 pb-4">
-                          <div className="flex gap-3">
-                              <div className="flex flex-col items-center gap-1 bg-slate-50 rounded-lg p-1">
-                                <button onClick={() => updateQuantity(item.product.id, 1)} className="p-1 hover:text-green-600"><ChevronUp size={14}/></button>
-                                <span className="font-bold text-slate-800 text-sm">{item.quantity}</span>
-                                <button onClick={() => item.quantity > 1 ? updateQuantity(item.product.id, -1) : removeFromCart(item.product.id)} className="p-1 hover:text-red-600"><ChevronDown size={14}/></button>
-                              </div>
-                              <div>
-                                <p className="font-medium text-slate-800">{item.product.name}</p>
-                                <p className="text-sm text-slate-500">R$ {item.product.price.toFixed(2)}</p>
-                              </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                               <span className="font-medium text-slate-900">R$ {(item.product.price * item.quantity).toFixed(2)}</span>
-                               <button onClick={() => removeFromCart(item.product.id)} className="text-xs text-red-500 font-medium hover:underline">Remover</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex justify-between items-center py-4 border-t border-slate-100 bg-slate-50/50 -mx-6 px-6">
-                       <span className="font-bold text-lg text-slate-600">Total</span>
-                       <span className="font-bold text-2xl text-slate-900">R$ {cartTotal.toFixed(2)}</span>
-                    </div>
-
-                    <form onSubmit={handleCheckout} className="space-y-5 pt-2">
-                      <div>
-                        <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2 mb-3"><Users size={16}/> Seus Dados</h4>
-                        <div className="grid grid-cols-1 gap-3">
-                           <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Nome Completo" required value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} />
-                           <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" type="email" placeholder="Email" required value={customerInfo.email} onChange={e => setCustomerInfo({...customerInfo, email: e.target.value})} />
-                           <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" type="tel" placeholder="Telefone / WhatsApp" required value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} />
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2 mb-3"><MapPin size={16}/> Endereço de Entrega</h4>
-                        <div className="grid grid-cols-4 gap-3">
-                           <input className="col-span-3 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Rua / Avenida" required value={customerInfo.street} onChange={e => setCustomerInfo({...customerInfo, street: e.target.value})} />
-                           <input className="col-span-1 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Nº" required value={customerInfo.number} onChange={e => setCustomerInfo({...customerInfo, number: e.target.value})} />
-                           <input className="col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Bairro" required value={customerInfo.neighborhood} onChange={e => setCustomerInfo({...customerInfo, neighborhood: e.target.value})} />
-                           <input className="col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cidade" required value={customerInfo.city} onChange={e => setCustomerInfo({...customerInfo, city: e.target.value})} />
-                           <input className="col-span-4 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Complemento (Opcional)" value={customerInfo.complement} onChange={e => setCustomerInfo({...customerInfo, complement: e.target.value})} />
-                        </div>
-                      </div>
-                      
-                      <button type="submit" className="w-full py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 hover:scale-[1.02] transition-all shadow-lg shadow-green-100 mt-4 text-lg">
-                        Fazer Pedido
-                      </button>
-                    </form>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-    </div>
-  );
-};
-
-const DashboardHome = ({ user }: { user: User }) => {
-  const [stats, setStats] = useState({ orders: 0, revenue: 0, clients: 0 });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-     const fetchStats = async () => {
-        try {
-          // Fetch Orders
-          const oQ = query(collection(db, `merchants/${user.uid}/orders`));
-          const oSnap = await getDocs(oQ);
-          let rev = 0;
-          oSnap.forEach(d => rev += (d.data().total || 0));
-          
-          // Fetch Clients
-          const cQ = query(collection(db, `merchants/${user.uid}/clients`));
-          const cSnap = await getDocs(cQ);
-          
-          setStats({ orders: oSnap.size, revenue: rev, clients: cSnap.size });
-        } catch (e) {
-          console.error("Error fetching stats:", e);
-        } finally {
-          setLoading(false);
-        }
-     };
-     fetchStats();
-  }, [user.uid]);
-
-  if (loading) return <LoadingSpinner />;
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-       <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800">Visão Geral</h2>
-            <p className="text-slate-500 text-sm">Resumo do seu negócio em tempo real</p>
-          </div>
-          <div className="text-right hidden sm:block">
-             <p className="text-sm font-bold text-slate-700">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-          </div>
-       </div>
-
-       {/* Cards com Dados Reais */}
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all group">
-             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors"><DollarSign size={24}/></div>
-             </div>
-             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Faturamento Total</h3>
-             <p className="text-3xl font-bold text-slate-800 mt-1">R$ {stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all group">
-             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-blue-50 rounded-xl text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors"><Package size={24}/></div>
-             </div>
-             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Pedidos Realizados</h3>
-             <p className="text-3xl font-bold text-slate-800 mt-1">{stats.orders}</p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all group">
-             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><Users size={24}/></div>
-             </div>
-             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Base de Clientes</h3>
-             <p className="text-3xl font-bold text-slate-800 mt-1">{stats.clients}</p>
-          </div>
-       </div>
-
-       {/* Banner "UI boa de antes" */}
-       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-8 text-white relative overflow-hidden shadow-lg shadow-indigo-200">
-          <div className="relative z-10">
-             <h3 className="text-2xl font-bold mb-2">Olá, {user.displayName || 'Lojista'}! 🚀</h3>
-             <p className="text-indigo-100 max-w-lg mb-6 text-sm leading-relaxed">Sua loja está pronta para vender. Use o menu lateral para gerenciar seus produtos, clientes e pedidos. Acompanhe suas métricas em tempo real.</p>
-             <Link to="/dashboard/store" className="px-6 py-3 bg-white text-indigo-600 font-bold text-sm rounded-xl hover:bg-indigo-50 transition-colors inline-flex items-center gap-2 shadow-md">
-                <Store size={18}/> Personalizar Loja
-             </Link>
-          </div>
-          <div className="absolute -right-10 -bottom-10 opacity-20 transform rotate-12">
-             <Rocket size={250} />
-          </div>
-       </div>
-    </div>
-  );
-};
-
-const Dashboard = () => {
+const App = () => {
   const [user, setUser] = useState<User>(null);
   const [loading, setLoading] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u: User) => {
-      if (u) {
-        setUser(u);
-      } else {
-        navigate('/login');
-      }
+      setUser(u);
       setLoading(false);
     });
     return unsubscribe;
-  }, [navigate]);
+  }, []);
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate('/login');
-  };
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-indigo-600" size={32} /></div>;
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600"/></div>;
-  if (!user) return null;
+  if (!user) return <Login />;
 
-  return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-100 hidden md:flex flex-col fixed h-full z-10">
-        <div className="p-6">
-          <AppLogo />
-        </div>
-        
-        <nav className="flex-1 px-4 space-y-1">
-          <Link to="/dashboard" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm ${location.pathname === '/dashboard' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <LayoutDashboard size={20} /> Visão Geral
-          </Link>
-          <Link to="/dashboard/orders" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm ${location.pathname.includes('/orders') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <Package size={20} /> Pedidos
-          </Link>
-          <Link to="/dashboard/clients" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm ${location.pathname.includes('/clients') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <Users size={20} /> Clientes
-          </Link>
-          <Link to="/dashboard/store" className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm ${location.pathname.includes('/store') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <Store size={20} /> Minha Loja
-          </Link>
-        </nav>
-
-        <div className="p-4 border-t border-slate-100">
-           <div className="flex items-center gap-3 px-4 py-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
-                {user.email?.[0].toUpperCase()}
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-bold text-slate-700 truncate">{user.displayName || 'Usuário'}</p>
-                <p className="text-xs text-slate-400 truncate">{user.email}</p>
-              </div>
-           </div>
-           <button onClick={handleLogout} className="flex items-center gap-2 text-slate-400 hover:text-red-500 text-xs font-bold px-4 transition-colors">
-              <LogOut size={14} /> Sair da conta
-           </button>
-        </div>
-      </aside>
-      
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 w-full bg-white border-b border-slate-100 z-20 px-4 h-16 flex items-center justify-between">
-         <AppLogo collapsed />
-         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-slate-600">
-            <Menu size={24} />
-         </button>
-      </div>
-
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-30 bg-white pt-20 px-6 space-y-4 md:hidden">
-            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><LayoutDashboard size={20}/> Visão Geral</Link>
-            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard/orders" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><Package size={20}/> Pedidos</Link>
-            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard/clients" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><Users size={20}/> Clientes</Link>
-            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard/store" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><Store size={20}/> Minha Loja</Link>
-            <button onClick={handleLogout} className="flex items-center gap-3 p-3 text-red-500 font-bold mt-8"><LogOut size={20}/> Sair</button>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen pt-20 md:pt-8">
-        <Routes>
-          <Route path="/" element={<DashboardHome user={user} />} />
-          <Route path="/orders" element={<OrdersManager user={user} />} />
-          <Route path="/clients" element={<ClientsManager user={user} />} />
-          <Route path="/store" element={<StoreEditor user={user} />} />
-        </Routes>
-      </main>
-
-      <AIAssistant user={user} />
-    </div>
-  );
-};
-
-const LandingPage = () => {
-  return (
-    <div className="min-h-screen bg-white">
-        <header className="fixed w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100">
-            <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
-                <AppLogo />
-                <div className="flex items-center gap-4">
-                    <Link to="/login" className="text-slate-600 font-medium hover:text-indigo-600 transition-colors">Entrar</Link>
-                    <Link to="/register" className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
-                        Começar Grátis
-                    </Link>
-                </div>
-            </div>
-        </header>
-
-        <section className="pt-32 pb-20 px-4 text-center max-w-4xl mx-auto">
-            <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-wider mb-6 inline-block">CRM e Vendas para Pequenos Negócios</span>
-            <h1 className="text-5xl md:text-7xl font-bold text-slate-900 mb-6 tracking-tight">
-                Gerencie seus clientes e <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">venda mais.</span>
-            </h1>
-            <p className="text-xl text-slate-500 mb-10 max-w-2xl mx-auto leading-relaxed">
-                A plataforma completa para gerenciar pedidos, fidelizar clientes e criar sua loja online em minutos. Com inteligência artificial integrada.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link to="/register" className="px-8 py-4 bg-slate-900 text-white rounded-xl font-bold text-lg hover:bg-black transition-all flex items-center gap-2">
-                    Criar Conta Grátis <ArrowRight size={20}/>
-                </Link>
-                <a href="#features" className="px-8 py-4 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold text-lg hover:bg-slate-50 transition-all">
-                    Saber mais
-                </a>
-            </div>
-        </section>
-
-        <section id="features" className="py-20 bg-slate-50">
-            <div className="max-w-6xl mx-auto px-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                        <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-6">
-                            <Store size={24} />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-3">Loja Online Pronta</h3>
-                        <p className="text-slate-500 leading-relaxed">Crie seu catálogo digital em minutos e receba pedidos diretamente no painel ou WhatsApp.</p>
-                    </div>
-                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-6">
-                            <Users size={24} />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-3">Gestão de Clientes</h3>
-                        <p className="text-slate-500 leading-relaxed">Organize sua base de contatos, histórico de compras e preferências para vender mais.</p>
-                    </div>
-                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                        <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center mb-6">
-                            <Sparkles size={24} />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-3">Inteligência Artificial</h3>
-                        <p className="text-slate-500 leading-relaxed">Use nossa IA para criar descrições de produtos, analisar vendas e sugerir melhorias.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
-  );
-};
-
-// --- APP ENTRY ---
-const App = () => {
   return (
     <HashRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<AuthPage />} />
-        <Route path="/register" element={<AuthPage />} />
-        <Route path="/dashboard/*" element={<Dashboard />} />
-        <Route path="/store/:id" element={<PublicStore />} />
-        <Route path="*" element={<LandingPage />} />
-      </Routes>
+      <div className="flex min-h-screen bg-slate-50 text-slate-900">
+        <nav className="w-20 lg:w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-10 transition-all">
+           <div className="h-20 flex items-center justify-center lg:justify-start lg:px-6 border-b border-slate-100">
+              <AppLogo collapsed={false} />
+           </div>
+           <div className="flex-1 py-6 flex flex-col gap-2 px-3">
+              <Link to="/" className="flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-colors">
+                 <LayoutDashboard size={20} /> <span className="hidden lg:block font-medium">Dashboard</span>
+              </Link>
+              <Link to="/clients" className="flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-colors">
+                 <Users size={20} /> <span className="hidden lg:block font-medium">Clientes</span>
+              </Link>
+              <Link to="/orders" className="flex items-center gap-3 p-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-colors">
+                 <ShoppingBag size={20} /> <span className="hidden lg:block font-medium">Pedidos</span>
+              </Link>
+           </div>
+           <div className="p-4 border-t border-slate-100">
+              <button onClick={() => signOut(auth)} className="w-full flex items-center gap-3 p-3 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors">
+                 <LogOut size={20} /> <span className="hidden lg:block font-medium">Sair</span>
+              </button>
+           </div>
+        </nav>
+        <main className="flex-1 ml-20 lg:ml-64 p-4 lg:p-8">
+           <Routes>
+              <Route path="/" element={<Dashboard user={user} />} />
+              <Route path="/clients" element={<ClientsManager user={user} />} />
+              <Route path="/orders" element={<OrdersManager user={user} />} />
+           </Routes>
+        </main>
+        <AIAssistant user={user} />
+      </div>
     </HashRouter>
   );
 };
