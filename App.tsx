@@ -18,7 +18,7 @@ import {
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload, Filter, Target
+  FileSpreadsheet, Download, Upload, Filter, Target, List
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
@@ -318,6 +318,7 @@ const ClientsManager = ({ user }: { user: User }) => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Client | null>(null);
   const [formData, setFormData] = useState<Partial<Client>>({});
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
 
@@ -570,13 +571,20 @@ const ClientsManager = ({ user }: { user: User }) => {
         </div>
       </div>
 
-      <div className="flex p-1 bg-slate-100 rounded-xl w-full max-w-md mx-auto md:mx-0">
-        <button onClick={() => setActiveTab('common')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${activeTab === 'common' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <UserIcon size={16}/> Consumidores
-        </button>
-        <button onClick={() => setActiveTab('commercial')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${activeTab === 'commercial' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <Briefcase size={16}/> Pontos Comerciais
-        </button>
+      <div className="flex justify-between items-center gap-4">
+          <div className="flex p-1 bg-slate-100 rounded-xl w-full max-w-md">
+            <button onClick={() => setActiveTab('common')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${activeTab === 'common' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <UserIcon size={16}/> Consumidores
+            </button>
+            <button onClick={() => setActiveTab('commercial')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${activeTab === 'commercial' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <Briefcase size={16}/> Pontos Comerciais
+            </button>
+          </div>
+
+          <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
+             <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGrid size={18}/></button>
+             <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}><List size={18}/></button>
+          </div>
       </div>
 
       {editing && (
@@ -661,54 +669,112 @@ const ClientsManager = ({ user }: { user: User }) => {
       {loading ? (
         <LoadingSpinner />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredClients.map(client => (
-            <div key={client.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-100 transition-all group flex flex-col justify-between h-full relative overflow-hidden">
-              <div>
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md ${client.clientType === 'commercial' ? 'bg-indigo-600' : 'bg-slate-400'}`}>
-                      {client.clientType === 'commercial' ? <Briefcase size={18}/> : <UserIcon size={18}/>}
+        <>
+            {viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredClients.map(client => (
+                        <div key={client.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-100 transition-all group flex flex-col justify-between h-full relative overflow-hidden">
+                        <div>
+                            <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md ${client.clientType === 'commercial' ? 'bg-indigo-600' : 'bg-slate-400'}`}>
+                                {client.clientType === 'commercial' ? <Briefcase size={18}/> : <UserIcon size={18}/>}
+                                </div>
+                                <div>
+                                <h4 className="font-bold text-slate-800 text-base leading-tight group-hover:text-indigo-700 transition-colors line-clamp-1">{client.name}</h4>
+                                <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mt-0.5">{client.clientType === 'commercial' ? 'Ponto Comercial' : 'Consumidor'}</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => openEdit(client)} className="text-slate-300 hover:text-indigo-600 transition-colors p-1"><Edit2 size={16}/></button>
+                                <button onClick={() => handleDelete(client.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><Trash2 size={16}/></button>
+                            </div>
+                            </div>
+                            <div className="space-y-2 text-sm text-slate-600">
+                            <p className="flex items-center gap-2"><Phone size={14} className="text-slate-400"/> {client.phone}</p>
+                            {client.address?.neighborhood && <p className="flex items-center gap-2"><MapPin size={14} className="text-slate-400"/> {client.address.neighborhood}</p>}
+                            </div>
+                            {client.clientType === 'commercial' && (
+                            <div className="mt-4 bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
+                                <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
+                                    <span className="text-[10px] uppercase font-bold text-slate-400">Status</span>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${CLIENT_STATUSES[client.status as ClientStatus]?.color || 'bg-slate-100 text-slate-500'}`}>
+                                        {CLIENT_STATUSES[client.status as ClientStatus]?.label || 'Potencial'}
+                                    </span>
+                                </div>
+                                {client.contactPerson && <div className="text-xs"><span className="font-bold text-slate-500">Resp:</span> {client.contactPerson}</div>}
+                            </div>
+                            )}
+                        </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-in fade-in">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                           <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b border-slate-100">
+                             <tr>
+                               <th className="px-6 py-4">Cliente</th>
+                               <th className="px-6 py-4">Contato</th>
+                               <th className="px-6 py-4">Status</th>
+                               <th className="px-6 py-4">Local</th>
+                               <th className="px-6 py-4 text-right">Ações</th>
+                             </tr>
+                           </thead>
+                           <tbody className="divide-y divide-slate-100">
+                             {filteredClients.map(client => (
+                                <tr key={client.id} className="hover:bg-slate-50 transition-colors">
+                                   <td className="px-6 py-4">
+                                     <div className="font-bold text-slate-800 flex items-center gap-2">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs ${client.clientType === 'commercial' ? 'bg-indigo-600' : 'bg-slate-400'}`}>
+                                            {client.clientType === 'commercial' ? <Briefcase size={10}/> : <UserIcon size={10}/>}
+                                        </div>
+                                        {client.name}
+                                     </div>
+                                     <div className="text-xs text-slate-400 ml-8">{client.clientType === 'commercial' ? 'Comercial' : 'Consumidor'}</div>
+                                   </td>
+                                   <td className="px-6 py-4">
+                                     <div className="flex items-center gap-2 text-slate-600"><Phone size={14} className="text-slate-300"/> {client.phone}</div>
+                                     {client.email && <div className="text-xs text-slate-400 mt-1">{client.email}</div>}
+                                   </td>
+                                   <td className="px-6 py-4">
+                                      {client.clientType === 'commercial' ? (
+                                         <span className={`px-2 py-1 rounded-full text-xs font-bold border ${CLIENT_STATUSES[client.status as ClientStatus]?.color || 'bg-slate-100 text-slate-500'}`}>
+                                           {CLIENT_STATUSES[client.status as ClientStatus]?.label || 'Potencial'}
+                                         </span>
+                                      ) : <span className="text-slate-400">-</span>}
+                                   </td>
+                                   <td className="px-6 py-4 text-slate-600">
+                                      {client.address?.city ? (
+                                        <span>{client.address.city} <span className="text-slate-300 mx-1">•</span> {client.address.neighborhood}</span>
+                                      ) : <span className="text-slate-400 italic">Sem endereço</span>}
+                                   </td>
+                                   <td className="px-6 py-4 text-right">
+                                       <div className="flex justify-end gap-2">
+                                           <button onClick={() => openEdit(client)} className="p-1.5 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded transition-colors"><Edit2 size={16}/></button>
+                                           <button onClick={() => handleDelete(client.id)} className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded transition-colors"><Trash2 size={16}/></button>
+                                       </div>
+                                   </td>
+                                </tr>
+                             ))}
+                           </tbody>
+                        </table>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-slate-800 text-base leading-tight group-hover:text-indigo-700 transition-colors line-clamp-1">{client.name}</h4>
-                      <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mt-0.5">{client.clientType === 'commercial' ? 'Ponto Comercial' : 'Consumidor'}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                     <button onClick={() => openEdit(client)} className="text-slate-300 hover:text-indigo-600 transition-colors p-1"><Edit2 size={16}/></button>
-                     <button onClick={() => handleDelete(client.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><Trash2 size={16}/></button>
-                  </div>
                 </div>
-                <div className="space-y-2 text-sm text-slate-600">
-                   <p className="flex items-center gap-2"><Phone size={14} className="text-slate-400"/> {client.phone}</p>
-                   {client.address?.neighborhood && <p className="flex items-center gap-2"><MapPin size={14} className="text-slate-400"/> {client.address.neighborhood}</p>}
-                </div>
-                {client.clientType === 'commercial' && (
-                   <div className="mt-4 bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
-                      <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
-                          <span className="text-[10px] uppercase font-bold text-slate-400">Status</span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${CLIENT_STATUSES[client.status as ClientStatus]?.color || 'bg-slate-100 text-slate-500'}`}>
-                              {CLIENT_STATUSES[client.status as ClientStatus]?.label || 'Potencial'}
-                          </span>
-                      </div>
-                      {client.contactPerson && <div className="text-xs"><span className="font-bold text-slate-500">Resp:</span> {client.contactPerson}</div>}
-                   </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {filteredClients.length === 0 && (
-              <div className="col-span-full p-10 md:p-16 text-center bg-white rounded-2xl border border-dashed border-slate-200 flex flex-col items-center">
-                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-4">
-                   {activeTab === 'commercial' ? <Briefcase size={32}/> : <Users size={32}/>}
-                </div>
-                <h3 className="text-slate-800 font-bold mb-1">Nenhum cliente encontrado</h3>
-                <p className="text-slate-400 max-w-xs mx-auto text-sm mb-4">Adicione um novo cadastro para começar a gerenciar.</p>
-                <button onClick={openNew} className="text-indigo-600 font-bold text-sm hover:underline">Adicionar Manualmente</button>
-              </div>
             )}
-        </div>
+
+            {filteredClients.length === 0 && (
+                <div className="col-span-full p-10 md:p-16 text-center bg-white rounded-2xl border border-dashed border-slate-200 flex flex-col items-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-4">
+                    {activeTab === 'commercial' ? <Briefcase size={32}/> : <Users size={32}/>}
+                    </div>
+                    <h3 className="text-slate-800 font-bold mb-1">Nenhum cliente encontrado</h3>
+                    <p className="text-slate-400 max-w-xs mx-auto text-sm mb-4">Adicione um novo cadastro para começar a gerenciar.</p>
+                    <button onClick={openNew} className="text-indigo-600 font-bold text-sm hover:underline">Adicionar Manualmente</button>
+                </div>
+            )}
+        </>
       )}
     </div>
   );
@@ -1276,6 +1342,91 @@ const PublicStore = () => {
 // --- DASHBOARD ---
 
 const DashboardHome = ({ user }: { user: User }) => {
+  const [loading, setLoading] = useState(true);
+  const [metrics, setMetrics] = useState({
+    salesToday: 0,
+    ordersToday: 0,
+    newClientsToday: 0,
+    avgTicketToday: 0,
+    weeklySales: [0,0,0,0,0,0,0],
+    monthlyRevenue: 0,
+    monthlyGoal: 20000 // Hardcoded goal for now
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+      
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(today.getDate() - 6);
+      sevenDaysAgo.setHours(0,0,0,0);
+
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+      // Fetch Orders
+      const ordersQ = query(collection(db, `merchants/${user.uid}/orders`));
+      const ordersSnap = await getDocs(ordersQ);
+      
+      let salesT = 0;
+      let ordersT = 0;
+      let monthlyRev = 0;
+      const weeklyData = [0,0,0,0,0,0,0]; // Last 7 days
+
+      ordersSnap.forEach(doc => {
+        const data = doc.data();
+        const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || Date.now()); // Handle Firestore Timestamp
+        const total = data.total || 0;
+
+        // Today
+        if (date >= today) {
+           salesT += total;
+           ordersT += 1;
+        }
+
+        // Monthly
+        if (date >= firstDayOfMonth) {
+          monthlyRev += total;
+        }
+
+        // Weekly (Last 7 days)
+        if (date >= sevenDaysAgo) {
+           const dayDiff = Math.floor((date.getTime() - sevenDaysAgo.getTime()) / (1000 * 3600 * 24));
+           if (dayDiff >= 0 && dayDiff < 7) {
+             weeklyData[dayDiff] += total;
+           }
+        }
+      });
+
+      // Fetch Clients (for New Clients Today)
+      const clientsQ = query(collection(db, `merchants/${user.uid}/clients`));
+      const clientsSnap = await getDocs(clientsQ);
+      let newClientsT = 0;
+      clientsSnap.forEach(doc => {
+          const data = doc.data();
+          const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
+          if (date >= today) newClientsT++;
+      });
+
+      setMetrics({
+        salesToday: salesT,
+        ordersToday: ordersT,
+        newClientsToday: newClientsT,
+        avgTicketToday: ordersT > 0 ? salesT / ordersT : 0,
+        weeklySales: weeklyData,
+        monthlyRevenue: monthlyRev,
+        monthlyGoal: 20000
+      });
+      setLoading(false);
+    };
+
+    fetchData();
+  }, [user]);
+
+  if (loading) return <LoadingSpinner />;
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex justify-between items-end">
@@ -1291,10 +1442,10 @@ const DashboardHome = ({ user }: { user: User }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                 {[
-                    { label: "Vendas Hoje", value: "R$ 1.250,00", icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50", trend: "+12%" },
-                    { label: "Pedidos", value: "24", icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50", trend: "+4" },
-                    { label: "Novos Clientes", value: "5", icon: Users, color: "text-violet-600", bg: "bg-violet-50", trend: "+2" },
-                    { label: "Ticket Médio", value: "R$ 52,00", icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50", trend: "+1.5%" },
+                    { label: "Vendas Hoje", value: `R$ ${metrics.salesToday.toFixed(2)}`, icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50", trend: "Hoje" },
+                    { label: "Pedidos", value: metrics.ordersToday.toString(), icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50", trend: "Hoje" },
+                    { label: "Novos Clientes", value: metrics.newClientsToday.toString(), icon: Users, color: "text-violet-600", bg: "bg-violet-50", trend: "Hoje" },
+                    { label: "Ticket Médio", value: `R$ ${metrics.avgTicketToday.toFixed(2)}`, icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50", trend: "Hoje" },
                 ].map((stat, i) => (
                     <div key={i} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
                         <div className="flex justify-between items-start mb-4">
@@ -1316,7 +1467,7 @@ const DashboardHome = ({ user }: { user: User }) => {
                         <button className="text-slate-400 hover:text-indigo-600"><ExternalLink size={16}/></button>
                     </div>
                     <div className="h-64">
-                        <SimpleBarChart data={[120, 300, 450, 200, 600, 300, 800]} height={250} />
+                        <SimpleBarChart data={metrics.weeklySales} height={250} />
                     </div>
                 </div>
 
@@ -1328,10 +1479,10 @@ const DashboardHome = ({ user }: { user: User }) => {
                         <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
                             <svg className="w-full h-full transform -rotate-90">
                                 <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-100" />
-                                <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray={2 * Math.PI * 88} strokeDashoffset={2 * Math.PI * 88 * (1 - 0.75)} className="text-indigo-600" strokeLinecap="round" />
+                                <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray={2 * Math.PI * 88} strokeDashoffset={2 * Math.PI * 88 * (1 - Math.min(metrics.monthlyRevenue / metrics.monthlyGoal, 1))} className="text-indigo-600" strokeLinecap="round" />
                             </svg>
                             <div className="absolute text-center">
-                                <span className="text-3xl font-bold text-slate-800">75%</span>
+                                <span className="text-3xl font-bold text-slate-800">{Math.round((metrics.monthlyRevenue / metrics.monthlyGoal) * 100)}%</span>
                                 <p className="text-xs text-slate-400 font-bold uppercase">Atingido</p>
                             </div>
                         </div>
@@ -1339,14 +1490,14 @@ const DashboardHome = ({ user }: { user: User }) => {
                      
                      <div className="mt-6 pt-6 border-t border-slate-100">
                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm text-slate-500">Receita</span>
-                            <span className="font-bold text-slate-800">R$ 15.000</span>
+                            <span className="text-sm text-slate-500">Receita Mês</span>
+                            <span className="font-bold text-slate-800">R$ {metrics.monthlyRevenue.toFixed(2)}</span>
                          </div>
                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-slate-500">Despesas</span>
-                            <span className="font-bold text-slate-800">R$ 4.500</span>
+                            <span className="text-sm text-slate-500">Despesas (Est.)</span>
+                            <span className="font-bold text-slate-800">R$ {(metrics.monthlyRevenue * 0.3).toFixed(2)}</span>
                          </div>
-                         <ProfitLossChart income={15000} expense={4500} />
+                         <ProfitLossChart income={metrics.monthlyRevenue} expense={metrics.monthlyRevenue * 0.3} />
                      </div>
                 </div>
             </div>
