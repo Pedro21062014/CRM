@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation, Navigate } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
 import { 
   signInWithPopup, 
@@ -18,9 +18,9 @@ import {
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload, Filter, Target, List
+  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle
 } from 'lucide-react';
-import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus } from './types';
+import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
 
 // --- AI CONFIGURATION ---
@@ -77,8 +77,23 @@ const IconButton = ({ onClick, icon: Icon, colorClass = "text-slate-500 hover:te
   </button>
 );
 
-// --- CHARTS & ANALYTICS COMPONENTS (SVG Based) ---
+// --- UTILS ---
+const openWhatsApp = (phone: string | undefined, text: string) => {
+  if (!phone) return;
+  const cleanPhone = phone.replace(/\D/g, '');
+  if (cleanPhone.length < 10) {
+    alert("Número de telefone inválido para WhatsApp.");
+    return;
+  }
+  let finalPhone = cleanPhone;
+  if (cleanPhone.length <= 11) {
+    finalPhone = `55${cleanPhone}`;
+  }
+  const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank');
+};
 
+// --- CHARTS ---
 const SimpleBarChart = ({ data, color = "indigo", height = 60 }: { data: number[], color?: string, height?: number }) => {
   const max = Math.max(...data, 1);
   return (
@@ -102,7 +117,6 @@ const ProfitLossChart = ({ income, expense }: { income: number, expense: number 
   const total = income + expense;
   const incomePct = total > 0 ? (income / total) * 100 : 0;
   const expensePct = total > 0 ? (expense / total) * 100 : 0;
-
   return (
     <div className="flex h-4 w-full rounded-full overflow-hidden bg-slate-100 mt-2">
       <div className="bg-emerald-500 transition-all duration-1000" style={{ width: `${incomePct}%` }} title={`Receita: ${income}`}></div>
@@ -111,196 +125,416 @@ const ProfitLossChart = ({ income, expense }: { income: number, expense: number 
   );
 };
 
-// --- AI ASSISTANT COMPONENT ---
+// --- PRODUCTS MANAGER (NEW) ---
+const ProductsManager = ({ user }: { user: User }) => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [formData, setFormData] = useState<Partial<Product>>({});
 
-const AIAssistant = ({ user }: { user: User }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<{role: 'user' | 'model', text: string}[]>([
-    { role: 'model', text: 'Olá! Sou a Nova AI. Posso criar produtos, mudar a cor da loja ou analisar suas vendas. Como posso ajudar?' }
-  ]);
-  const [input, setInput] = useState('');
-  const [thinking, setThinking] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const q = query(collection(db, `merchants/${user.uid}/products`));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items: Product[] = [];
+      snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() } as Product));
+      setProducts(items);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, [user.uid]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        name: formData.name || 'Produto Sem Nome',
+        price: Number(formData.price) || 0,
+        description: formData.description || '',
+        category: formData.category || 'Geral',
+        imageUrl: formData.imageUrl || '',
+        stock: Number(formData.stock) || 0,
+        updatedAt: serverTimestamp()
+      };
+
+      if (editing && editing.id) {
+        await updateDoc(doc(db, `merchants/${user.uid}/products`, editing.id), payload);
+      } else {
+        await addDoc(collection(db, `merchants/${user.uid}/products`), {
+          ...payload,
+          createdAt: serverTimestamp()
+        });
+      }
+      setEditing(null);
+      setFormData({});
+    } catch (err) {
+      alert("Erro ao salvar produto.");
+    }
   };
 
-  useEffect(scrollToBottom, [messages]);
-
-  // TOOLS DECLARATIONS
-  const tools: FunctionDeclaration[] = [
-    {
-      name: 'createProduct',
-      description: 'Cria um novo produto no catálogo da loja.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          name: { type: Type.STRING, description: 'Nome do produto' },
-          price: { type: Type.NUMBER, description: 'Preço do produto' },
-          category: { type: Type.STRING, description: 'Categoria do produto (ex: Lanches, Bebidas)' },
-          description: { type: Type.STRING, description: 'Descrição curta do produto' }
-        },
-        required: ['name', 'price']
-      }
-    },
-    {
-      name: 'updateStoreTheme',
-      description: 'Atualiza a cor principal do tema da loja.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          colorHex: { type: Type.STRING, description: 'Código hexadecimal da cor (ex: #ff0000)' }
-        },
-        required: ['colorHex']
-      }
-    },
-    {
-      name: 'getSalesSummary',
-      description: 'Retorna o resumo das vendas e faturamento.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {},
-      }
+  const handleDelete = async (id: string) => {
+    if (confirm("Deseja excluir este produto?")) {
+      await deleteDoc(doc(db, `merchants/${user.uid}/products`, id));
     }
-  ];
+  };
 
-  const handleSend = async () => {
-    if (!input.trim() || !user) return;
-    const userMsg = input;
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
-    setThinking(true);
+  const openEdit = (product: Product) => {
+    setEditing(product);
+    setFormData(product);
+  };
 
-    try {
-      // Create chat history for context
-      const historyContents = messages.map(m => ({
-        role: m.role,
-        parts: [{ text: m.text }]
-      }));
-      
-      // Add current message
-      historyContents.push({ role: 'user', parts: [{ text: userMsg }] });
-
-      // Call Gemini using new SDK
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview", 
-        contents: historyContents,
-        config: {
-            tools: [{ functionDeclarations: tools }],
-        }
-      });
-
-      const calls = response.functionCalls;
-
-      if (calls && calls.length > 0) {
-        const results: string[] = [];
-        for (const call of calls) {
-          if (call.name === 'createProduct') {
-            const args = call.args as any;
-            await addDoc(collection(db, `merchants/${user.uid}/products`), {
-              name: args.name,
-              price: args.price,
-              category: args.category || 'Geral',
-              description: args.description || '',
-              stock: 100,
-              imageUrl: '',
-              createdAt: serverTimestamp()
-            });
-            results.push(`✅ Criei o produto: ${args.name} (R$ ${args.price})`);
-          } 
-          else if (call.name === 'updateStoreTheme') {
-            const args = call.args as any;
-            await setDoc(doc(db, 'merchants', user.uid), { 
-              storeConfig: { themeColor: args.colorHex } 
-            }, { merge: true });
-            results.push(`🎨 Atualizei a cor da loja para ${args.colorHex}`);
-          }
-          else if (call.name === 'getSalesSummary') {
-             const q = query(collection(db, `merchants/${user.uid}/orders`));
-             const snap = await getDocs(q);
-             let total = 0;
-             let count = 0;
-             snap.forEach(d => { total += d.data().total; count++; });
-             results.push(`📊 Total de vendas: R$ ${total.toFixed(2)} em ${count} pedidos.`);
-          }
-        }
-        setMessages(prev => [...prev, { role: 'model', text: results.join('\n') }]);
-      } else {
-        // Just text response
-        setMessages(prev => [...prev, { role: 'model', text: response.text || "Desculpe, não entendi." }]);
-      }
-
-    } catch (e) {
-      console.error(e);
-      setMessages(prev => [...prev, { role: 'model', text: "Desculpe, tive um erro ao processar seu pedido. Tente novamente." }]);
-    } finally {
-      setThinking(false);
-    }
+  const openNew = () => {
+    setEditing({} as Product);
+    setFormData({});
   };
 
   return (
-    <>
-      {/* Floating Button */}
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:scale-110 transition-transform z-40 border-2 border-white/20"
-      >
-        {isOpen ? <X size={24} /> : <Sparkles size={24} />}
-      </button>
+    <div className="space-y-6 animate-in fade-in">
+      <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Gerenciar Produtos</h2>
+          <p className="text-slate-500 text-sm">Controle seu estoque e cardápio</p>
+        </div>
+        <PrimaryButton onClick={openNew}><Plus size={18}/> Novo Produto</PrimaryButton>
+      </div>
 
-      {/* Chat Window */}
-      {isOpen && (
-        <div className="fixed bottom-24 right-4 md:right-6 w-[calc(100%-2rem)] md:w-96 h-[500px] bg-white rounded-2xl shadow-2xl border border-slate-200 z-40 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in">
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+           <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg animate-in zoom-in-95">
+              <div className="flex justify-between items-center mb-6">
+                 <h3 className="font-bold text-lg">{editing.id ? 'Editar Produto' : 'Novo Produto'}</h3>
+                 <button onClick={() => setEditing(null)}><X size={24} className="text-slate-400"/></button>
+              </div>
+              <form onSubmit={handleSave} className="space-y-4">
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase">Nome do Produto</label>
+                    <input required className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Preço (R$)</label>
+                        <input required type="number" step="0.01" className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.price || ''} onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Estoque</label>
+                        <input type="number" className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.stock || ''} onChange={e => setFormData({...formData, stock: parseInt(e.target.value)})} />
+                    </div>
+                 </div>
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase">Categoria</label>
+                    <input className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Lanches, Bebidas" value={formData.category || ''} onChange={e => setFormData({...formData, category: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase">URL da Imagem</label>
+                    <input className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://..." value={formData.imageUrl || ''} onChange={e => setFormData({...formData, imageUrl: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase">Descrição</label>
+                    <textarea className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" rows={3} value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} />
+                 </div>
+                 <div className="flex gap-3 pt-2">
+                    <button type="button" onClick={() => setEditing(null)} className="flex-1 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Cancelar</button>
+                    <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg">Salvar</button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
+
+      {loading ? <LoadingSpinner/> : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {products.map(product => (
+            <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group hover:shadow-md transition-all">
+               <div className="h-40 bg-slate-100 relative overflow-hidden">
+                  <img src={product.imageUrl || `https://picsum.photos/400/300?random=${product.id}`} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                  <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <button onClick={() => openEdit(product)} className="p-2 bg-white rounded-full shadow text-indigo-600 hover:text-indigo-800"><Edit2 size={16}/></button>
+                     <button onClick={() => handleDelete(product.id)} className="p-2 bg-white rounded-full shadow text-red-500 hover:text-red-700"><Trash2 size={16}/></button>
+                  </div>
+                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 backdrop-blur-sm rounded text-white text-xs font-bold">
+                    Estoque: {product.stock}
+                  </div>
+               </div>
+               <div className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                     <div>
+                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{product.category}</span>
+                       <h3 className="font-bold text-slate-800 leading-tight">{product.name}</h3>
+                     </div>
+                     <span className="font-bold text-indigo-600">R$ {product.price.toFixed(2)}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 line-clamp-2 h-8">{product.description}</p>
+               </div>
+            </div>
+          ))}
+          {products.length === 0 && (
+             <div className="col-span-full py-16 text-center border-2 border-dashed border-slate-200 rounded-2xl">
+                <Package size={48} className="mx-auto text-slate-300 mb-4"/>
+                <p className="text-slate-500 font-medium">Você ainda não tem produtos.</p>
+                <button onClick={openNew} className="text-indigo-600 font-bold hover:underline mt-2">Cadastrar Primeiro Produto</button>
+             </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- META BUSINESS API / WHATSAPP BOT ---
+const WhatsAppBot = ({ user }: { user: User }) => {
+  const [metaConfig, setMetaConfig] = useState<WhatsAppConfig>({ phoneNumberId: '', accessToken: '' });
+  const [showConfig, setShowConfig] = useState(false);
+  const [targetPhone, setTargetPhone] = useState('');
+  const [messages, setMessages] = useState<{id: string, sender: 'me' | 'them', text: string, time: string}[]>([]);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Load config
+  useEffect(() => {
+    const loadConfig = async () => {
+        const docRef = doc(db, 'merchants', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().storeConfig?.metaWhatsApp) {
+            setMetaConfig(docSnap.data().storeConfig.metaWhatsApp);
+        } else {
+            setShowConfig(true);
+        }
+    };
+    loadConfig();
+  }, [user]);
+
+  // Save config
+  const handleSaveConfig = async (e: React.FormEvent) => {
+      e.preventDefault();
+      try {
+          await setDoc(doc(db, 'merchants', user.uid), {
+             storeConfig: { metaWhatsApp: metaConfig } 
+          }, { merge: true });
+          setShowConfig(false);
+          alert('Configuração salva com sucesso!');
+      } catch (error) {
+          alert('Erro ao salvar configuração.');
+      }
+  };
+
+  useEffect(() => {
+    if(scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
+  const sendMetaMessage = async () => {
+    if (!input.trim() || !targetPhone) {
+        alert("Preencha o telefone e a mensagem.");
+        return;
+    }
+    if (!metaConfig.phoneNumberId || !metaConfig.accessToken) {
+        alert("Configure a API da Meta primeiro.");
+        setShowConfig(true);
+        return;
+    }
+
+    setSending(true);
+    const newMsg = { id: Date.now().toString(), sender: 'me' as const, text: input, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
+    
+    // Optimistic UI update
+    setMessages(prev => [...prev, newMsg]);
+    
+    try {
+        // Clean phone number
+        let phone = targetPhone.replace(/\D/g, '');
+        if (phone.length <= 11 && !phone.startsWith('55')) phone = `55${phone}`; // Force Brazil default if short
+
+        const url = `https://graph.facebook.com/v17.0/${metaConfig.phoneNumberId}/messages`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${metaConfig.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp',
+                to: phone,
+                type: 'text',
+                text: { body: input }
+            })
+        });
+
+        const data = await response.json();
+        if (data.error) {
+            console.error("Meta API Error:", data.error);
+            setMessages(prev => [...prev, { id: 'err', sender: 'them', text: `Erro ao enviar: ${data.error.message}`, time: 'System' }]);
+        } else {
+            // Success
+            setInput('');
+        }
+    } catch (error) {
+        console.error("Fetch Error:", error);
+        alert("Erro de conexão com a Meta API.");
+    } finally {
+        setSending(false);
+    }
+  };
+
+  if (showConfig) {
+      return (
+          <div className="flex items-center justify-center h-full bg-slate-50 p-4">
+              <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 max-w-lg w-full">
+                  <div className="flex items-center gap-3 mb-6 text-[#008069]">
+                      <MessageCircle size={32} />
+                      <h2 className="text-2xl font-bold text-slate-800">Configurar Meta API</h2>
+                  </div>
+                  <p className="text-sm text-slate-500 mb-6">
+                      Para enviar mensagens diretamente, insira as credenciais do seu App na Meta (Developers Facebook).
+                      <a href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started" target="_blank" className="text-indigo-600 underline ml-1">Saiba como obter.</a>
+                  </p>
+                  
+                  <form onSubmit={handleSaveConfig} className="space-y-4">
+                      <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">ID do Número de Telefone</label>
+                          <input 
+                            required 
+                            className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" 
+                            value={metaConfig.phoneNumberId} 
+                            onChange={e => setMetaConfig({...metaConfig, phoneNumberId: e.target.value})}
+                            placeholder="Ex: 1045234..."
+                          />
+                      </div>
+                      <div>
+                          <label className="text-xs font-bold text-slate-500 uppercase">Token de Acesso (Permanente ou Temp)</label>
+                          <input 
+                            required 
+                            type="password"
+                            className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" 
+                            value={metaConfig.accessToken} 
+                            onChange={e => setMetaConfig({...metaConfig, accessToken: e.target.value})}
+                            placeholder="EAAG..."
+                          />
+                      </div>
+                      <div className="flex gap-3 pt-4">
+                          {messages.length > 0 && <button type="button" onClick={() => setShowConfig(false)} className="px-4 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Voltar</button>}
+                          <button type="submit" className="flex-1 py-3 bg-[#008069] text-white font-bold rounded-xl hover:bg-[#006d59] shadow-lg flex items-center justify-center gap-2">
+                              <Key size={18}/> Salvar Credenciais
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      );
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-100px)] bg-slate-100 overflow-hidden rounded-xl shadow-xl border border-slate-200 animate-in zoom-in-95 duration-300">
+       {/* Sidebar List (Manual Input mostly since no webhook) */}
+       <div className="w-full md:w-[350px] bg-white border-r border-slate-200 flex flex-col">
+          <div className="h-16 bg-slate-50 border-b border-slate-200 flex items-center justify-between px-4 shrink-0">
+              <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
+                 {user.photoURL ? <img src={user.photoURL} className="w-full h-full"/> : <UserIcon className="text-slate-400"/>}
+              </div>
+              <div className="flex gap-2 text-slate-500">
+                  <button onClick={() => setShowConfig(true)} className="p-2 hover:bg-slate-200 rounded-full" title="Configurações API"><Settings size={20}/></button>
+              </div>
+          </div>
+          
+          <div className="p-4 border-b border-slate-100 bg-emerald-50">
+             <label className="text-xs font-bold text-emerald-700 uppercase mb-1 block">Iniciar Conversa</label>
+             <div className="flex items-center bg-white border border-emerald-200 rounded-lg px-3 py-2">
+                <Phone size={16} className="text-emerald-500 mr-2"/>
+                <input 
+                    placeholder="5511999999999" 
+                    value={targetPhone}
+                    onChange={e => setTargetPhone(e.target.value)}
+                    className="bg-transparent border-none text-sm w-full outline-none placeholder:text-slate-400 font-medium"
+                />
+             </div>
+             <p className="text-[10px] text-emerald-600 mt-2 leading-tight">
+                 <AlertTriangle size={10} className="inline mr-1"/>
+                 Sem um servidor Webhook, você não receberá respostas aqui. Use apenas para enviar notificações.
+             </p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+              <div className="p-3">
+                  <p className="text-xs text-slate-400 text-center uppercase font-bold tracking-wider mb-2">Histórico Local</p>
+                  {/* Just a visual placeholder since we don't fetch history from Meta API */}
+                  <div className={`flex items-center gap-3 p-3 cursor-pointer bg-slate-100 rounded-lg`}>
+                      <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold shrink-0">
+                          <MessageCircle size={20}/>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-baseline">
+                              <h4 className="font-medium text-slate-900 truncate">{targetPhone || 'Novo Chat'}</h4>
+                              <span className="text-xs text-slate-400">Agora</span>
+                          </div>
+                          <p className="text-sm text-slate-500 truncate">Conversa ativa via API</p>
+                      </div>
+                  </div>
+              </div>
+          </div>
+       </div>
+
+       {/* Chat Area */}
+       <div className="hidden md:flex flex-1 flex-col bg-[#efeae2] relative">
+          <div className="absolute inset-0 opacity-10" style={{backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")'}}></div>
+          
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-4 flex items-center gap-3">
-             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white">
-                <Sparkles size={16}/>
-             </div>
-             <div>
-               <h3 className="text-white font-bold text-sm">Assistente Nova AI</h3>
-               <p className="text-indigo-100 text-xs">Online • Gemini 3.0</p>
-             </div>
-             <button onClick={() => setIsOpen(false)} className="ml-auto text-white/70 hover:text-white"><X size={18}/></button>
+          <div className="h-16 bg-slate-50 border-b border-slate-200 flex items-center justify-between px-4 shrink-0 z-10">
+              <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">
+                      <UserIcon size={20}/>
+                  </div>
+                  <div>
+                      <h4 className="font-medium text-slate-900">{targetPhone ? targetPhone : 'Selecione um número'}</h4>
+                      <p className="text-xs text-slate-500">via WhatsApp Cloud API</p>
+                  </div>
+              </div>
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-             {messages.map((msg, idx) => (
-               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'}`}>
-                    {msg.text}
-                  </div>
-               </div>
-             ))}
-             {thinking && (
-               <div className="flex justify-start">
-                 <div className="bg-white border border-slate-200 p-3 rounded-2xl rounded-tl-none shadow-sm">
-                    <Loader2 className="animate-spin text-indigo-500" size={16}/>
+          <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-2 z-10" ref={scrollRef}>
+             {messages.length === 0 && (
+                 <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-60">
+                     <MessageCircle size={48} className="mb-2"/>
+                     <p>Envie a primeira mensagem para iniciar.</p>
                  </div>
-               </div>
              )}
-             <div ref={messagesEndRef} />
+             
+             {messages.map((msg) => (
+                 <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+                     <div className={`max-w-[70%] p-2 px-3 rounded-lg text-sm shadow-sm relative ${msg.sender === 'me' ? 'bg-[#d9fdd3] text-slate-800 rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none'}`}>
+                        <div className="break-words">{msg.text}</div>
+                        <div className="flex justify-end items-center gap-1 mt-1">
+                            <span className="text-[10px] text-slate-500">{msg.time}</span>
+                            {msg.sender === 'me' && <span className="text-blue-500"><CheckCircle2 size={12}/></span>}
+                        </div>
+                     </div>
+                 </div>
+             ))}
           </div>
 
           {/* Input */}
-          <div className="p-3 bg-white border-t border-slate-100 flex gap-2">
-             <input 
-               value={input}
-               onChange={e => setInput(e.target.value)}
-               onKeyDown={e => e.key === 'Enter' && handleSend()}
-               placeholder="Ex: Crie um produto X-Salada..." 
-               className="flex-1 bg-slate-100 border-none rounded-xl px-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-             />
-             <button onClick={handleSend} disabled={thinking} className="p-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50">
-               <Send size={18}/>
-             </button>
+          <div className="h-16 bg-slate-50 px-4 flex items-center gap-3 z-10">
+              <button className="text-slate-500 hover:text-slate-700"><Smile size={24}/></button>
+              <button className="text-slate-500 hover:text-slate-700"><Paperclip size={24}/></button>
+              <input 
+                 value={input}
+                 onChange={e => setInput(e.target.value)}
+                 onKeyDown={e => e.key === 'Enter' && sendMetaMessage()}
+                 className="flex-1 p-2.5 rounded-lg border-none bg-white outline-none focus:ring-1 focus:ring-white placeholder:text-slate-400" 
+                 placeholder={targetPhone ? "Digite sua mensagem..." : "Insira um número ao lado primeiro"}
+                 disabled={!targetPhone}
+              />
+              {input.trim() ? (
+                  <button onClick={sendMetaMessage} disabled={sending} className="p-2 text-[#00a884] hover:bg-slate-100 rounded-full transition-all">
+                      {sending ? <Loader2 size={24} className="animate-spin"/> : <Send size={24}/>}
+                  </button>
+              ) : (
+                  <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-full"><Phone size={24}/></button> 
+              )}
           </div>
-        </div>
-      )}
-    </>
+       </div>
+    </div>
   );
 };
+
 
 // --- CONSTANTS FOR CLIENT STATUS ---
 const CLIENT_STATUSES = {
@@ -686,6 +920,7 @@ const ClientsManager = ({ user }: { user: User }) => {
                                 </div>
                             </div>
                             <div className="flex gap-2">
+                                <button onClick={() => openWhatsApp(client.phone, `Olá ${client.name}, tudo bem?`)} className="text-emerald-500 hover:text-emerald-600 transition-colors p-1" title="Chamar no WhatsApp"><MessageCircle size={16}/></button>
                                 <button onClick={() => openEdit(client)} className="text-slate-300 hover:text-indigo-600 transition-colors p-1"><Edit2 size={16}/></button>
                                 <button onClick={() => handleDelete(client.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><Trash2 size={16}/></button>
                             </div>
@@ -752,6 +987,7 @@ const ClientsManager = ({ user }: { user: User }) => {
                                    </td>
                                    <td className="px-6 py-4 text-right">
                                        <div className="flex justify-end gap-2">
+                                           <button onClick={() => openWhatsApp(client.phone, `Olá ${client.name}, tudo bem?`)} className="p-1.5 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded transition-colors" title="Chamar no WhatsApp"><MessageCircle size={16}/></button>
                                            <button onClick={() => openEdit(client)} className="p-1.5 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded transition-colors"><Edit2 size={16}/></button>
                                            <button onClick={() => handleDelete(client.id)} className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded transition-colors"><Trash2 size={16}/></button>
                                        </div>
@@ -905,16 +1141,21 @@ const StoreEditor = ({ user }: { user: User }) => {
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição / Slogan</label>
                         <input className="w-full p-2 border rounded-lg mt-1" value={config.description || ''} onChange={e => setConfig({...config, description: e.target.value})} />
                     </div>
+                    <div>
+                        <label className="text-xs font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1"><MessageCircle size={12}/> WhatsApp do Estabelecimento</label>
+                        <input className="w-full p-2 border border-emerald-100 rounded-lg mt-1 focus:ring-emerald-500" placeholder="Ex: 11999999999 (para receber pedidos)" value={config.whatsapp || ''} onChange={e => setConfig({...config, whatsapp: e.target.value})} />
+                        <p className="text-[10px] text-slate-400 mt-1">Insira apenas números com DDD. Os pedidos serão enviados para este número.</p>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cor Principal</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase">Cor Principal</label>
                             <div className="flex items-center gap-2 mt-1 border rounded-lg p-1">
                                 <input type="color" className="w-8 h-8 rounded cursor-pointer border-none bg-transparent" value={config.themeColor} onChange={e => setConfig({...config, themeColor: e.target.value})} />
                                 <span className="text-xs text-slate-500">{config.themeColor}</span>
                             </div>
                         </div>
                          <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Logo & Banner</label>
+                            <label className="text-xs font-bold text-slate-500 uppercase">Logo & Banner</label>
                             <div className="flex flex-col gap-2 mt-1">
                                 <input className="w-full p-2 text-xs border rounded-lg" placeholder="URL do Logo" value={config.logoUrl || ''} onChange={e => setConfig({...config, logoUrl: e.target.value})} />
                                 <input className="w-full p-2 text-xs border rounded-lg" placeholder="URL do Banner" value={config.bannerUrl || ''} onChange={e => setConfig({...config, bannerUrl: e.target.value})} />
@@ -1198,6 +1439,12 @@ const OrdersManager = ({ user }: { user: User }) => {
                                 <option value="completed">Concluído</option>
                                 <option value="cancelled">Cancelado</option>
                              </select>
+                             <button 
+                                onClick={() => openWhatsApp(order.customerPhone, `Olá ${order.customerName}, estou entrando em contato sobre o pedido #${order.id.slice(0, 8)} da ${new Date(order.createdAt?.seconds * 1000).toLocaleDateString()}.`)}
+                                className="flex items-center justify-center gap-2 p-3 rounded-xl bg-emerald-50 text-emerald-700 font-bold hover:bg-emerald-100 transition-colors"
+                             >
+                                <MessageCircle size={18} /> Contactar Cliente
+                             </button>
                         </div>
                     </div>
                 ))}
@@ -1261,7 +1508,14 @@ const PublicStore = () => {
 
   const checkout = () => {
       const message = `Olá! Gostaria de fazer um pedido:\n\n${cart.map(i => `${i.quantity}x ${i.product.name}`).join('\n')}\n\nTotal: R$ ${total.toFixed(2)}`;
-      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+      
+      // Se o estabelecimento tem um WhatsApp configurado, usa ele.
+      if (config?.whatsapp) {
+          openWhatsApp(config.whatsapp, message);
+      } else {
+          // Fallback antigo: abre sem número (usuário escolhe)
+          window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+      }
   };
 
   if (loading) return <LoadingSpinner />;
@@ -1336,6 +1590,110 @@ const PublicStore = () => {
               </div>
           )}
       </div>
+  );
+};
+
+// --- AI Assistant ---
+const AIAssistant = ({ user }: { user: User }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isOpen]);
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const newMsg = { role: 'user' as const, text: input };
+    setMessages(prev => [...prev, newMsg]);
+    setInput('');
+    setLoading(true);
+
+    try {
+      const history = messages.map(m => ({
+        role: m.role,
+        parts: [{ text: m.text }]
+      }));
+      
+      const response = await genAI.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [...history, { role: 'user', parts: [{ text: newMsg.text }] }],
+        config: {
+            systemInstruction: "Você é um assistente virtual especialista em negócios e CRM. Ajude o usuário a gerenciar sua loja, analisar métricas e melhorar vendas. Seja curto e eficiente."
+        }
+      });
+
+      const reply = response.text || "Não consegui processar a resposta.";
+      setMessages(prev => [...prev, { role: 'model', text: reply }]);
+    } catch (error) {
+      console.error(error);
+      setMessages(prev => [...prev, { role: 'model', text: "Erro ao conectar com a IA." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-6 right-6 p-4 bg-indigo-600 text-white rounded-full shadow-xl hover:bg-indigo-700 hover:scale-105 transition-all z-50 group"
+      >
+        {isOpen ? <X size={24}/> : <Sparkles size={24} className="group-hover:animate-spin-slow"/>}
+      </button>
+
+      {isOpen && (
+        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[500px] max-h-[70vh] bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
+           <div className="bg-indigo-600 p-4 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2 font-bold">
+                 <Bot size={20}/> Assistente IA
+              </div>
+              <button onClick={() => setIsOpen(false)}><X size={18} className="opacity-70 hover:opacity-100"/></button>
+           </div>
+           
+           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50" ref={scrollRef}>
+              {messages.length === 0 && (
+                  <div className="text-center text-slate-400 mt-10">
+                      <Sparkles size={32} className="mx-auto mb-2 text-indigo-300"/>
+                      <p className="text-sm">Olá! Pergunte sobre vendas, marketing ou gestão.</p>
+                  </div>
+              )}
+              {messages.map((m, i) => (
+                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white text-slate-700 shadow-sm border border-slate-100 rounded-tl-sm'}`}>
+                          {m.text}
+                      </div>
+                  </div>
+              ))}
+              {loading && (
+                  <div className="flex justify-start">
+                      <div className="bg-white p-3 rounded-2xl rounded-tl-sm shadow-sm border border-slate-100">
+                          <Loader2 size={16} className="animate-spin text-indigo-500"/>
+                      </div>
+                  </div>
+              )}
+           </div>
+           
+           <div className="p-3 bg-white border-t border-slate-100 shrink-0 flex gap-2">
+              <input 
+                className="flex-1 bg-slate-100 border-none rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-100"
+                placeholder="Digite sua mensagem..."
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && sendMessage()}
+              />
+              <button onClick={sendMessage} disabled={!input.trim() || loading} className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50">
+                  <Send size={20}/>
+              </button>
+           </div>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -1536,7 +1894,9 @@ const Dashboard = () => {
   const menuItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Visão Geral', exact: true },
     { path: '/dashboard/orders', icon: ShoppingBag, label: 'Pedidos' },
+    { path: '/dashboard/products', icon: Package, label: 'Produtos' },
     { path: '/dashboard/clients', icon: Users, label: 'Clientes' },
+    { path: '/dashboard/whatsapp', icon: MessageCircle, label: 'WhatsApp Bot' },
     { path: '/dashboard/store', icon: Store, label: 'Loja Virtual' },
   ];
 
@@ -1613,7 +1973,9 @@ const Dashboard = () => {
               <Route path="/" element={<DashboardHome user={user} />} />
               <Route path="/orders" element={<OrdersManager user={user} />} />
               <Route path="/clients" element={<ClientsManager user={user} />} />
+              <Route path="/whatsapp" element={<WhatsAppBot user={user} />} />
               <Route path="/store" element={<StoreEditor user={user} />} />
+              <Route path="/products" element={<ProductsManager user={user} />} />
             </Routes>
          </div>
       </main>
@@ -1623,95 +1985,16 @@ const Dashboard = () => {
   );
 };
 
-// --- LANDING PAGE ---
-const LandingPage = () => {
-  const navigate = useNavigate();
-  return (
-    <div className="min-h-screen bg-white">
-      <nav className="flex items-center justify-between p-4 md:p-6 max-w-7xl mx-auto">
-        <AppLogo />
-        <div className="flex gap-2 md:gap-4">
-          <button onClick={() => navigate('/login')} className="px-3 md:px-5 py-2 text-sm md:text-base text-slate-600 font-medium hover:text-indigo-600 transition-colors">Entrar</button>
-          <button onClick={() => navigate('/register')} className="px-3 md:px-5 py-2 text-sm md:text-base bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">Começar</button>
-        </div>
-      </nav>
-      
-      <div className="max-w-7xl mx-auto px-6 py-12 md:py-20 flex flex-col md:flex-row items-center gap-12">
-        <div className="flex-1 space-y-6 text-center md:text-left">
-          <h1 className="text-4xl md:text-7xl font-bold text-slate-900 leading-tight">
-            Gerencie seu negócio <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">com inteligência.</span>
-          </h1>
-          <p className="text-lg md:text-xl text-slate-500 max-w-lg leading-relaxed mx-auto md:mx-0">
-            CRM, Vendas e Loja Virtual em uma única plataforma. Potencialize seus resultados com nossa IA integrada.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center md:justify-start">
-             <button onClick={() => navigate('/register')} className="px-8 py-4 bg-slate-900 text-white text-lg font-bold rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
-                Criar Conta Grátis <ArrowRight size={20}/>
-             </button>
-             <button className="px-8 py-4 bg-white text-slate-700 border border-slate-200 text-lg font-bold rounded-2xl hover:bg-slate-50 transition-all">
-                Ver Demonstração
-             </button>
-          </div>
-        </div>
-        <div className="flex-1 relative w-full max-w-md md:max-w-full">
-           <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-100 to-violet-100 rounded-full blur-3xl opacity-50 -z-10"></div>
-           <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-100 transform rotate-2 hover:rotate-0 transition-all duration-500">
-               <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-4">
-                   <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                   <div className="w-3 h-3 rounded-full bg-amber-400"></div>
-                   <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
-               </div>
-               <div className="space-y-4 opacity-50">
-                   <div className="h-8 bg-slate-100 rounded w-1/3"></div>
-                   <div className="grid grid-cols-3 gap-4">
-                       <div className="h-24 bg-indigo-50 rounded"></div>
-                       <div className="h-24 bg-purple-50 rounded"></div>
-                       <div className="h-24 bg-emerald-50 rounded"></div>
-                   </div>
-                   <div className="h-40 bg-slate-50 rounded"></div>
-               </div>
-           </div>
-        </div>
-      </div>
-      
-      <div className="bg-slate-50 py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-6">
-           <div className="text-center mb-16">
-              <h2 className="text-3xl font-bold text-slate-900 mb-4">Tudo que você precisa</h2>
-              <p className="text-slate-500 max-w-2xl mx-auto">Uma suíte completa de ferramentas para modernizar sua operação comercial.</p>
-           </div>
-           
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                  { icon: <Store size={32} className="text-indigo-600"/>, title: "Loja Virtual", desc: "Crie seu catálogo online em minutos e receba pedidos no WhatsApp ou Painel." },
-                  { icon: <Users size={32} className="text-violet-600"/>, title: "CRM de Clientes", desc: "Organize sua carteira de clientes, histórico de compras e funil de vendas." },
-                  { icon: <Sparkles size={32} className="text-emerald-600"/>, title: "IA Integrada", desc: "Nossa IA ajuda você a criar descrições, analisar dados e tomar decisões." }
-              ].map((item, i) => (
-                  <div key={i} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                      <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-6">{item.icon}</div>
-                      <h3 className="text-xl font-bold text-slate-800 mb-3">{item.title}</h3>
-                      <p className="text-slate-500 leading-relaxed">{item.desc}</p>
-                  </div>
-              ))}
-           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- APP ENTRY ---
 const App = () => {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/register" element={<AuthPage />} />
-        <Route path="/dashboard/*" element={<Dashboard />} />
         <Route path="/store/:id" element={<PublicStore />} />
-        <Route path="*" element={<LandingPage />} />
+        <Route path="/dashboard/*" element={<Dashboard />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </HashRouter>
   );

@@ -93,13 +93,22 @@ export interface StoreSection {
   layout?: 'grid' | 'list'; // For products
 }
 
+export interface WhatsAppConfig {
+  phoneNumberId: string;
+  accessToken: string;
+  businessAccountId?: string;
+}
+
 export interface StoreConfig {
   storeName: string;
   description?: string; // Slogan ou info extra (ex: "Aberto das 18h as 23h")
+  whatsapp?: string; // Número para receber pedidos
   themeColor: string;
   logoUrl?: string;
   bannerUrl?: string; // Capa estilo iFood
   sections: StoreSection[];
   ratingSum?: number;
   ratingCount?: number;
+  // Integração Meta
+  metaWhatsApp?: WhatsAppConfig;
 }
