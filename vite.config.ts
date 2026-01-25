@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Evita erro de 'process is not defined' no navegador se o replace não ocorrer automaticamente
-    'process.env': process.env
+    // Avoid replacing the entire process.env object which causes build failures
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || '')
   }
 });

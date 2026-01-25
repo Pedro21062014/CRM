@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
-import * as firebaseAuth from 'firebase/auth';
-const { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } = firebaseAuth as any;
-type User = any;
+import { 
+  signInWithPopup, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  type User 
+} from 'firebase/auth';
+
 import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit, runTransaction } from 'firebase/firestore';
 import { GoogleGenAI, Type, FunctionDeclaration, Schema } from "@google/genai";
 import XLSX from 'xlsx-js-style';
@@ -1090,7 +1096,11 @@ const OrdersManager = ({ user }: { user: User }) => {
                             </div>
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2 text-sm text-slate-600"><UserIcon size={16}/> {order.customerName}</div>
-                                <div className="flex items-center gap-2 text-sm text-slate-600"><MapPin size={16}/> {order.deliveryAddress.street}, {order.deliveryAddress.number}</div>
+                                {order.deliveryAddress ? (
+                                  <div className="flex items-center gap-2 text-sm text-slate-600"><MapPin size={16}/> {order.deliveryAddress.street}, {order.deliveryAddress.number}</div>
+                                ) : (
+                                  <div className="flex items-center gap-2 text-sm text-slate-400 italic"><MapPin size={16}/> Endereço não disponível</div>
+                                )}
                             </div>
                             <div className="border-t border-slate-100 pt-3">
                                 {order.items.map((item, idx) => (
