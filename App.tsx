@@ -6,7 +6,7 @@ const { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassw
 type User = any;
 import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit, runTransaction } from 'firebase/firestore';
 import { GoogleGenAI, Type, FunctionDeclaration, Schema } from "@google/genai";
-import XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, Store, Settings, 
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
@@ -1651,103 +1651,176 @@ const PublicStore = () => {
   );
 };
 
-const DashboardHome = ({ user }: { user: User }) => {
-  const [stats, setStats] = useState({ orders: 0, revenue: 0, clients: 0 });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-     const fetchStats = async () => {
-        try {
-          // Fetch Orders
-          const oQ = query(collection(db, `merchants/${user.uid}/orders`));
-          const oSnap = await getDocs(oQ);
-          let rev = 0;
-          oSnap.forEach(d => rev += (d.data().total || 0));
-          
-          // Fetch Clients
-          const cQ = query(collection(db, `merchants/${user.uid}/clients`));
-          const cSnap = await getDocs(cQ);
-          
-          setStats({ orders: oSnap.size, revenue: rev, clients: cSnap.size });
-        } catch (e) {
-          console.error("Error fetching stats:", e);
-        } finally {
-          setLoading(false);
-        }
-     };
-     fetchStats();
-  }, [user.uid]);
-
-  if (loading) return <LoadingSpinner />;
-
+// --- LANDING PAGE ---
+const LandingPage = () => {
+  const navigate = useNavigate();
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-       <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800">Visão Geral</h2>
-            <p className="text-slate-500 text-sm">Resumo do seu negócio em tempo real</p>
+    <div className="min-h-screen bg-white">
+      <nav className="flex items-center justify-between p-6 max-w-7xl mx-auto">
+        <AppLogo />
+        <div className="flex gap-4">
+          <button onClick={() => navigate('/login')} className="px-5 py-2 text-slate-600 font-medium hover:text-indigo-600 transition-colors">Entrar</button>
+          <button onClick={() => navigate('/register')} className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">Começar Grátis</button>
+        </div>
+      </nav>
+      
+      <div className="max-w-7xl mx-auto px-6 py-20 flex flex-col md:flex-row items-center gap-12">
+        <div className="flex-1 space-y-6">
+          <h1 className="text-5xl md:text-7xl font-bold text-slate-900 leading-tight">
+            Gerencie seu negócio <br/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">com inteligência.</span>
+          </h1>
+          <p className="text-xl text-slate-500 max-w-lg leading-relaxed">
+            CRM, Vendas e Loja Virtual em uma única plataforma. Potencialize seus resultados com nossa IA integrada.
+          </p>
+          <div className="flex gap-4 pt-4">
+             <button onClick={() => navigate('/register')} className="px-8 py-4 bg-slate-900 text-white text-lg font-bold rounded-2xl hover:bg-slate-800 transition-all flex items-center gap-2">
+                Criar Conta Grátis <ArrowRight size={20}/>
+             </button>
+             <button className="px-8 py-4 bg-white text-slate-700 border border-slate-200 text-lg font-bold rounded-2xl hover:bg-slate-50 transition-all">
+                Ver Demonstração
+             </button>
           </div>
-          <div className="text-right hidden sm:block">
-             <p className="text-sm font-bold text-slate-700">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-          </div>
-       </div>
-
-       {/* Cards com Dados Reais */}
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all group">
-             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors"><DollarSign size={24}/></div>
-             </div>
-             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Faturamento Total</h3>
-             <p className="text-3xl font-bold text-slate-800 mt-1">R$ {stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all group">
-             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-blue-50 rounded-xl text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors"><Package size={24}/></div>
-             </div>
-             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Pedidos Realizados</h3>
-             <p className="text-3xl font-bold text-slate-800 mt-1">{stats.orders}</p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all group">
-             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><Users size={24}/></div>
-             </div>
-             <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Base de Clientes</h3>
-             <p className="text-3xl font-bold text-slate-800 mt-1">{stats.clients}</p>
-          </div>
-       </div>
-
-       {/* Banner "UI boa de antes" */}
-       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-8 text-white relative overflow-hidden shadow-lg shadow-indigo-200">
-          <div className="relative z-10">
-             <h3 className="text-2xl font-bold mb-2">Olá, {user.displayName || 'Lojista'}! 🚀</h3>
-             <p className="text-indigo-100 max-w-lg mb-6 text-sm leading-relaxed">Sua loja está pronta para vender. Use o menu lateral para gerenciar seus produtos, clientes e pedidos. Acompanhe suas métricas em tempo real.</p>
-             <Link to="/dashboard/store" className="px-6 py-3 bg-white text-indigo-600 font-bold text-sm rounded-xl hover:bg-indigo-50 transition-colors inline-flex items-center gap-2 shadow-md">
-                <Store size={18}/> Personalizar Loja
-             </Link>
-          </div>
-          <div className="absolute -right-10 -bottom-10 opacity-20 transform rotate-12">
-             <Rocket size={250} />
-          </div>
-       </div>
+        </div>
+        <div className="flex-1 relative">
+           <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-100 to-violet-100 rounded-full blur-3xl opacity-50 -z-10"></div>
+           <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-100 transform rotate-2 hover:rotate-0 transition-all duration-500">
+               <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-4">
+                   <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                   <div className="w-3 h-3 rounded-full bg-amber-400"></div>
+                   <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
+               </div>
+               <div className="space-y-4 opacity-50">
+                   <div className="h-8 bg-slate-100 rounded w-1/3"></div>
+                   <div className="grid grid-cols-3 gap-4">
+                       <div className="h-24 bg-indigo-50 rounded"></div>
+                       <div className="h-24 bg-purple-50 rounded"></div>
+                       <div className="h-24 bg-emerald-50 rounded"></div>
+                   </div>
+                   <div className="h-40 bg-slate-50 rounded"></div>
+               </div>
+           </div>
+        </div>
+      </div>
+      
+      <div className="bg-slate-50 py-24">
+        <div className="max-w-7xl mx-auto px-6">
+           <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold text-slate-900 mb-4">Tudo que você precisa</h2>
+              <p className="text-slate-500 max-w-2xl mx-auto">Uma suíte completa de ferramentas para modernizar sua operação comercial.</p>
+           </div>
+           
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                  { icon: <Store size={32} className="text-indigo-600"/>, title: "Loja Virtual", desc: "Crie seu catálogo online em minutos e receba pedidos no WhatsApp ou Painel." },
+                  { icon: <Users size={32} className="text-violet-600"/>, title: "CRM de Clientes", desc: "Organize sua carteira de clientes, histórico de compras e funil de vendas." },
+                  { icon: <Sparkles size={32} className="text-emerald-600"/>, title: "IA Integrada", desc: "Nossa IA ajuda você a criar descrições, analisar dados e tomar decisões." }
+              ].map((item, i) => (
+                  <div key={i} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
+                      <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-6">{item.icon}</div>
+                      <h3 className="text-xl font-bold text-slate-800 mb-3">{item.title}</h3>
+                      <p className="text-slate-500 leading-relaxed">{item.desc}</p>
+                  </div>
+              ))}
+           </div>
+        </div>
+      </div>
     </div>
   );
 };
 
+// --- DASHBOARD ---
+
+const DashboardHome = ({ user }: { user: User }) => {
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="flex justify-between items-end">
+                <div>
+                    <h2 className="text-3xl font-bold text-slate-800">Olá, {user.displayName || 'Lojista'}</h2>
+                    <p className="text-slate-500">Aqui está o resumo da sua operação hoje.</p>
+                </div>
+                <div className="text-right hidden md:block">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Data de Hoje</p>
+                    <p className="text-xl font-medium text-slate-700">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                    { label: "Vendas Hoje", value: "R$ 1.250,00", icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50", trend: "+12%" },
+                    { label: "Pedidos", value: "24", icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50", trend: "+4" },
+                    { label: "Novos Clientes", value: "5", icon: Users, color: "text-violet-600", bg: "bg-violet-50", trend: "+2" },
+                    { label: "Ticket Médio", value: "R$ 52,00", icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50", trend: "+1.5%" },
+                ].map((stat, i) => (
+                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
+                                <stat.icon size={24} />
+                            </div>
+                            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">{stat.trend}</span>
+                        </div>
+                        <h3 className="text-slate-500 text-sm font-medium mb-1">{stat.label}</h3>
+                        <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
+                    </div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="font-bold text-slate-800 text-lg">Vendas da Semana</h3>
+                        <button className="text-slate-400 hover:text-indigo-600"><ExternalLink size={16}/></button>
+                    </div>
+                    <div className="h-64">
+                        <SimpleBarChart data={[120, 300, 450, 200, 600, 300, 800]} height={250} />
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                     <div>
+                        <h3 className="font-bold text-slate-800 text-lg mb-2">Meta Mensal</h3>
+                        <p className="text-slate-500 text-sm mb-6">Seu progresso em relação à meta de R$ 20.000</p>
+                        
+                        <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
+                            <svg className="w-full h-full transform -rotate-90">
+                                <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-100" />
+                                <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray={2 * Math.PI * 88} strokeDashoffset={2 * Math.PI * 88 * (1 - 0.75)} className="text-indigo-600" strokeLinecap="round" />
+                            </svg>
+                            <div className="absolute text-center">
+                                <span className="text-3xl font-bold text-slate-800">75%</span>
+                                <p className="text-xs text-slate-400 font-bold uppercase">Atingido</p>
+                            </div>
+                        </div>
+                     </div>
+                     
+                     <div className="mt-6 pt-6 border-t border-slate-100">
+                         <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-slate-500">Receita</span>
+                            <span className="font-bold text-slate-800">R$ 15.000</span>
+                         </div>
+                         <div className="flex justify-between items-center">
+                            <span className="text-sm text-slate-500">Despesas</span>
+                            <span className="font-bold text-slate-800">R$ 4.500</span>
+                         </div>
+                         <ProfitLossChart income={15000} expense={4500} />
+                     </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const Dashboard = () => {
-  const [user, setUser] = useState<User>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Sidebar State
   const navigate = useNavigate();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u: User) => {
-      if (u) {
-        setUser(u);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser: User) => {
+      if (currentUser) {
+        setUser(currentUser);
       } else {
         navigate('/login');
       }
@@ -1764,149 +1837,69 @@ const Dashboard = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600"/></div>;
   if (!user) return null;
 
-  return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
-      {/* Sidebar */}
-      <aside className={`bg-white border-r border-slate-100 hidden md:flex flex-col fixed h-full z-10 transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'}`}>
-        {/* Toggle Button */}
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="absolute -right-3 top-9 bg-white border border-slate-200 text-slate-400 p-1 rounded-full shadow-sm hover:text-indigo-600 transition-colors z-20"
-        >
-          {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
+  const menuItems = [
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Visão Geral', exact: true },
+    { path: '/dashboard/orders', icon: ShoppingBag, label: 'Pedidos' },
+    { path: '/dashboard/clients', icon: Users, label: 'Clientes' },
+    { path: '/dashboard/store', icon: Store, label: 'Loja Virtual' },
+  ];
 
-        <div className={`p-6 ${sidebarCollapsed ? 'px-4' : ''}`}>
-          <AppLogo collapsed={sidebarCollapsed} />
+  return (
+    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} hidden md:flex flex-col`}>
+        <div className="h-20 flex items-center justify-center border-b border-slate-100">
+             <AppLogo collapsed={!sidebarOpen} />
         </div>
         
-        <nav className="flex-1 px-4 space-y-1">
-          <Link to="/dashboard" className={`flex items-center gap-3 py-3 rounded-xl transition-all font-medium text-sm ${sidebarCollapsed ? 'justify-center px-2' : 'px-4'} ${location.pathname === '/dashboard' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`} title="Visão Geral">
-            <LayoutDashboard size={20} /> {!sidebarCollapsed && <span>Visão Geral</span>}
-          </Link>
-          <Link to="/dashboard/orders" className={`flex items-center gap-3 py-3 rounded-xl transition-all font-medium text-sm ${sidebarCollapsed ? 'justify-center px-2' : 'px-4'} ${location.pathname.includes('/orders') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`} title="Pedidos">
-            <Package size={20} /> {!sidebarCollapsed && <span>Pedidos</span>}
-          </Link>
-          <Link to="/dashboard/clients" className={`flex items-center gap-3 py-3 rounded-xl transition-all font-medium text-sm ${sidebarCollapsed ? 'justify-center px-2' : 'px-4'} ${location.pathname.includes('/clients') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`} title="Clientes">
-            <Users size={20} /> {!sidebarCollapsed && <span>Clientes</span>}
-          </Link>
-          <Link to="/dashboard/store" className={`flex items-center gap-3 py-3 rounded-xl transition-all font-medium text-sm ${sidebarCollapsed ? 'justify-center px-2' : 'px-4'} ${location.pathname.includes('/store') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`} title="Minha Loja">
-            <Store size={20} /> {!sidebarCollapsed && <span>Minha Loja</span>}
-          </Link>
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+           {menuItems.map((item) => {
+             const active = item.exact ? location.pathname === item.path : location.pathname.startsWith(item.path);
+             return (
+               <Link 
+                 key={item.path} 
+                 to={item.path}
+                 className={`flex items-center gap-3 p-3 rounded-xl transition-all ${active ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
+               >
+                 <item.icon size={20} />
+                 {sidebarOpen && <span>{item.label}</span>}
+               </Link>
+             )
+           })}
         </nav>
 
         <div className="p-4 border-t border-slate-100">
-           <div className={`flex items-center gap-3 mb-2 ${sidebarCollapsed ? 'justify-center' : 'px-4 py-3'}`}>
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs shrink-0">
-                {user.email?.[0].toUpperCase()}
-              </div>
-              {!sidebarCollapsed && (
-                <div className="flex-1 overflow-hidden animate-in fade-in">
-                  <p className="text-sm font-bold text-slate-700 truncate">{user.displayName || 'Usuário'}</p>
-                  <p className="text-xs text-slate-400 truncate">{user.email}</p>
-                </div>
-              )}
-           </div>
-           <button onClick={handleLogout} className={`flex items-center gap-2 text-slate-400 hover:text-red-500 text-xs font-bold transition-colors ${sidebarCollapsed ? 'justify-center w-full py-2' : 'px-4'}`} title="Sair">
-              <LogOut size={14} /> {!sidebarCollapsed && <span>Sair da conta</span>}
-           </button>
+            <button onClick={handleLogout} className={`flex items-center gap-3 p-3 rounded-xl w-full text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all ${!sidebarOpen && 'justify-center'}`}>
+                <LogOut size={20} />
+                {sidebarOpen && <span className="font-medium">Sair</span>}
+            </button>
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="mt-4 w-full flex justify-center text-slate-300 hover:text-indigo-600">
+                {sidebarOpen ? <ChevronLeft size={20}/> : <ChevronRight size={20}/>}
+            </button>
         </div>
       </aside>
-      
-      {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 w-full bg-white border-b border-slate-100 z-20 px-4 h-16 flex items-center justify-between">
-         <AppLogo collapsed />
-         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 text-slate-600">
-            <Menu size={24} />
-         </button>
-      </div>
-
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-30 bg-white pt-20 px-6 space-y-4 md:hidden">
-            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><LayoutDashboard size={20}/> Visão Geral</Link>
-            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard/orders" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><Package size={20}/> Pedidos</Link>
-            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard/clients" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><Users size={20}/> Clientes</Link>
-            <Link onClick={() => setMobileMenuOpen(false)} to="/dashboard/store" className="flex items-center gap-3 p-3 text-slate-700 font-bold border-b border-slate-50"><Store size={20}/> Minha Loja</Link>
-            <button onClick={handleLogout} className="flex items-center gap-3 p-3 text-red-500 font-bold mt-8"><LogOut size={20}/> Sair</button>
-        </div>
-      )}
 
       {/* Main Content */}
-      <main className={`flex-1 transition-all duration-300 p-4 md:p-8 overflow-y-auto h-screen pt-20 md:pt-8 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
-        <Routes>
-          <Route path="/" element={<DashboardHome user={user} />} />
-          <Route path="/orders" element={<OrdersManager user={user} />} />
-          <Route path="/clients" element={<ClientsManager user={user} />} />
-          <Route path="/store" element={<StoreEditor user={user} />} />
-        </Routes>
+      <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
+         {/* Mobile Header */}
+         <div className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-40">
+            <AppLogo />
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 text-slate-500">
+                <Menu size={24}/>
+            </button>
+         </div>
+
+         <div className="p-6 md:p-10 max-w-7xl mx-auto">
+            <Routes>
+              <Route path="/" element={<DashboardHome user={user} />} />
+              <Route path="/orders" element={<OrdersManager user={user} />} />
+              <Route path="/clients" element={<ClientsManager user={user} />} />
+              <Route path="/store" element={<StoreEditor user={user} />} />
+            </Routes>
+         </div>
       </main>
-
+      
       <AIAssistant user={user} />
-    </div>
-  );
-};
-
-const LandingPage = () => {
-  return (
-    <div className="min-h-screen bg-white">
-        <header className="fixed w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100">
-            <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
-                <AppLogo />
-                <div className="flex items-center gap-4">
-                    <Link to="/login" className="text-slate-600 font-medium hover:text-indigo-600 transition-colors">Entrar</Link>
-                    <Link to="/register" className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
-                        Começar Grátis
-                    </Link>
-                </div>
-            </div>
-        </header>
-
-        <section className="pt-32 pb-20 px-4 text-center max-w-4xl mx-auto">
-            <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold uppercase tracking-wider mb-6 inline-block">CRM e Vendas para Pequenos Negócios</span>
-            <h1 className="text-5xl md:text-7xl font-bold text-slate-900 mb-6 tracking-tight">
-                Gerencie seus clientes e <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">venda mais.</span>
-            </h1>
-            <p className="text-xl text-slate-500 mb-10 max-w-2xl mx-auto leading-relaxed">
-                A plataforma completa para gerenciar pedidos, fidelizar clientes e criar sua loja online em minutos. Com inteligência artificial integrada.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link to="/register" className="px-8 py-4 bg-slate-900 text-white rounded-xl font-bold text-lg hover:bg-black transition-all flex items-center gap-2">
-                    Criar Conta Grátis <ArrowRight size={20}/>
-                </Link>
-                <a href="#features" className="px-8 py-4 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold text-lg hover:bg-slate-50 transition-all">
-                    Saber mais
-                </a>
-            </div>
-        </section>
-
-        <section id="features" className="py-20 bg-slate-50">
-            <div className="max-w-6xl mx-auto px-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                        <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center mb-6">
-                            <Store size={24} />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-3">Loja Online Pronta</h3>
-                        <p className="text-slate-500 leading-relaxed">Crie seu catálogo digital em minutos e receba pedidos diretamente no painel ou WhatsApp.</p>
-                    </div>
-                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mb-6">
-                            <Users size={24} />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-3">Gestão de Clientes</h3>
-                        <p className="text-slate-500 leading-relaxed">Organize sua base de contatos, histórico de compras e preferências para vender mais.</p>
-                    </div>
-                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                        <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center mb-6">
-                            <Sparkles size={24} />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-800 mb-3">Inteligência Artificial</h3>
-                        <p className="text-slate-500 leading-relaxed">Use nossa IA para criar descrições de produtos, analisar vendas e sugerir melhorias.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
     </div>
   );
 };
