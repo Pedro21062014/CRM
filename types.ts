@@ -13,6 +13,9 @@ export interface Product {
 
 export type ClientType = 'common' | 'commercial';
 
+// Adicionando tipos de status para funil de vendas
+export type ClientStatus = 'potential' | 'negotiation' | 'converted' | 'active' | 'loyal';
+
 export interface Client {
   id: string;
   clientType: ClientType; // 'common' or 'commercial'
@@ -34,6 +37,7 @@ export interface Client {
   lastVisit?: string; // Data da última visita (ISO string YYYY-MM-DD para simplificar formulários)
   nextVisit?: string; // Data da próxima visita (Programação)
   notes?: string; // Observações
+  status?: ClientStatus; // Classificação do funil
   
   lastOrderDate?: any;
   totalOrders?: number;

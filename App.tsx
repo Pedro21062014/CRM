@@ -6,15 +6,15 @@ const { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassw
 type User = any;
 import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit, runTransaction } from 'firebase/firestore';
 import { GoogleGenAI, Type, FunctionDeclaration, Schema } from "@google/genai";
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx';
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, Store, Settings, 
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload
+  FileSpreadsheet, Download, Upload, Filter, Target
 } from 'lucide-react';
-import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType } from './types';
+import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
 
 // --- AI CONFIGURATION ---
@@ -295,6 +295,14 @@ const AIAssistant = ({ user }: { user: User }) => {
   );
 };
 
+// --- CONSTANTS FOR CLIENT STATUS ---
+const CLIENT_STATUSES = {
+    'potential': { label: 'Potencial', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+    'negotiation': { label: 'Em Negociação', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+    'converted': { label: 'Recém Convertido', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+    'active': { label: 'Cliente Ativo', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+    'loyal': { label: 'Fidelizado', color: 'bg-violet-100 text-violet-700 border-violet-200' }
+};
 
 // --- Clients Manager ---
 const ClientsManager = ({ user }: { user: User }) => {
@@ -316,7 +324,8 @@ const ClientsManager = ({ user }: { user: User }) => {
           id: doc.id, 
           ...data,
           // Default to common if not set (legacy data)
-          clientType: data.clientType || 'common' 
+          clientType: data.clientType || 'common',
+          status: data.status || 'potential'
         } as Client);
       });
       setClients(items);
@@ -353,6 +362,7 @@ const ClientsManager = ({ user }: { user: User }) => {
         payload.lastVisit = formData.lastVisit || '';
         payload.nextVisit = formData.nextVisit || '';
         payload.notes = formData.notes || '';
+        payload.status = formData.status || 'potential';
       }
 
       if (editing && editing.id) {
@@ -394,7 +404,7 @@ const ClientsManager = ({ user }: { user: User }) => {
     // 1. Dados
     const headers = [
       "Tipo", "Nome / Razão Social", "Email", "Telefone", 
-      "Responsável", "Potencial (R$)", "Dia Compra", 
+      "Responsável", "Potencial (R$)", "Status/Classificação", "Dia Compra", 
       "Endereço Completo", "Cidade", "Notas"
     ];
 
@@ -405,6 +415,7 @@ const ClientsManager = ({ user }: { user: User }) => {
       c.phone,
       c.contactPerson || '-',
       c.purchasePotential || 0,
+      c.status ? CLIENT_STATUSES[c.status as keyof typeof CLIENT_STATUSES]?.label || c.status : '-',
       c.bestBuyDay || '-',
       `${c.address?.street || ''}, ${c.address?.number || ''} - ${c.address?.neighborhood || ''}`,
       c.address?.city || '',
@@ -435,9 +446,9 @@ const ClientsManager = ({ user }: { user: User }) => {
     
     // Mesclar Células do Cabeçalho
     ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }, // Título (A1:J1)
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } }, // Subtítulo (A2:J2)
-        { s: { r: 2, c: 0 }, e: { r: 2, c: 9 } }  // Data (A3:J3)
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } }, // Título (A1:K1)
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } }, // Subtítulo (A2:K2)
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 10 } }  // Data (A3:K3)
     ];
 
     // Definir largura das colunas
@@ -448,6 +459,7 @@ const ClientsManager = ({ user }: { user: User }) => {
         { wch: 15 }, // Telefone
         { wch: 20 }, // Responsavel
         { wch: 15 }, // Potencial
+        { wch: 20 }, // Status
         { wch: 15 }, // Dia
         { wch: 45 }, // Endereço
         { wch: 20 }, // Cidade
@@ -564,6 +576,15 @@ const ClientsManager = ({ user }: { user: User }) => {
         if (!row['Nome / Razão Social'] && !row['Nome']) continue;
 
         const type = (row['Tipo'] || '').toLowerCase().includes('comercial') ? 'commercial' : 'common';
+        
+        // Status Map Import
+        const statusRaw = (row['Status/Classificação'] || '').toLowerCase();
+        let status = 'potential';
+        if(statusRaw.includes('negocia')) status = 'negotiation';
+        else if(statusRaw.includes('convert')) status = 'converted';
+        else if(statusRaw.includes('ativo')) status = 'active';
+        else if(statusRaw.includes('fiel') || statusRaw.includes('fidel')) status = 'loyal';
+
         const clientData = {
           clientType: type,
           name: row['Nome / Razão Social'] || row['Nome'] || 'Cliente Importado',
@@ -572,6 +593,7 @@ const ClientsManager = ({ user }: { user: User }) => {
           contactPerson: row['Responsável'] || '',
           purchasePotential: Number(row['Potencial (R$)'] || row['Potencial Compra'] || 0),
           notes: row['Notas'] || '',
+          status: status,
           address: {
             street: '', // Simplificado na importação se vier tudo junto
             number: '',
@@ -618,7 +640,7 @@ const ClientsManager = ({ user }: { user: User }) => {
 
   const openNew = () => {
     setEditing({} as Client);
-    setFormData({ clientType: activeTab });
+    setFormData({ clientType: activeTab, status: 'potential' });
   };
 
   return (
@@ -721,6 +743,22 @@ const ClientsManager = ({ user }: { user: User }) => {
                <div className="pt-2 border-t border-slate-100 bg-indigo-50/50 p-4 rounded-xl -mx-4 md:mx-0">
                   <h4 className="text-sm font-bold text-indigo-800 mb-4 flex items-center gap-2"><Briefcase size={16}/> Detalhes Comerciais</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     {/* Classification / Status Field */}
+                     <div className="md:col-span-2 bg-white p-3 rounded-xl border border-indigo-100 shadow-sm mb-2">
+                        <label className="text-xs font-bold text-indigo-500 uppercase tracking-wider block mb-2"><Target size={14} className="inline mr-1"/> Classificação (Funil de Vendas)</label>
+                        <select 
+                           className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                           value={formData.status || 'potential'} 
+                           onChange={e => setFormData({...formData, status: e.target.value as ClientStatus})}
+                        >
+                           <option value="potential">🟡 Potencial (Prospecção)</option>
+                           <option value="negotiation">🟠 Em Negociação (Visitado)</option>
+                           <option value="converted">🔵 Recém Convertido (Primeiras Compras)</option>
+                           <option value="active">🟢 Cliente Ativo (Comprador Frequente)</option>
+                           <option value="loyal">🟣 Fidelizado (Parceiro VIP)</option>
+                        </select>
+                     </div>
+
                      <div>
                         <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider ml-1">Responsável pela Compra</label>
                         <input className="w-full p-3 mt-1 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Sr. João" value={formData.contactPerson || ''} onChange={e => setFormData({...formData, contactPerson: e.target.value})} />
@@ -805,6 +843,14 @@ const ClientsManager = ({ user }: { user: User }) => {
                 {/* Commercial Specific Info */}
                 {client.clientType === 'commercial' && (
                    <div className="mt-4 bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
+                      {/* Status Badge */}
+                      <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
+                          <span className="text-[10px] uppercase font-bold text-slate-400">Status</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${CLIENT_STATUSES[client.status as ClientStatus]?.color || 'bg-slate-100 text-slate-500'}`}>
+                              {CLIENT_STATUSES[client.status as ClientStatus]?.label || 'Potencial'}
+                          </span>
+                      </div>
+
                       {client.contactPerson && <div className="text-xs"><span className="font-bold text-slate-500">Resp:</span> {client.contactPerson}</div>}
                       {client.purchasePotential && (
                          <div className="text-xs flex justify-between items-center">
