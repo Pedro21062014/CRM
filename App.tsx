@@ -32,7 +32,7 @@ const LoadingSpinner = () => (
 
 const AppLogo = ({ collapsed, dark = false }: { collapsed?: boolean, dark?: boolean }) => (
   <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} transition-all duration-300 group cursor-pointer`}>
-    <div className="bg-indigo-600 text-white p-2 rounded-lg shadow-lg shadow-indigo-200 group-hover:bg-indigo-700 transition-all duration-300 transform group-hover:scale-105">
+    <div className="bg-indigo-600 text-white p-2 rounded-lg shadow-lg shadow-indigo-200 group-hover:bg-indigo-700 transition-all duration-300 transform group-hover:scale-105 shrink-0">
       <Rocket size={20} strokeWidth={2.5} />
     </div>
     {!collapsed && (
@@ -245,7 +245,7 @@ const AIAssistant = ({ user }: { user: User }) => {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-white rounded-2xl shadow-2xl border border-slate-200 z-40 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in">
+        <div className="fixed bottom-24 right-4 md:right-6 w-[calc(100%-2rem)] md:w-96 h-[500px] bg-white rounded-2xl shadow-2xl border border-slate-200 z-40 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 fade-in">
           {/* Header */}
           <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-4 flex items-center gap-3">
              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white">
@@ -255,6 +255,7 @@ const AIAssistant = ({ user }: { user: User }) => {
                <h3 className="text-white font-bold text-sm">Assistente Nova AI</h3>
                <p className="text-indigo-100 text-xs">Online • Gemini 3.0</p>
              </div>
+             <button onClick={() => setIsOpen(false)} className="ml-auto text-white/70 hover:text-white"><X size={18}/></button>
           </div>
 
           {/* Messages */}
@@ -399,9 +400,6 @@ const ClientsManager = ({ user }: { user: User }) => {
       return;
     }
 
-    // --- LOGICA DE ESTILIZAÇÃO AVANÇADA ---
-
-    // 1. Dados
     const headers = [
       "Tipo", "Nome / Razão Social", "Email", "Telefone", 
       "Responsável", "Potencial (R$)", "Status/Classificação", "Dia Compra", 
@@ -422,114 +420,44 @@ const ClientsManager = ({ user }: { user: User }) => {
       c.notes || ''
     ]);
 
-    // 2. Montar estrutura da matriz (Array of Arrays)
-    // Linha 0: Título/Logo
-    // Linha 1: Subtítulo
-    // Linha 2: Data
-    // Linha 3: (Vazia)
-    // Linha 4: Cabeçalhos da Tabela
-    // Linha 5+: Dados
-
     const wsData = [
-      ["NOVA CRM"],                                     // A1
-      ["Relatório de Clientes e Parceiros"],            // A2
-      [`Gerado em: ${new Date().toLocaleDateString()}`],// A3
-      [""],                                             // A4 (Spacer)
-      headers,                                          // A5
-      ...dataRows                                       // A6...
+      ["NOVA CRM"],
+      ["Relatório de Clientes e Parceiros"],
+      [`Gerado em: ${new Date().toLocaleDateString()}`],
+      [""],
+      headers,
+      ...dataRows
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-    // 3. Estilos
     const range = XLSX.utils.decode_range(ws['!ref'] || "A1:A1");
-    
-    // Mesclar Células do Cabeçalho
     ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } }, // Título (A1:K1)
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } }, // Subtítulo (A2:K2)
-        { s: { r: 2, c: 0 }, e: { r: 2, c: 10 } }  // Data (A3:K3)
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 10 } }
     ];
-
-    // Definir largura das colunas
     ws['!cols'] = [
-        { wch: 15 }, // Tipo
-        { wch: 35 }, // Nome
-        { wch: 25 }, // Email
-        { wch: 15 }, // Telefone
-        { wch: 20 }, // Responsavel
-        { wch: 15 }, // Potencial
-        { wch: 20 }, // Status
-        { wch: 15 }, // Dia
-        { wch: 45 }, // Endereço
-        { wch: 20 }, // Cidade
-        { wch: 30 }  // Notas
+        { wch: 15 }, { wch: 35 }, { wch: 25 }, { wch: 15 }, { wch: 20 },
+        { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 45 }, { wch: 20 }, { wch: 30 }
     ];
 
-    // Iterar para aplicar estilos célula por célula
     for (let R = range.s.r; R <= range.e.r; ++R) {
         for (let C = range.s.c; C <= range.e.c; ++C) {
             const cell_address = XLSX.utils.encode_cell({ r: R, c: C });
             if (!ws[cell_address]) continue;
-
             const cell = ws[cell_address];
-
-            // Estilo padrão
             cell.s = {
                 font: { name: "Arial", sz: 10, color: { rgb: "333333" } },
                 alignment: { vertical: "center" },
-                border: {
-                    top: { style: "thin", color: { rgb: "E2E8F0" } },
-                    bottom: { style: "thin", color: { rgb: "E2E8F0" } },
-                    left: { style: "thin", color: { rgb: "E2E8F0" } },
-                    right: { style: "thin", color: { rgb: "E2E8F0" } }
-                }
+                border: { top: { style: "thin", color: { rgb: "E2E8F0" } }, bottom: { style: "thin", color: { rgb: "E2E8F0" } }, left: { style: "thin", color: { rgb: "E2E8F0" } }, right: { style: "thin", color: { rgb: "E2E8F0" } } }
             };
-
-            // ROW 0: Título / Logo
-            if (R === 0) {
-                cell.s = {
-                    fill: { fgColor: { rgb: "4F46E5" } }, // Indigo 600
-                    font: { name: "Arial", sz: 28, bold: true, color: { rgb: "FFFFFF" } },
-                    alignment: { horizontal: "center", vertical: "center" }
-                };
-            }
-            // ROW 1: Subtítulo
-            else if (R === 1) {
-                cell.s = {
-                    fill: { fgColor: { rgb: "4338CA" } }, // Indigo 700
-                    font: { name: "Arial", sz: 14, color: { rgb: "E0E7FF" } },
-                    alignment: { horizontal: "center", vertical: "center" }
-                };
-            }
-            // ROW 2: Data
-            else if (R === 2) {
-                cell.s = {
-                    fill: { fgColor: { rgb: "F8FAFC" } }, // Slate 50
-                    font: { name: "Arial", sz: 10, italic: true, color: { rgb: "64748B" } },
-                    alignment: { horizontal: "center", vertical: "center" }
-                };
-            }
-            // ROW 4: Cabeçalhos da Tabela
-            else if (R === 4) {
-                cell.s = {
-                    fill: { fgColor: { rgb: "1E293B" } }, // Slate 800
-                    font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
-                    alignment: { horizontal: "center", vertical: "center" },
-                    border: {
-                        bottom: { style: "medium", color: { rgb: "000000" } }
-                    }
-                };
-            }
-            // ROW 5+: Dados (Alternar cores / Zebra)
+            if (R === 0) cell.s = { fill: { fgColor: { rgb: "4F46E5" } }, font: { name: "Arial", sz: 28, bold: true, color: { rgb: "FFFFFF" } }, alignment: { horizontal: "center", vertical: "center" } };
+            else if (R === 1) cell.s = { fill: { fgColor: { rgb: "4338CA" } }, font: { name: "Arial", sz: 14, color: { rgb: "E0E7FF" } }, alignment: { horizontal: "center", vertical: "center" } };
+            else if (R === 2) cell.s = { fill: { fgColor: { rgb: "F8FAFC" } }, font: { name: "Arial", sz: 10, italic: true, color: { rgb: "64748B" } }, alignment: { horizontal: "center", vertical: "center" } };
+            else if (R === 4) cell.s = { fill: { fgColor: { rgb: "1E293B" } }, font: { name: "Arial", sz: 11, bold: true, color: { rgb: "FFFFFF" } }, alignment: { horizontal: "center", vertical: "center" }, border: { bottom: { style: "medium", color: { rgb: "000000" } } } };
             else if (R > 4) {
-                 if (R % 2 === 0) {
-                     cell.s.fill = { fgColor: { rgb: "F1F5F9" } }; // Slate 100 para linhas pares
-                 }
-                 // Formatação monetária para coluna de Potencial (Index 5)
-                 if (C === 5) {
-                     cell.z = '"R$" #,##0.00';
-                 }
+                 if (R % 2 === 0) cell.s.fill = { fgColor: { rgb: "F1F5F9" } };
+                 if (C === 5) cell.z = '"R$" #,##0.00';
             }
         }
     }
@@ -539,45 +467,27 @@ const ClientsManager = ({ user }: { user: User }) => {
     XLSX.writeFile(wb, `Relatorio_NovaCRM_${new Date().toISOString().slice(0,10)}.xlsx`);
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleImportClick = () => fileInputRef.current?.click();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-
     const file = e.target.files[0];
     setImporting(true);
-
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-      // Tenta ler com cabeçalho ou detectar automatico
-      // Precisamos ser robustos aqui pois o formato de exportação mudou (começa na linha 5 agora)
-      
-      // Vamos tentar converter tudo para JSON (array of arrays) e procurar a linha de cabeçalho
       const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-      
       let headerRowIndex = 0;
-      // Procura linha que tenha "Nome" ou "Nome / Razão Social"
       rawData.forEach((row, index) => {
-          if (row.some((cell: any) => typeof cell === 'string' && (cell.includes('Nome') || cell.includes('Tipo')))) {
-              headerRowIndex = index;
-          }
+          if (row.some((cell: any) => typeof cell === 'string' && (cell.includes('Nome') || cell.includes('Tipo')))) headerRowIndex = index;
       });
-
-      // Agora lemos usando essa linha como cabeçalho
       const json: any[] = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
-
       let count = 0;
       for (const row of json) {
         if (!row['Nome / Razão Social'] && !row['Nome']) continue;
-
         const type = (row['Tipo'] || '').toLowerCase().includes('comercial') ? 'commercial' : 'common';
-        
-        // Status Map Import
         const statusRaw = (row['Status/Classificação'] || '').toLowerCase();
         let status = 'potential';
         if(statusRaw.includes('negocia')) status = 'negotiation';
@@ -594,20 +504,10 @@ const ClientsManager = ({ user }: { user: User }) => {
           purchasePotential: Number(row['Potencial (R$)'] || row['Potencial Compra'] || 0),
           notes: row['Notas'] || '',
           status: status,
-          address: {
-            street: '', // Simplificado na importação se vier tudo junto
-            number: '',
-            neighborhood: '',
-            city: row['Cidade'] || '',
-            zip: '',
-            complement: ''
-          },
-          // Tentar parsear endereço se vier junto
+          address: { street: '', number: '', neighborhood: '', city: row['Cidade'] || '', zip: '', complement: '' },
           createdAt: serverTimestamp(),
           totalOrders: 0
         };
-        
-        // Simples parser de endereço se estiver em uma coluna só
         const fullAddr = row['Endereço Completo'] || row['Endereço'] || '';
         if (fullAddr) {
             const parts = fullAddr.split(',');
@@ -618,16 +518,14 @@ const ClientsManager = ({ user }: { user: User }) => {
                 if (numParts[1]) clientData.address.neighborhood = numParts[1].trim();
             }
         }
-
         await addDoc(collection(db, `merchants/${user.uid}/clients`), clientData);
         count++;
       }
-
       alert(`${count} clientes importados com sucesso!`);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {
       console.error("Erro ao importar:", error);
-      alert("Erro ao processar arquivo. Verifique se é um Excel válido.");
+      alert("Erro ao processar arquivo.");
     } finally {
       setImporting(false);
     }
@@ -645,167 +543,112 @@ const ClientsManager = ({ user }: { user: User }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <input 
-        type="file" 
-        accept=".xlsx, .xls" 
-        ref={fileInputRef} 
-        onChange={handleFileChange} 
-        className="hidden" 
-      />
+      <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
       
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Gerenciar Clientes</h2>
           <p className="text-slate-500 text-sm">Gerencie consumidores e pontos comerciais</p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <SecondaryButton onClick={handleImportClick} disabled={importing}>
+        <div className="flex flex-wrap gap-3 w-full xl:w-auto">
+          <SecondaryButton onClick={handleImportClick} disabled={importing} className="flex-1 xl:flex-none">
              {importing ? <Loader2 className="animate-spin" size={18}/> : <Upload size={18} />} 
-             Importar Excel
+             Importar
           </SecondaryButton>
-          <SecondaryButton onClick={handleExport}>
-             <Download size={18} /> Exportar Excel
+          <SecondaryButton onClick={handleExport} className="flex-1 xl:flex-none">
+             <Download size={18} /> Exportar
           </SecondaryButton>
-          <PrimaryButton onClick={openNew}>
+          <PrimaryButton onClick={openNew} className="flex-1 xl:flex-none w-full xl:w-auto">
             <Plus size={18} /> Novo Cliente
           </PrimaryButton>
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex p-1 bg-slate-100 rounded-xl w-full max-w-md mx-auto md:mx-0">
-        <button 
-          onClick={() => setActiveTab('common')} 
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${activeTab === 'common' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
+        <button onClick={() => setActiveTab('common')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${activeTab === 'common' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
           <UserIcon size={16}/> Consumidores
         </button>
-        <button 
-          onClick={() => setActiveTab('commercial')} 
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${activeTab === 'commercial' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
+        <button onClick={() => setActiveTab('commercial')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all ${activeTab === 'commercial' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
           <Briefcase size={16}/> Pontos Comerciais
         </button>
       </div>
 
-      {/* Form Modal/Section */}
       {editing && (
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-indigo-100 animate-in fade-in slide-in-from-top-4 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-violet-500"></div>
-          <div className="flex justify-between items-center mb-6">
-             <h3 className="font-bold text-xl text-slate-800">{editing.id ? 'Editar Cliente' : 'Novo Cliente'}</h3>
-             <button onClick={() => setEditing(null)}><X size={24} className="text-slate-400 hover:text-slate-600"/></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white p-6 md:p-8 rounded-2xl shadow-2xl border border-indigo-100 w-full max-w-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden my-auto">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-violet-500"></div>
+            <div className="flex justify-between items-center mb-6">
+               <h3 className="font-bold text-xl text-slate-800">{editing.id ? 'Editar Cliente' : 'Novo Cliente'}</h3>
+               <button onClick={() => setEditing(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-400"/></button>
+            </div>
+            
+            <form onSubmit={handleSave} className="space-y-6 max-h-[80vh] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tipo de Cliente</label>
+                 <div className="flex flex-col sm:flex-row gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="clientType" value="common" checked={formData.clientType === 'common' || !formData.clientType} onChange={() => setFormData({...formData, clientType: 'common'})} className="text-indigo-600 focus:ring-indigo-500" />
+                      <span className="text-sm font-medium text-slate-700">Consumidor Final</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="clientType" value="commercial" checked={formData.clientType === 'commercial'} onChange={() => setFormData({...formData, clientType: 'commercial'})} className="text-indigo-600 focus:ring-indigo-500" />
+                      <span className="text-sm font-medium text-slate-700">Ponto Comercial (B2B)</span>
+                    </label>
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="md:col-span-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">{formData.clientType === 'commercial' ? 'Nome do Estabelecimento' : 'Nome Completo'}</label>
+                    <input className="w-full p-3 mt-1 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" required value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Telefone / WhatsApp</label>
+                    <input className="w-full p-3 mt-1 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" required value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                 </div>
+                 <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Email (Opcional)</label>
+                    <input className="w-full p-3 mt-1 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
+                 </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                 <h4 className="text-sm font-bold text-slate-700 mb-3">Endereço</h4>
+                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <input className="md:col-span-3 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Rua / Avenida" value={formData.address?.street || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), street: e.target.value}})} />
+                    <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Número" value={formData.address?.number || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), number: e.target.value}})} />
+                    <input className="md:col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Bairro" value={formData.address?.neighborhood || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), neighborhood: e.target.value}})} />
+                    <input className="md:col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Cidade" value={formData.address?.city || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), city: e.target.value}})} />
+                 </div>
+              </div>
+
+              {formData.clientType === 'commercial' && (
+                 <div className="pt-2 border-t border-slate-100 bg-indigo-50/50 p-4 rounded-xl -mx-2 md:mx-0">
+                    <h4 className="text-sm font-bold text-indigo-800 mb-4 flex items-center gap-2"><Briefcase size={16}/> Detalhes Comerciais</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div className="md:col-span-2 bg-white p-3 rounded-xl border border-indigo-100 shadow-sm mb-2">
+                          <label className="text-xs font-bold text-indigo-500 uppercase tracking-wider block mb-2"><Target size={14} className="inline mr-1"/> Classificação (Funil de Vendas)</label>
+                          <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" value={formData.status || 'potential'} onChange={e => setFormData({...formData, status: e.target.value as ClientStatus})}>
+                             <option value="potential">🟡 Potencial (Prospecção)</option>
+                             <option value="negotiation">🟠 Em Negociação (Visitado)</option>
+                             <option value="converted">🔵 Recém Convertido (Primeiras Compras)</option>
+                             <option value="active">🟢 Cliente Ativo (Comprador Frequente)</option>
+                             <option value="loyal">🟣 Fidelizado (Parceiro VIP)</option>
+                          </select>
+                       </div>
+                       <div><label className="text-xs font-bold text-indigo-400 uppercase tracking-wider ml-1">Responsável</label><input className="w-full p-3 mt-1 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.contactPerson || ''} onChange={e => setFormData({...formData, contactPerson: e.target.value})} /></div>
+                       <div><label className="text-xs font-bold text-indigo-400 uppercase tracking-wider ml-1">Potencial (R$)</label><input className="w-full p-3 mt-1 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" type="number" value={formData.purchasePotential || ''} onChange={e => setFormData({...formData, purchasePotential: parseFloat(e.target.value)})} /></div>
+                       <div className="md:col-span-2"><label className="text-xs font-bold text-indigo-400 uppercase tracking-wider ml-1">Observações</label><input className="w-full p-3 mt-1 bg-white border border-indigo-100 rounded-xl outline-none" value={formData.notes || ''} onChange={e => setFormData({...formData, notes: e.target.value})} /></div>
+                    </div>
+                 </div>
+              )}
+
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-slate-100">
+                <button type="button" onClick={() => setEditing(null)} className="w-full sm:w-auto px-6 py-3 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors">Cancelar</button>
+                <button type="submit" className="w-full sm:w-auto px-8 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all">Salvar Cliente</button>
+              </div>
+            </form>
           </div>
-          
-          <form onSubmit={handleSave} className="space-y-6">
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tipo de Cliente</label>
-               <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="clientType" value="common" checked={formData.clientType === 'common' || !formData.clientType} onChange={() => setFormData({...formData, clientType: 'common'})} className="text-indigo-600 focus:ring-indigo-500" />
-                    <span className="text-sm font-medium text-slate-700">Consumidor Final</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="clientType" value="commercial" checked={formData.clientType === 'commercial'} onChange={() => setFormData({...formData, clientType: 'commercial'})} className="text-indigo-600 focus:ring-indigo-500" />
-                    <span className="text-sm font-medium text-slate-700">Ponto Comercial (B2B)</span>
-                  </label>
-               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">{formData.clientType === 'commercial' ? 'Nome do Estabelecimento' : 'Nome Completo'}</label>
-                  <input className="w-full p-3 mt-1 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" required value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
-               </div>
-               <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Telefone / WhatsApp</label>
-                  <input className="w-full p-3 mt-1 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" required value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
-               </div>
-               <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Email (Opcional)</label>
-                  <input className="w-full p-3 mt-1 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
-               </div>
-            </div>
-
-            {/* Address Fields */}
-            <div className="pt-2 border-t border-slate-100">
-               <h4 className="text-sm font-bold text-slate-700 mb-3">Endereço</h4>
-               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <input className="md:col-span-3 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Rua / Avenida" value={formData.address?.street || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), street: e.target.value}})} />
-                  <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Número" value={formData.address?.number || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), number: e.target.value}})} />
-                  <input className="md:col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Bairro" value={formData.address?.neighborhood || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), neighborhood: e.target.value}})} />
-                  <input className="md:col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="Cidade" value={formData.address?.city || ''} onChange={e => setFormData({...formData, address: {...(formData.address || {}), city: e.target.value}})} />
-               </div>
-            </div>
-
-            {/* Commercial Specific Fields */}
-            {formData.clientType === 'commercial' && (
-               <div className="pt-2 border-t border-slate-100 bg-indigo-50/50 p-4 rounded-xl -mx-4 md:mx-0">
-                  <h4 className="text-sm font-bold text-indigo-800 mb-4 flex items-center gap-2"><Briefcase size={16}/> Detalhes Comerciais</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     {/* Classification / Status Field */}
-                     <div className="md:col-span-2 bg-white p-3 rounded-xl border border-indigo-100 shadow-sm mb-2">
-                        <label className="text-xs font-bold text-indigo-500 uppercase tracking-wider block mb-2"><Target size={14} className="inline mr-1"/> Classificação (Funil de Vendas)</label>
-                        <select 
-                           className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                           value={formData.status || 'potential'} 
-                           onChange={e => setFormData({...formData, status: e.target.value as ClientStatus})}
-                        >
-                           <option value="potential">🟡 Potencial (Prospecção)</option>
-                           <option value="negotiation">🟠 Em Negociação (Visitado)</option>
-                           <option value="converted">🔵 Recém Convertido (Primeiras Compras)</option>
-                           <option value="active">🟢 Cliente Ativo (Comprador Frequente)</option>
-                           <option value="loyal">🟣 Fidelizado (Parceiro VIP)</option>
-                        </select>
-                     </div>
-
-                     <div>
-                        <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider ml-1">Responsável pela Compra</label>
-                        <input className="w-full p-3 mt-1 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Sr. João" value={formData.contactPerson || ''} onChange={e => setFormData({...formData, contactPerson: e.target.value})} />
-                     </div>
-                     <div>
-                        <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider ml-1">Potencial de Compra (Mensal)</label>
-                        <input className="w-full p-3 mt-1 bg-white border border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" type="number" placeholder="0.00" value={formData.purchasePotential || ''} onChange={e => setFormData({...formData, purchasePotential: parseFloat(e.target.value)})} />
-                     </div>
-                     <div>
-                        <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider ml-1">Melhor Dia de Compra</label>
-                        <select className="w-full p-3 mt-1 bg-white border border-indigo-100 rounded-xl outline-none" value={formData.bestBuyDay || ''} onChange={e => setFormData({...formData, bestBuyDay: e.target.value})}>
-                           <option value="">Selecione...</option>
-                           <option value="Segunda-feira">Segunda-feira</option>
-                           <option value="Terça-feira">Terça-feira</option>
-                           <option value="Quarta-feira">Quarta-feira</option>
-                           <option value="Quinta-feira">Quinta-feira</option>
-                           <option value="Sexta-feira">Sexta-feira</option>
-                           <option value="Sábado">Sábado</option>
-                        </select>
-                     </div>
-                     <div>
-                        <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider ml-1">Observações</label>
-                        <input className="w-full p-3 mt-1 bg-white border border-indigo-100 rounded-xl outline-none" placeholder="Obs..." value={formData.notes || ''} onChange={e => setFormData({...formData, notes: e.target.value})} />
-                     </div>
-                  </div>
-                  
-                  <div className="mt-4 pt-4 border-t border-indigo-100">
-                     <h5 className="text-xs font-bold text-indigo-800 mb-3 uppercase tracking-wide">Cronograma de Visitas</h5>
-                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                           <label className="text-xs text-indigo-500 mb-1 block">Última Visita</label>
-                           <input type="date" className="w-full p-2 rounded-lg border border-indigo-100 text-sm" value={formData.lastVisit || ''} onChange={e => setFormData({...formData, lastVisit: e.target.value})} />
-                        </div>
-                        <div>
-                           <label className="text-xs text-indigo-500 mb-1 block font-bold">Próxima Visita (Agendar)</label>
-                           <input type="date" className="w-full p-2 rounded-lg border-2 border-indigo-200 text-sm font-medium text-indigo-900" value={formData.nextVisit || ''} onChange={e => setFormData({...formData, nextVisit: e.target.value})} />
-                        </div>
-                     </div>
-                  </div>
-               </div>
-            )}
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-              <button type="button" onClick={() => setEditing(null)} className="px-6 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-xl transition-colors">Cancelar</button>
-              <button type="submit" className="px-8 py-2.5 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all">Salvar Cliente</button>
-            </div>
-          </form>
         </div>
       )}
 
@@ -815,7 +658,6 @@ const ClientsManager = ({ user }: { user: User }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredClients.map(client => (
             <div key={client.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-indigo-100 transition-all group flex flex-col justify-between h-full relative overflow-hidden">
-              {/* Card Header */}
               <div>
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
@@ -828,164 +670,38 @@ const ClientsManager = ({ user }: { user: User }) => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                     <button onClick={() => openEdit(client)} className="text-slate-300 hover:text-indigo-600 transition-colors p-1" title="Editar"><Edit2 size={16}/></button>
-                     <button onClick={() => handleDelete(client.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1" title="Excluir"><Trash2 size={16}/></button>
+                     <button onClick={() => openEdit(client)} className="text-slate-300 hover:text-indigo-600 transition-colors p-1"><Edit2 size={16}/></button>
+                     <button onClick={() => handleDelete(client.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><Trash2 size={16}/></button>
                   </div>
                 </div>
-
                 <div className="space-y-2 text-sm text-slate-600">
                    <p className="flex items-center gap-2"><Phone size={14} className="text-slate-400"/> {client.phone}</p>
-                   {client.address?.neighborhood && (
-                      <p className="flex items-center gap-2"><MapPin size={14} className="text-slate-400"/> {client.address.neighborhood}, {client.address.city}</p>
-                   )}
+                   {client.address?.neighborhood && <p className="flex items-center gap-2"><MapPin size={14} className="text-slate-400"/> {client.address.neighborhood}</p>}
                 </div>
-
-                {/* Commercial Specific Info */}
                 {client.clientType === 'commercial' && (
                    <div className="mt-4 bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
-                      {/* Status Badge */}
                       <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
                           <span className="text-[10px] uppercase font-bold text-slate-400">Status</span>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${CLIENT_STATUSES[client.status as ClientStatus]?.color || 'bg-slate-100 text-slate-500'}`}>
                               {CLIENT_STATUSES[client.status as ClientStatus]?.label || 'Potencial'}
                           </span>
                       </div>
-
                       {client.contactPerson && <div className="text-xs"><span className="font-bold text-slate-500">Resp:</span> {client.contactPerson}</div>}
-                      {client.purchasePotential && (
-                         <div className="text-xs flex justify-between items-center">
-                            <span className="font-bold text-slate-500">Potencial:</span> 
-                            <span className="font-bold text-emerald-600">R$ {client.purchasePotential.toFixed(2)}</span>
-                         </div>
-                      )}
-                      {client.nextVisit && (
-                         <div className={`mt-2 pt-2 border-t border-slate-200 flex items-center gap-2 text-xs font-bold ${new Date(client.nextVisit) < new Date() ? 'text-rose-500' : 'text-indigo-600'}`}>
-                            <Calendar size={14}/> Próxima Visita: {new Date(client.nextVisit + 'T12:00:00').toLocaleDateString('pt-BR')}
-                         </div>
-                      )}
                    </div>
                 )}
               </div>
-              
-              <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center">
-                 <span className="text-xs text-slate-400">Cadastrado em {client.createdAt?.seconds ? new Date(client.createdAt.seconds * 1000).toLocaleDateString() : '-'}</span>
-              </div>
             </div>
           ))}
-          
           {filteredClients.length === 0 && (
-              <div className="col-span-full p-16 text-center bg-white rounded-2xl border border-dashed border-slate-200 flex flex-col items-center">
+              <div className="col-span-full p-10 md:p-16 text-center bg-white rounded-2xl border border-dashed border-slate-200 flex flex-col items-center">
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-4">
                    {activeTab === 'commercial' ? <Briefcase size={32}/> : <Users size={32}/>}
                 </div>
-                <h3 className="text-slate-800 font-bold mb-1">Nenhum {activeTab === 'commercial' ? 'ponto comercial' : 'cliente'} encontrado</h3>
-                <p className="text-slate-400 max-w-xs mx-auto text-sm">Adicione um novo cadastro para começar a gerenciar.</p>
-                <div className="flex gap-4 mt-4">
-                   <button onClick={handleImportClick} className="text-slate-600 font-bold text-sm hover:underline">Importar Excel</button>
-                   <button onClick={openNew} className="text-indigo-600 font-bold text-sm hover:underline">Adicionar Manualmente</button>
-                </div>
+                <h3 className="text-slate-800 font-bold mb-1">Nenhum cliente encontrado</h3>
+                <p className="text-slate-400 max-w-xs mx-auto text-sm mb-4">Adicione um novo cadastro para começar a gerenciar.</p>
+                <button onClick={openNew} className="text-indigo-600 font-bold text-sm hover:underline">Adicionar Manualmente</button>
               </div>
             )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const OrdersManager = ({ user }: { user: User }) => {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const q = query(collection(db, `merchants/${user.uid}/orders`), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const items: Order[] = [];
-      snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() } as Order));
-      setOrders(items);
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, [user.uid]);
-
-  const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
-    await updateDoc(doc(db, `merchants/${user.uid}/orders`, orderId), { status: newStatus });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch(status) {
-      case OrderStatus.NEW: return <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200">NOVO</span>;
-      case OrderStatus.PROCESSING: return <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-200">PREPARANDO</span>;
-      case OrderStatus.COMPLETED: return <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200">ENTREGUE</span>;
-      case OrderStatus.CANCELLED: return <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold border border-red-200">CANCELADO</span>;
-      default: return null;
-    }
-  };
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-        <h2 className="text-2xl font-bold text-slate-800">Vendas</h2>
-        <p className="text-slate-500 text-sm">Acompanhe e gerencie os pedidos da sua loja</p>
-      </div>
-
-      {loading ? (
-        <LoadingSpinner />
-      ) : (
-        <div className="space-y-4">
-          {orders.map(order => (
-            <div key={order.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between md:items-center gap-6 hover:shadow-md transition-all relative overflow-hidden">
-               <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                   order.status === OrderStatus.NEW ? 'bg-blue-500' : 
-                   order.status === OrderStatus.COMPLETED ? 'bg-emerald-500' :
-                   order.status === OrderStatus.PROCESSING ? 'bg-amber-500' : 'bg-red-400'
-               }`}></div>
-               
-              <div className="pl-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="font-mono text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">#{order.id.slice(-6)}</span>
-                  {getStatusBadge(order.status)}
-                  <span className="text-xs text-slate-400 flex items-center gap-1">• {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleString() : ''}</span>
-                  {order.rating && (
-                     <div className="flex items-center gap-1 ml-2 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-100">
-                        <Star size={12} className="text-amber-500 fill-amber-500"/> <span className="text-xs font-bold text-amber-600">{order.rating}</span>
-                     </div>
-                  )}
-                </div>
-                <h4 className="font-bold text-slate-800 text-lg">{order.customerName}</h4>
-                 <div className="text-sm text-slate-500 mb-3 flex flex-col">
-                    <span>{order.customerPhone}</span>
-                    {order.deliveryAddress && (
-                        <span className="flex items-center gap-1"><MapPin size={12}/> {order.deliveryAddress.street}, {order.deliveryAddress.number} - {order.deliveryAddress.neighborhood}</span>
-                    )}
-                </div>
-                <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100 inline-block min-w-[300px]">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between py-1 border-b border-slate-200 last:border-0">
-                        <span>{item.quantity}x {item.productName}</span>
-                        <span className="font-medium text-slate-900">R$ {(item.price * item.quantity).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-3 pl-4 md:border-l md:border-slate-100 md:pl-8">
-                <div className="text-right">
-                    <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Total do Pedido</p>
-                    <span className="text-3xl font-bold text-slate-900">R$ {order.total.toFixed(2)}</span>
-                </div>
-                <div className="flex gap-2">
-                  {order.status === OrderStatus.NEW && (
-                    <button onClick={() => updateStatus(order.id, OrderStatus.PROCESSING)} className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all">Aceitar Pedido</button>
-                  )}
-                  {order.status === OrderStatus.PROCESSING && (
-                    <button onClick={() => updateStatus(order.id, OrderStatus.COMPLETED)} className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 shadow-md shadow-emerald-200 transition-all">Concluir Entrega</button>
-                  )}
-                  {(order.status === OrderStatus.NEW || order.status === OrderStatus.PROCESSING) && (
-                    <button onClick={() => updateStatus(order.id, OrderStatus.CANCELLED)} className="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 hover:text-red-600 transition-all">Cancelar</button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       )}
     </div>
@@ -1090,22 +806,22 @@ const StoreEditor = ({ user }: { user: User }) => {
 
   return (
     <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100 shrink-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100 shrink-0 gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Editor Visual</h2>
         </div>
-        <div className="flex gap-3">
-          <a href={publicLink} target="_blank" rel="noopener noreferrer" className="px-4 py-2 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 text-sm">
+        <div className="flex gap-3 w-full md:w-auto">
+          <a href={publicLink} target="_blank" rel="noopener noreferrer" className="flex-1 md:flex-none justify-center px-4 py-2 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 text-sm">
             <ExternalLink size={14} /> Ver Loja
           </a>
-          <button onClick={saveConfig} disabled={saving} className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-md transition-all text-sm">
+          <button onClick={saveConfig} disabled={saving} className="flex-1 md:flex-none px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-md transition-all text-sm">
             {saving ? 'Salvando...' : 'Salvar Alterações'}
           </button>
         </div>
       </div>
 
-      <div className="flex flex-1 gap-6 overflow-hidden">
-        <div className="w-1/2 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar pb-10">
+      <div className="flex flex-col lg:flex-row flex-1 gap-6 overflow-hidden">
+        <div className="w-full lg:w-1/2 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar pb-10">
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
                 <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Settings size={18}/> Identidade Visual</h3>
                 <div className="space-y-4">
@@ -1189,10 +905,10 @@ const StoreEditor = ({ user }: { user: User }) => {
             </div>
         </div>
 
-        <div className="w-1/2 bg-slate-100 rounded-2xl border border-slate-200 flex items-center justify-center p-8 relative overflow-hidden">
+        <div className="w-full lg:w-1/2 bg-slate-100 rounded-2xl border border-slate-200 flex items-center justify-center p-4 md:p-8 relative overflow-hidden min-h-[500px]">
             <div className="absolute top-4 left-4 text-xs font-bold text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded">Preview em Tempo Real</div>
             
-            <div className="w-[340px] h-[680px] bg-white rounded-[40px] shadow-2xl border-8 border-slate-800 overflow-hidden relative flex flex-col">
+            <div className="w-full max-w-[340px] h-[600px] md:h-[680px] bg-white rounded-[40px] shadow-2xl border-8 border-slate-800 overflow-hidden relative flex flex-col mx-auto">
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-slate-800 rounded-b-2xl z-20"></div>
                 
                 <div className="flex-1 overflow-y-auto hide-scrollbar bg-gray-50">
@@ -1233,7 +949,6 @@ const StoreEditor = ({ user }: { user: User }) => {
                                     </div>
                                 )
                             }
-                            // ... other preview sections ...
                             return null;
                         })}
                     </div>
@@ -1252,24 +967,31 @@ const StoreEditor = ({ user }: { user: User }) => {
 };
 
 const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    setIsRegister(location.pathname === '/register');
+  }, [location]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setLoading(true);
     try {
-      if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
-      } else {
+      if (isRegister) {
         await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
       }
       navigate('/dashboard');
-    } catch (err: any) {
-      setError("Erro na autenticação. Verifique seus dados.");
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1277,455 +999,267 @@ const AuthPage = () => {
     try {
       await signInWithPopup(auth, googleProvider);
       navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (error: any) {
+      alert(error.message);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] px-4 font-sans">
-      <div className="absolute top-6 left-6 cursor-pointer" onClick={() => navigate('/')}>
-         <div className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors">
-            <ChevronLeft size={20} /> Voltar para Home
-         </div>
-      </div>
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] p-10 border border-slate-100">
-        <div className="flex justify-center mb-8">
-          <AppLogo />
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
+        <div className="text-center mb-8">
+           <div className="flex justify-center mb-4"><AppLogo /></div>
+           <h2 className="text-2xl font-bold text-slate-800">{isRegister ? 'Crie sua conta' : 'Bem-vindo de volta'}</h2>
+           <p className="text-slate-500 text-sm mt-2">{isRegister ? 'Comece a gerenciar seu negócio hoje.' : 'Entre para acessar seu painel.'}</p>
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 text-center mb-2">{isLogin ? 'Bem-vindo de volta' : 'Crie sua conta'}</h2>
-        <p className="text-slate-500 mb-8 text-center text-sm">Gerencie seus clientes e vendas em um só lugar.</p>
-        
-        {error && <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm flex items-center gap-2"><X size={16}/> {error}</div>}
-        
-        <form onSubmit={handleAuth} className="space-y-5">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Email</label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-              placeholder="seu@email.com"
-              required 
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 ml-1">Senha</label>
-            <input 
-              type="password" 
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full p-3.5 bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-              placeholder="••••••••"
-              required 
-            />
-          </div>
-          <button type="submit" className="w-full py-3.5 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-xl font-semibold hover:shadow-lg hover:from-black hover:to-slate-900 transition-all duration-300 transform hover:-translate-y-0.5">
-            {isLogin ? 'Entrar na Plataforma' : 'Criar Conta Grátis'}
-          </button>
+
+        <form onSubmit={handleAuth} className="space-y-4">
+           <div>
+             <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
+             <input type="email" required className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={email} onChange={e => setEmail(e.target.value)} />
+           </div>
+           <div>
+             <label className="text-xs font-bold text-slate-500 uppercase">Senha</label>
+             <input type="password" required className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={password} onChange={e => setPassword(e.target.value)} />
+           </div>
+           
+           <button disabled={loading} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all flex justify-center items-center gap-2">
+             {loading && <Loader2 className="animate-spin" size={18}/>}
+             {isRegister ? 'Cadastrar' : 'Entrar'}
+           </button>
         </form>
 
-        <div className="my-8 flex items-center">
-          <div className="flex-1 border-t border-slate-100"></div>
-          <span className="px-4 text-slate-400 text-xs uppercase tracking-widest font-medium">ou continue com</span>
-          <div className="flex-1 border-t border-slate-100"></div>
+        <div className="my-6 flex items-center gap-4">
+           <div className="h-px bg-slate-100 flex-1"></div>
+           <span className="text-slate-400 text-xs uppercase font-bold">Ou</span>
+           <div className="h-px bg-slate-100 flex-1"></div>
         </div>
 
-        <button onClick={handleGoogle} className="w-full py-3.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-3">
-          <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
+        <button onClick={handleGoogle} className="w-full py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex justify-center items-center gap-2">
+          <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
           Google
         </button>
 
-        <p className="mt-8 text-center text-sm text-slate-500">
-          {isLogin ? 'Ainda não tem uma conta?' : 'Já tem uma conta?'}
-          <button onClick={() => setIsLogin(!isLogin)} className="ml-2 text-indigo-600 font-semibold hover:text-indigo-700 transition-colors">
-            {isLogin ? 'Cadastre-se' : 'Entrar'}
-          </button>
+        <p className="text-center mt-6 text-sm text-slate-500">
+           {isRegister ? 'Já tem uma conta?' : 'Não tem conta?'}
+           <span onClick={() => navigate(isRegister ? '/login' : '/register')} className="text-indigo-600 font-bold cursor-pointer ml-1 hover:underline">
+              {isRegister ? 'Entrar' : 'Cadastrar'}
+           </span>
         </p>
       </div>
     </div>
   );
 };
 
-// --- PUBLIC STORE ---
+const OrdersManager = ({ user }: { user: User }) => {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+      const q = query(collection(db, `merchants/${user.uid}/orders`), orderBy('createdAt', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+          const items: Order[] = [];
+          snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() } as Order));
+          setOrders(items);
+          setLoading(false);
+      });
+      return unsubscribe;
+  }, [user.uid]);
+
+  const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
+      await updateDoc(doc(db, `merchants/${user.uid}/orders`, orderId), { status: newStatus });
+  };
+
+  return (
+      <div className="space-y-6">
+          <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+              <div>
+                  <h2 className="text-2xl font-bold text-slate-800">Pedidos</h2>
+                  <p className="text-slate-500 text-sm">Gerencie os pedidos da sua loja</p>
+              </div>
+          </div>
+          
+          {loading ? <LoadingSpinner /> : (
+            <div className="grid gap-4">
+                {orders.map(order => (
+                    <div key={order.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-6">
+                        <div className="flex-1 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <span className="font-bold text-lg text-slate-800">#{order.id.slice(0, 8)}</span>
+                                <span className="text-sm text-slate-500">{new Date(order.createdAt?.seconds * 1000).toLocaleString()}</span>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-2 text-sm text-slate-600"><UserIcon size={16}/> {order.customerName}</div>
+                                <div className="flex items-center gap-2 text-sm text-slate-600"><MapPin size={16}/> {order.deliveryAddress.street}, {order.deliveryAddress.number}</div>
+                            </div>
+                            <div className="border-t border-slate-100 pt-3">
+                                {order.items.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between text-sm py-1">
+                                        <span className="text-slate-600">{item.quantity}x {item.productName}</span>
+                                        <span className="font-medium">R$ {(item.price * item.quantity).toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                             <div className="flex justify-between items-center border-t border-slate-100 pt-3">
+                                <span className="font-bold text-slate-800">Total</span>
+                                <span className="font-bold text-xl text-indigo-600">R$ {order.total.toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <div className="w-full md:w-64 flex flex-col gap-3 justify-center border-l border-slate-100 md:pl-6">
+                             <label className="text-xs font-bold text-slate-400 uppercase">Status do Pedido</label>
+                             <select 
+                                value={order.status}
+                                onChange={(e) => updateStatus(order.id, e.target.value as OrderStatus)}
+                                className={`w-full p-3 rounded-xl border font-bold outline-none ${
+                                    order.status === 'new' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                    order.status === 'processing' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                    order.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                    'bg-slate-50 text-slate-700 border-slate-200'
+                                }`}
+                             >
+                                <option value="new">Novo Pedido</option>
+                                <option value="processing">Em Preparo</option>
+                                <option value="completed">Concluído</option>
+                                <option value="cancelled">Cancelado</option>
+                             </select>
+                        </div>
+                    </div>
+                ))}
+                {orders.length === 0 && (
+                    <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
+                        <ShoppingBag size={48} className="mx-auto text-slate-300 mb-4"/>
+                        <p className="text-slate-500 font-medium">Nenhum pedido recebido ainda.</p>
+                    </div>
+                )}
+            </div>
+          )}
+      </div>
+  );
+};
+
 const PublicStore = () => {
   const { id } = useParams();
   const [config, setConfig] = useState<StoreConfig | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Cart & Checkout
   const [cart, setCart] = useState<{product: Product, quantity: number}[]>([]);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [customerInfo, setCustomerInfo] = useState({ 
-    name: '', email: '', phone: '',
-    street: '', number: '', neighborhood: '', city: '', zip: '', complement: ''
-  });
+  const [loading, setLoading] = useState(true);
+  const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!id) return;
-      try {
-        const docRef = doc(db, 'merchants', id);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists() && docSnap.data().storeConfig) {
-          setConfig(docSnap.data().storeConfig);
-        } else {
-            setConfig({
-                storeName: 'Loja não encontrada',
-                themeColor: '#000000',
-                sections: []
-            });
-        }
-
-        const q = query(collection(db, `merchants/${id}/products`));
-        const querySnapshot = await getDocs(q);
-        const prods: Product[] = [];
-        querySnapshot.forEach((doc) => {
-          prods.push({ id: doc.id, ...doc.data() } as Product);
-        });
-        setProducts(prods);
-
-      } catch (error) {
-        console.error("Error loading store", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+      const loadStore = async () => {
+          if (!id) return;
+          try {
+              const docSnap = await getDoc(doc(db, 'merchants', id));
+              if (docSnap.exists() && docSnap.data().storeConfig) {
+                  setConfig(docSnap.data().storeConfig);
+              }
+              const pSnap = await getDocs(collection(db, `merchants/${id}/products`));
+              const pList: Product[] = [];
+              pSnap.forEach(d => pList.push({id: d.id, ...d.data()} as Product));
+              setProducts(pList);
+          } catch(e) {
+              console.error(e);
+          } finally {
+              setLoading(false);
+          }
+      };
+      loadStore();
   }, [id]);
 
   const addToCart = (product: Product) => {
-    setCart(prev => {
-        const existing = prev.find(p => p.product.id === product.id);
-        if(existing) {
-            return prev.map(p => p.product.id === product.id ? {...p, quantity: p.quantity + 1} : p);
-        }
-        return [...prev, {product, quantity: 1}];
-    });
-    // Optional: Toast notification here
+      setCart(prev => {
+          const existing = prev.find(p => p.product.id === product.id);
+          if (existing) {
+              return prev.map(p => p.product.id === product.id ? {...p, quantity: p.quantity + 1} : p);
+          }
+          return [...prev, { product, quantity: 1 }];
+      });
+      setCartOpen(true);
   };
 
   const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
+      setCart(prev => prev.filter(p => p.product.id !== productId));
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.product.id === productId) {
-        return { ...item, quantity: Math.max(1, item.quantity + delta) };
-      }
-      return item;
-    }));
+  const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+
+  const checkout = () => {
+      const message = `Olá! Gostaria de fazer um pedido:\n\n${cart.map(i => `${i.quantity}x ${i.product.name}`).join('\n')}\n\nTotal: R$ ${total.toFixed(2)}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  const handleCheckout = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id || cart.length === 0) return;
-
-    try {
-      const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
-      
-      const orderPayload = {
-        merchantId: id,
-        customerName: customerInfo.name,
-        customerEmail: customerInfo.email,
-        customerPhone: customerInfo.phone,
-        deliveryAddress: {
-            street: customerInfo.street,
-            number: customerInfo.number,
-            neighborhood: customerInfo.neighborhood,
-            city: customerInfo.city,
-            zip: customerInfo.zip,
-            complement: customerInfo.complement || ''
-        },
-        items: cart.map(i => ({ 
-          productId: i.product.id, 
-          productName: i.product.name, 
-          quantity: i.quantity, 
-          price: i.product.price,
-          imageUrl: i.product.imageUrl || ''
-        })),
-        total,
-        status: 'new',
-        createdAt: serverTimestamp()
-      };
-
-      // 1. Create Order
-      const orderRef = await addDoc(collection(db, `merchants/${id}/orders`), orderPayload);
-
-      // 2. Handle Client (Deduplication)
-      const clientsRef = collection(db, `merchants/${id}/clients`);
-      const q = query(clientsRef, where("email", "==", customerInfo.email), limit(1));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        // Update existing client
-        const clientDoc = querySnapshot.docs[0];
-        await updateDoc(doc(db, `merchants/${id}/clients`, clientDoc.id), {
-          lastOrderDate: serverTimestamp(),
-          phone: customerInfo.phone, // Update contact info
-          address: orderPayload.deliveryAddress,
-          totalOrders: (clientDoc.data().totalOrders || 0) + 1
-        });
-      } else {
-        // Create new client
-        await addDoc(clientsRef, {
-            name: customerInfo.name,
-            email: customerInfo.email,
-            phone: customerInfo.phone,
-            address: orderPayload.deliveryAddress,
-            createdAt: serverTimestamp(),
-            lastOrderDate: serverTimestamp(),
-            totalOrders: 1,
-            clientType: 'common' // Default for online orders
-        });
-      }
-
-      alert('Pedido realizado com sucesso!');
-      setCart([]);
-      setIsCheckoutOpen(false);
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao processar pedido.');
-    }
-  };
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600"/></div>;
-  if (!config) return <div className="min-h-screen flex items-center justify-center">Loja não encontrada.</div>;
-
-  const cartTotal = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
-  const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
+  if (loading) return <LoadingSpinner />;
+  if (!config) return <div className="text-center py-20">Loja não encontrada.</div>;
 
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-900 pb-24">
-         {/* Simple Header */}
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md shadow-sm border-b border-slate-100">
+      <div className="min-h-screen bg-white font-sans text-slate-900">
+          <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 shadow-sm">
              <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    {config.logoUrl ? (
-                         <img src={config.logoUrl} alt={config.storeName} className="w-10 h-10 rounded-full object-cover shadow-sm" />
-                    ) : (
-                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">
-                             {config.storeName.charAt(0)}
-                         </div>
-                    )}
-                    <div>
-                        <h1 className="font-bold text-slate-900 leading-tight">{config.storeName}</h1>
-                        {config.description && <p className="text-xs text-slate-500 hidden sm:block">{config.description}</p>}
-                    </div>
-                </div>
-                
-                <button 
-                  onClick={() => setIsCheckoutOpen(true)}
-                  className="relative p-2 text-slate-600 hover:bg-slate-50 rounded-full transition-colors"
-                >
-                    <ShoppingBag size={24} />
-                    {cartCount > 0 && (
-                        <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
-                            {cartCount}
-                        </span>
-                    )}
-                </button>
+                 <div className="flex items-center gap-3">
+                     {config.logoUrl && <img src={config.logoUrl} className="w-8 h-8 rounded-full object-cover"/>}
+                     <span className="font-bold text-lg">{config.storeName}</span>
+                 </div>
+                 <button onClick={() => setCartOpen(true)} className="relative p-2 hover:bg-slate-100 rounded-full">
+                     <ShoppingBag size={24}/>
+                     {cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full font-bold">{cart.reduce((a,b)=>a+b.quantity,0)}</span>}
+                 </button>
              </div>
-        </header>
+          </header>
 
-        {config.bannerUrl && (
-             <div className="w-full h-48 md:h-64 bg-cover bg-center relative" style={{ backgroundImage: `url(${config.bannerUrl})` }}>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-             </div>
-        )}
+          {config.sections.map(section => {
+              if (section.type === 'hero') return <HeroSection key={section.id} section={section} />;
+              if (section.type === 'text') return <TextSection key={section.id} section={section} />;
+              if (section.type === 'products') return <ProductGridSection key={section.id} section={section} products={products} onAddToCart={addToCart} />;
+              return null;
+          })}
 
-        {config.sections.map((section) => {
-            if(section.type === 'hero') return <HeroSection key={section.id} section={section} />;
-            if(section.type === 'text') return <TextSection key={section.id} section={section} />;
-            if(section.type === 'products') return <ProductGridSection key={section.id} section={section} products={products} onAddToCart={addToCart} />;
-            return null;
-        })}
-        
-        {config.sections.length === 0 && (
-             <div className="py-20 text-center text-slate-400">
-                 <p>Esta loja ainda não configurou suas seções.</p>
-             </div>
-        )}
+          <footer className="py-10 bg-slate-50 border-t border-slate-200 text-center">
+              <p className="text-slate-500 text-sm">© {new Date().getFullYear()} {config.storeName}. Powered by NovaCRM.</p>
+          </footer>
 
-        <footer className="mt-20 border-t border-slate-100 py-10 text-center">
-            <p className="text-sm text-slate-400">Powered by <span className="font-bold text-slate-600">NovaCRM</span></p>
-        </footer>
-
-        {/* Floating Cart Button (Mobile) */}
-        {cartCount > 0 && (
-          <div className="fixed bottom-4 left-4 right-4 z-40 md:hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
-              <button 
-                onClick={() => setIsCheckoutOpen(true)}
-                className="w-full bg-slate-900 text-white p-4 rounded-xl shadow-xl flex justify-between items-center font-bold hover:scale-[1.02] transition-transform"
-                style={{ backgroundColor: config.themeColor || '#0f172a' }}
-              >
-                  <span className="bg-white/20 px-3 py-1 rounded-full text-sm">{cartCount}</span>
-                  <span>Ver Sacola</span>
-                  <span>R$ {cartTotal.toFixed(2)}</span>
-              </button>
-          </div>
-        )}
-
-        {/* Checkout Modal */}
-        {isCheckoutOpen && (
-          <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
-            <div className="bg-white w-full max-w-lg h-[90vh] md:h-auto md:max-h-[90vh] rounded-t-3xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 duration-300">
-              {/* Modal Header */}
-              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                <h3 className="text-lg font-bold text-slate-800">Finalizar Pedido</h3>
-                <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-slate-50 rounded-full"><X size={24}/></button>
-              </div>
-              
-              {/* Modal Content */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {cart.length === 0 ? (
-                  <div className="text-center py-10 text-slate-400">
-                    <ShoppingBag size={48} className="mx-auto mb-4 opacity-20"/>
-                    <p>Sua sacola está vazia.</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-4">
-                      {cart.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-start border-b border-gray-50 pb-4">
-                          <div className="flex gap-3">
-                              <div className="flex flex-col items-center gap-1 bg-slate-50 rounded-lg p-1">
-                                <button onClick={() => updateQuantity(item.product.id, 1)} className="p-1 hover:text-green-600"><ChevronUp size={14}/></button>
-                                <span className="font-bold text-slate-800 text-sm">{item.quantity}</span>
-                                <button onClick={() => item.quantity > 1 ? updateQuantity(item.product.id, -1) : removeFromCart(item.product.id)} className="p-1 hover:text-red-600"><ChevronDown size={14}/></button>
-                              </div>
-                              <div>
-                                <p className="font-medium text-slate-800">{item.product.name}</p>
-                                <p className="text-sm text-slate-500">R$ {item.product.price.toFixed(2)}</p>
-                              </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                               <span className="font-medium text-slate-900">R$ {(item.product.price * item.quantity).toFixed(2)}</span>
-                               <button onClick={() => removeFromCart(item.product.id)} className="text-xs text-red-500 font-medium hover:underline">Remover</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex justify-between items-center py-4 border-t border-slate-100 bg-slate-50/50 -mx-6 px-6">
-                       <span className="font-bold text-lg text-slate-600">Total</span>
-                       <span className="font-bold text-2xl text-slate-900">R$ {cartTotal.toFixed(2)}</span>
-                    </div>
-
-                    <form onSubmit={handleCheckout} className="space-y-5 pt-2">
-                      <div>
-                        <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2 mb-3"><Users size={16}/> Seus Dados</h4>
-                        <div className="grid grid-cols-1 gap-3">
-                           <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Nome Completo" required value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} />
-                           <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" type="email" placeholder="Email" required value={customerInfo.email} onChange={e => setCustomerInfo({...customerInfo, email: e.target.value})} />
-                           <input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" type="tel" placeholder="Telefone / WhatsApp" required value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} />
-                        </div>
+          {/* Shopping Cart Sidebar */}
+          {cartOpen && (
+              <div className="fixed inset-0 z-50 flex justify-end">
+                  <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setCartOpen(false)}></div>
+                  <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
+                      <div className="p-4 border-b flex justify-between items-center bg-slate-50">
+                          <h3 className="font-bold text-lg">Seu Pedido</h3>
+                          <button onClick={() => setCartOpen(false)}><X size={24}/></button>
                       </div>
-
-                      <div>
-                        <h4 className="font-bold text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2 mb-3"><MapPin size={16}/> Endereço de Entrega</h4>
-                        <div className="grid grid-cols-4 gap-3">
-                           <input className="col-span-3 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Rua / Avenida" required value={customerInfo.street} onChange={e => setCustomerInfo({...customerInfo, street: e.target.value})} />
-                           <input className="col-span-1 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Nº" required value={customerInfo.number} onChange={e => setCustomerInfo({...customerInfo, number: e.target.value})} />
-                           <input className="col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Bairro" required value={customerInfo.neighborhood} onChange={e => setCustomerInfo({...customerInfo, neighborhood: e.target.value})} />
-                           <input className="col-span-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cidade" required value={customerInfo.city} onChange={e => setCustomerInfo({...customerInfo, city: e.target.value})} />
-                           <input className="col-span-4 w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Complemento (Opcional)" value={customerInfo.complement} onChange={e => setCustomerInfo({...customerInfo, complement: e.target.value})} />
-                        </div>
+                      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                          {cart.map(item => (
+                              <div key={item.product.id} className="flex gap-4">
+                                  <div className="w-16 h-16 bg-slate-100 rounded-lg flex-shrink-0 overflow-hidden">
+                                     {item.product.imageUrl && <img src={item.product.imageUrl} className="w-full h-full object-cover"/>}
+                                  </div>
+                                  <div className="flex-1">
+                                      <h4 className="font-bold text-sm">{item.product.name}</h4>
+                                      <p className="text-xs text-slate-500">Un: R$ {item.product.price.toFixed(2)}</p>
+                                      <div className="flex items-center justify-between mt-2">
+                                          <span className="font-bold">R$ {(item.product.price * item.quantity).toFixed(2)}</span>
+                                          <div className="flex items-center gap-2">
+                                              <button onClick={() => removeFromCart(item.product.id)} className="text-red-500 text-xs font-bold">Remover</button>
+                                              <span className="bg-slate-100 px-2 py-1 rounded text-xs font-bold">x{item.quantity}</span>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                          ))}
+                          {cart.length === 0 && <p className="text-center text-slate-500 py-10">Carrinho vazio</p>}
                       </div>
-                      
-                      <button type="submit" className="w-full py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 hover:scale-[1.02] transition-all shadow-lg shadow-green-100 mt-4 text-lg">
-                        Fazer Pedido
-                      </button>
-                    </form>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-    </div>
-  );
-};
-
-// --- LANDING PAGE ---
-const LandingPage = () => {
-  const navigate = useNavigate();
-  return (
-    <div className="min-h-screen bg-white">
-      <nav className="flex items-center justify-between p-6 max-w-7xl mx-auto">
-        <AppLogo />
-        <div className="flex gap-4">
-          <button onClick={() => navigate('/login')} className="px-5 py-2 text-slate-600 font-medium hover:text-indigo-600 transition-colors">Entrar</button>
-          <button onClick={() => navigate('/register')} className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">Começar Grátis</button>
-        </div>
-      </nav>
-      
-      <div className="max-w-7xl mx-auto px-6 py-20 flex flex-col md:flex-row items-center gap-12">
-        <div className="flex-1 space-y-6">
-          <h1 className="text-5xl md:text-7xl font-bold text-slate-900 leading-tight">
-            Gerencie seu negócio <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">com inteligência.</span>
-          </h1>
-          <p className="text-xl text-slate-500 max-w-lg leading-relaxed">
-            CRM, Vendas e Loja Virtual em uma única plataforma. Potencialize seus resultados com nossa IA integrada.
-          </p>
-          <div className="flex gap-4 pt-4">
-             <button onClick={() => navigate('/register')} className="px-8 py-4 bg-slate-900 text-white text-lg font-bold rounded-2xl hover:bg-slate-800 transition-all flex items-center gap-2">
-                Criar Conta Grátis <ArrowRight size={20}/>
-             </button>
-             <button className="px-8 py-4 bg-white text-slate-700 border border-slate-200 text-lg font-bold rounded-2xl hover:bg-slate-50 transition-all">
-                Ver Demonstração
-             </button>
-          </div>
-        </div>
-        <div className="flex-1 relative">
-           <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-100 to-violet-100 rounded-full blur-3xl opacity-50 -z-10"></div>
-           <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-100 transform rotate-2 hover:rotate-0 transition-all duration-500">
-               <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-4">
-                   <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                   <div className="w-3 h-3 rounded-full bg-amber-400"></div>
-                   <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
-               </div>
-               <div className="space-y-4 opacity-50">
-                   <div className="h-8 bg-slate-100 rounded w-1/3"></div>
-                   <div className="grid grid-cols-3 gap-4">
-                       <div className="h-24 bg-indigo-50 rounded"></div>
-                       <div className="h-24 bg-purple-50 rounded"></div>
-                       <div className="h-24 bg-emerald-50 rounded"></div>
-                   </div>
-                   <div className="h-40 bg-slate-50 rounded"></div>
-               </div>
-           </div>
-        </div>
-      </div>
-      
-      <div className="bg-slate-50 py-24">
-        <div className="max-w-7xl mx-auto px-6">
-           <div className="text-center mb-16">
-              <h2 className="text-3xl font-bold text-slate-900 mb-4">Tudo que você precisa</h2>
-              <p className="text-slate-500 max-w-2xl mx-auto">Uma suíte completa de ferramentas para modernizar sua operação comercial.</p>
-           </div>
-           
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                  { icon: <Store size={32} className="text-indigo-600"/>, title: "Loja Virtual", desc: "Crie seu catálogo online em minutos e receba pedidos no WhatsApp ou Painel." },
-                  { icon: <Users size={32} className="text-violet-600"/>, title: "CRM de Clientes", desc: "Organize sua carteira de clientes, histórico de compras e funil de vendas." },
-                  { icon: <Sparkles size={32} className="text-emerald-600"/>, title: "IA Integrada", desc: "Nossa IA ajuda você a criar descrições, analisar dados e tomar decisões." }
-              ].map((item, i) => (
-                  <div key={i} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                      <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-6">{item.icon}</div>
-                      <h3 className="text-xl font-bold text-slate-800 mb-3">{item.title}</h3>
-                      <p className="text-slate-500 leading-relaxed">{item.desc}</p>
+                      <div className="p-4 border-t bg-slate-50">
+                          <div className="flex justify-between items-center mb-4">
+                              <span className="font-bold text-slate-500">Total</span>
+                              <span className="font-bold text-xl text-indigo-600">R$ {total.toFixed(2)}</span>
+                          </div>
+                          <button onClick={checkout} disabled={cart.length === 0} className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                              <MessageSquare size={20}/> Pedir no WhatsApp
+                          </button>
+                      </div>
                   </div>
-              ))}
-           </div>
-        </div>
+              </div>
+          )}
       </div>
-    </div>
   );
 };
 
@@ -1736,8 +1270,8 @@ const DashboardHome = ({ user }: { user: User }) => {
         <div className="space-y-8 animate-in fade-in duration-500">
             <div className="flex justify-between items-end">
                 <div>
-                    <h2 className="text-3xl font-bold text-slate-800">Olá, {user.displayName || 'Lojista'}</h2>
-                    <p className="text-slate-500">Aqui está o resumo da sua operação hoje.</p>
+                    <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Olá, {user.displayName || 'Lojista'}</h2>
+                    <p className="text-slate-500 text-sm md:text-base">Aqui está o resumo da sua operação hoje.</p>
                 </div>
                 <div className="text-right hidden md:block">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Data de Hoje</p>
@@ -1745,14 +1279,14 @@ const DashboardHome = ({ user }: { user: User }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                 {[
                     { label: "Vendas Hoje", value: "R$ 1.250,00", icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50", trend: "+12%" },
                     { label: "Pedidos", value: "24", icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50", trend: "+4" },
                     { label: "Novos Clientes", value: "5", icon: Users, color: "text-violet-600", bg: "bg-violet-50", trend: "+2" },
                     { label: "Ticket Médio", value: "R$ 52,00", icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50", trend: "+1.5%" },
                 ].map((stat, i) => (
-                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
+                    <div key={i} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
                         <div className="flex justify-between items-start mb-4">
                             <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
                                 <stat.icon size={24} />
@@ -1765,8 +1299,8 @@ const DashboardHome = ({ user }: { user: User }) => {
                 ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+                <div className="lg:col-span-2 bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-slate-800 text-lg">Vendas da Semana</h3>
                         <button className="text-slate-400 hover:text-indigo-600"><ExternalLink size={16}/></button>
@@ -1776,7 +1310,7 @@ const DashboardHome = ({ user }: { user: User }) => {
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
                      <div>
                         <h3 className="font-bold text-slate-800 text-lg mb-2">Meta Mensal</h3>
                         <p className="text-slate-500 text-sm mb-6">Seu progresso em relação à meta de R$ 20.000</p>
@@ -1815,7 +1349,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser: User) => {
@@ -1845,51 +1380,74 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} hidden md:flex flex-col`}>
-        <div className="h-20 flex items-center justify-center border-b border-slate-100">
-             <AppLogo collapsed={!sidebarOpen} />
+    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900 overflow-hidden">
+      {/* Mobile Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Desktop & Mobile */}
+      <aside 
+        className={`
+          fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transition-all duration-300 transform 
+          ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} 
+          md:translate-x-0 md:static 
+          ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'}
+          w-64
+          flex flex-col
+        `}
+      >
+        <div className="h-20 flex items-center justify-center border-b border-slate-100 relative">
+             <AppLogo collapsed={sidebarCollapsed} />
+             {/* Mobile Close Button */}
+             <button onClick={() => setMobileMenuOpen(false)} className="absolute right-4 md:hidden p-2 text-slate-400 hover:text-slate-600">
+               <X size={20} />
+             </button>
         </div>
         
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
            {menuItems.map((item) => {
              const active = item.exact ? location.pathname === item.path : location.pathname.startsWith(item.path);
              return (
                <Link 
                  key={item.path} 
                  to={item.path}
-                 className={`flex items-center gap-3 p-3 rounded-xl transition-all ${active ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
+                 onClick={() => setMobileMenuOpen(false)}
+                 className={`flex items-center gap-3 p-3 rounded-xl transition-all ${active ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${sidebarCollapsed ? 'justify-center' : ''}`}
+                 title={sidebarCollapsed ? item.label : ''}
                >
-                 <item.icon size={20} />
-                 {sidebarOpen && <span>{item.label}</span>}
+                 <item.icon size={20} className="shrink-0" />
+                 {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
                </Link>
              )
            })}
         </nav>
 
         <div className="p-4 border-t border-slate-100">
-            <button onClick={handleLogout} className={`flex items-center gap-3 p-3 rounded-xl w-full text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all ${!sidebarOpen && 'justify-center'}`}>
-                <LogOut size={20} />
-                {sidebarOpen && <span className="font-medium">Sair</span>}
+            <button onClick={handleLogout} className={`flex items-center gap-3 p-3 rounded-xl w-full text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all ${sidebarCollapsed ? 'justify-center' : ''}`} title="Sair">
+                <LogOut size={20} className="shrink-0" />
+                {!sidebarCollapsed && <span className="font-medium truncate">Sair</span>}
             </button>
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="mt-4 w-full flex justify-center text-slate-300 hover:text-indigo-600">
-                {sidebarOpen ? <ChevronLeft size={20}/> : <ChevronRight size={20}/>}
+            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="mt-4 w-full justify-center text-slate-300 hover:text-indigo-600 hidden md:flex">
+                {sidebarCollapsed ? <ChevronRight size={20}/> : <ChevronLeft size={20}/>}
             </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
+      <main className="flex-1 transition-all duration-300 overflow-y-auto h-screen relative w-full">
          {/* Mobile Header */}
-         <div className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-40">
+         <div className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-30">
             <AppLogo />
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 text-slate-500">
+            <button onClick={() => setMobileMenuOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg">
                 <Menu size={24}/>
             </button>
          </div>
 
-         <div className="p-6 md:p-10 max-w-7xl mx-auto">
+         <div className="p-4 md:p-10 max-w-7xl mx-auto pb-24 md:pb-10">
             <Routes>
               <Route path="/" element={<DashboardHome user={user} />} />
               <Route path="/orders" element={<OrdersManager user={user} />} />
@@ -1900,6 +1458,84 @@ const Dashboard = () => {
       </main>
       
       <AIAssistant user={user} />
+    </div>
+  );
+};
+
+// --- LANDING PAGE ---
+const LandingPage = () => {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-white">
+      <nav className="flex items-center justify-between p-4 md:p-6 max-w-7xl mx-auto">
+        <AppLogo />
+        <div className="flex gap-2 md:gap-4">
+          <button onClick={() => navigate('/login')} className="px-3 md:px-5 py-2 text-sm md:text-base text-slate-600 font-medium hover:text-indigo-600 transition-colors">Entrar</button>
+          <button onClick={() => navigate('/register')} className="px-3 md:px-5 py-2 text-sm md:text-base bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">Começar</button>
+        </div>
+      </nav>
+      
+      <div className="max-w-7xl mx-auto px-6 py-12 md:py-20 flex flex-col md:flex-row items-center gap-12">
+        <div className="flex-1 space-y-6 text-center md:text-left">
+          <h1 className="text-4xl md:text-7xl font-bold text-slate-900 leading-tight">
+            Gerencie seu negócio <br/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">com inteligência.</span>
+          </h1>
+          <p className="text-lg md:text-xl text-slate-500 max-w-lg leading-relaxed mx-auto md:mx-0">
+            CRM, Vendas e Loja Virtual em uma única plataforma. Potencialize seus resultados com nossa IA integrada.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center md:justify-start">
+             <button onClick={() => navigate('/register')} className="px-8 py-4 bg-slate-900 text-white text-lg font-bold rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+                Criar Conta Grátis <ArrowRight size={20}/>
+             </button>
+             <button className="px-8 py-4 bg-white text-slate-700 border border-slate-200 text-lg font-bold rounded-2xl hover:bg-slate-50 transition-all">
+                Ver Demonstração
+             </button>
+          </div>
+        </div>
+        <div className="flex-1 relative w-full max-w-md md:max-w-full">
+           <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-100 to-violet-100 rounded-full blur-3xl opacity-50 -z-10"></div>
+           <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-100 transform rotate-2 hover:rotate-0 transition-all duration-500">
+               <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-4">
+                   <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                   <div className="w-3 h-3 rounded-full bg-amber-400"></div>
+                   <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
+               </div>
+               <div className="space-y-4 opacity-50">
+                   <div className="h-8 bg-slate-100 rounded w-1/3"></div>
+                   <div className="grid grid-cols-3 gap-4">
+                       <div className="h-24 bg-indigo-50 rounded"></div>
+                       <div className="h-24 bg-purple-50 rounded"></div>
+                       <div className="h-24 bg-emerald-50 rounded"></div>
+                   </div>
+                   <div className="h-40 bg-slate-50 rounded"></div>
+               </div>
+           </div>
+        </div>
+      </div>
+      
+      <div className="bg-slate-50 py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-6">
+           <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold text-slate-900 mb-4">Tudo que você precisa</h2>
+              <p className="text-slate-500 max-w-2xl mx-auto">Uma suíte completa de ferramentas para modernizar sua operação comercial.</p>
+           </div>
+           
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                  { icon: <Store size={32} className="text-indigo-600"/>, title: "Loja Virtual", desc: "Crie seu catálogo online em minutos e receba pedidos no WhatsApp ou Painel." },
+                  { icon: <Users size={32} className="text-violet-600"/>, title: "CRM de Clientes", desc: "Organize sua carteira de clientes, histórico de compras e funil de vendas." },
+                  { icon: <Sparkles size={32} className="text-emerald-600"/>, title: "IA Integrada", desc: "Nossa IA ajuda você a criar descrições, analisar dados e tomar decisões." }
+              ].map((item, i) => (
+                  <div key={i} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all">
+                      <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-6">{item.icon}</div>
+                      <h3 className="text-xl font-bold text-slate-800 mb-3">{item.title}</h3>
+                      <p className="text-slate-500 leading-relaxed">{item.desc}</p>
+                  </div>
+              ))}
+           </div>
+        </div>
+      </div>
     </div>
   );
 };
