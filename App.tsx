@@ -357,179 +357,23 @@ const ProductsManager = ({ user }: { user: User }) => {
 };
 
 const WhatsAppBot = ({ user }: { user: User }) => {
-  const [metaConfig, setMetaConfig] = useState<WhatsAppConfig>({ phoneNumberId: '', accessToken: '' });
-  const [showConfig, setShowConfig] = useState(false);
-  const [targetPhone, setTargetPhone] = useState('');
-  const [messages, setMessages] = useState<{id: string, sender: 'me' | 'them', text: string, time: string}[]>([]);
-  const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const loadConfig = async () => {
-        const docRef = doc(db, 'merchants', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists() && docSnap.data().storeConfig?.metaWhatsApp) {
-            setMetaConfig(docSnap.data().storeConfig.metaWhatsApp);
-        } else {
-            setShowConfig(true);
-        }
-    };
-    loadConfig();
-  }, [user]);
-
-  const handleSaveConfig = async (e: React.FormEvent) => {
-      e.preventDefault();
-      try {
-          await setDoc(doc(db, 'merchants', user.uid), {
-             storeConfig: { metaWhatsApp: metaConfig } 
-          }, { merge: true });
-          setShowConfig(false);
-          alert('Configuração salva com sucesso!');
-      } catch (error) {
-          alert('Erro ao salvar configuração.');
-      }
-  };
-
-  useEffect(() => {
-    if(scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
-
-  const sendMetaMessage = async () => {
-    if (!input.trim() || !targetPhone) {
-        alert("Preencha o telefone e a mensagem.");
-        return;
-    }
-    if (!metaConfig.phoneNumberId || !metaConfig.accessToken) {
-        alert("Configure a API da Meta primeiro.");
-        setShowConfig(true);
-        return;
-    }
-
-    setSending(true);
-    const newMsg = { id: Date.now().toString(), sender: 'me' as const, text: input, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) };
-    
-    setMessages(prev => [...prev, newMsg]);
-    
-    try {
-        let phone = targetPhone.replace(/\D/g, '');
-        if (phone.length <= 11 && !phone.startsWith('55')) phone = `55${phone}`; 
-
-        const url = `https://graph.facebook.com/v17.0/${metaConfig.phoneNumberId}/messages`;
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${metaConfig.accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                messaging_product: 'whatsapp',
-                to: phone,
-                type: 'text',
-                text: { body: input }
-            })
-        });
-
-        const data = await response.json();
-        if (data.error) {
-            console.error("Meta API Error:", data.error);
-            setMessages(prev => [...prev, { id: 'err', sender: 'them', text: `Erro ao enviar: ${data.error.message}`, time: 'System' }]);
-        } else {
-            setInput('');
-        }
-    } catch (error) {
-        console.error("Fetch Error:", error);
-        alert("Erro de conexão com a Meta API.");
-    } finally {
-        setSending(false);
-    }
-  };
-
-  if (showConfig) {
-      return (
-          <div className="flex items-center justify-center h-full bg-slate-50 p-4">
-              <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 max-w-lg w-full">
-                  <div className="flex items-center gap-3 mb-6 text-[#008069]">
-                      <MessageCircle size={32} />
-                      <h2 className="text-2xl font-bold text-slate-800">Configurar Meta API</h2>
-                  </div>
-                  <p className="text-sm text-slate-500 mb-6">
-                      Para enviar mensagens diretamente, insira as credenciais do seu App na Meta (Developers Facebook).
-                  </p>
-                  
-                  <form onSubmit={handleSaveConfig} className="space-y-4">
-                      <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase">ID do Número de Telefone</label>
-                          <input required className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" value={metaConfig.phoneNumberId} onChange={e => setMetaConfig({...metaConfig, phoneNumberId: e.target.value})} placeholder="Ex: 1045234..." />
-                      </div>
-                      <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase">Token de Acesso</label>
-                          <input required type="password" className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" value={metaConfig.accessToken} onChange={e => setMetaConfig({...metaConfig, accessToken: e.target.value})} placeholder="EAAG..." />
-                      </div>
-                      <div className="flex gap-3 pt-4">
-                          {messages.length > 0 && <button type="button" onClick={() => setShowConfig(false)} className="px-4 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Voltar</button>}
-                          <button type="submit" className="flex-1 py-3 bg-[#008069] text-white font-bold rounded-xl hover:bg-[#006d59] shadow-lg flex items-center justify-center gap-2"><Key size={18}/> Salvar Credenciais</button>
-                      </div>
-                  </form>
-              </div>
-          </div>
-      );
-  }
-
   return (
-    <div className="flex h-[calc(100vh-100px)] bg-slate-100 overflow-hidden rounded-xl shadow-xl border border-slate-200 animate-in zoom-in-95 duration-300">
-       <div className="w-full md:w-[350px] bg-white border-r border-slate-200 flex flex-col">
-          <div className="h-16 bg-slate-50 border-b border-slate-200 flex items-center justify-between px-4 shrink-0">
-              <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden">
-                 {user.photoURL ? <img src={user.photoURL} className="w-full h-full"/> : <UserIcon className="text-slate-400"/>}
-              </div>
-              <div className="flex gap-2 text-slate-500">
-                  <button onClick={() => setShowConfig(true)} className="p-2 hover:bg-slate-200 rounded-full" title="Configurações API"><Settings size={20}/></button>
-              </div>
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-100px)] bg-slate-50 rounded-2xl border border-slate-200 p-8 text-center animate-in fade-in duration-500">
+      <div className="bg-white p-6 rounded-full shadow-sm mb-6 relative">
+          <Bot size={64} className="text-indigo-600" />
+          <div className="absolute -bottom-2 -right-2 bg-amber-500 text-white p-1.5 rounded-full border-4 border-slate-50">
+              <AlertTriangle size={20} fill="currentColor" />
           </div>
-          <div className="p-4 border-b border-slate-100 bg-emerald-50">
-             <label className="text-xs font-bold text-emerald-700 uppercase mb-1 block">Iniciar Conversa</label>
-             <div className="flex items-center bg-white border border-emerald-200 rounded-lg px-3 py-2">
-                <Phone size={16} className="text-emerald-500 mr-2"/>
-                <input placeholder="5511999999999" value={targetPhone} onChange={e => setTargetPhone(e.target.value)} className="bg-transparent border-none text-sm w-full outline-none placeholder:text-slate-400 font-medium" />
-             </div>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-              <div className="p-3">
-                  <p className="text-xs text-slate-400 text-center uppercase font-bold tracking-wider mb-2">Histórico Local</p>
-                  <div className={`flex items-center gap-3 p-3 cursor-pointer bg-slate-100 rounded-lg`}>
-                      <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold shrink-0"><MessageCircle size={20}/></div>
-                      <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-baseline"><h4 className="font-medium text-slate-900 truncate">{targetPhone || 'Novo Chat'}</h4><span className="text-xs text-slate-400">Agora</span></div>
-                          <p className="text-sm text-slate-500 truncate">Conversa ativa via API</p>
-                      </div>
-                  </div>
-              </div>
-          </div>
-       </div>
-       <div className="hidden md:flex flex-1 flex-col bg-[#efeae2] relative">
-          <div className="absolute inset-0 opacity-10" style={{backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")'}}></div>
-          <div className="h-16 bg-slate-50 border-b border-slate-200 flex items-center justify-between px-4 shrink-0 z-10">
-              <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold"><UserIcon size={20}/></div>
-                  <div><h4 className="font-medium text-slate-900">{targetPhone ? targetPhone : 'Selecione um número'}</h4><p className="text-xs text-slate-500">via WhatsApp Cloud API</p></div>
-              </div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-2 z-10" ref={scrollRef}>
-             {messages.map((msg) => (
-                 <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                     <div className={`max-w-[70%] p-2 px-3 rounded-lg text-sm shadow-sm relative ${msg.sender === 'me' ? 'bg-[#d9fdd3] text-slate-800 rounded-tr-none' : 'bg-white text-slate-800 rounded-tl-none'}`}>
-                        <div className="break-words">{msg.text}</div>
-                        <div className="flex justify-end items-center gap-1 mt-1"><span className="text-[10px] text-slate-500">{msg.time}</span></div>
-                     </div>
-                 </div>
-             ))}
-          </div>
-          <div className="h-16 bg-slate-50 px-4 flex items-center gap-3 z-10">
-              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMetaMessage()} className="flex-1 p-2.5 rounded-lg border-none bg-white outline-none focus:ring-1 focus:ring-white placeholder:text-slate-400" placeholder={targetPhone ? "Digite sua mensagem..." : "Insira um número ao lado primeiro"} disabled={!targetPhone} />
-              <button onClick={sendMetaMessage} disabled={sending} className="p-2 text-[#00a884] hover:bg-slate-100 rounded-full transition-all">{sending ? <Loader2 size={24} className="animate-spin"/> : <Send size={24}/>}</button>
-          </div>
-       </div>
+      </div>
+      <h2 className="text-2xl font-bold text-slate-800 mb-3">Bot de WhatsApp em Desenvolvimento</h2>
+      <p className="text-slate-500 max-w-md text-base leading-relaxed mb-8">
+          Estamos trabalhando para trazer uma automação completa de vendas via WhatsApp API Oficial. 
+          <br/><br/>
+          Por enquanto, gerencie seus pedidos manualmente através do painel de Pedidos.
+      </p>
+      <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-full text-sm font-bold">
+          <Sparkles size={16}/> Novidades em breve
+      </div>
     </div>
   );
 };
