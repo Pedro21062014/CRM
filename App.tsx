@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation, Navigate, Outlet } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
 import { 
   signInWithPopup, 
@@ -18,7 +18,7 @@ import {
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save
+  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
@@ -43,6 +43,7 @@ const AppLogo = ({ collapsed, dark = false }: { collapsed?: boolean, dark?: bool
     {!collapsed && (
       <div className="flex flex-col animate-in fade-in duration-300">
         <span className={`font-bold text-xl tracking-tight leading-none font-sans ${dark ? 'text-white' : 'text-slate-900'}`}>Nova<span className="text-indigo-500">CRM</span></span>
+        <span className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-slate-400' : 'text-slate-400'}`}>Versão 3.0 Alpha</span>
       </div>
     )}
   </div>
@@ -168,85 +169,155 @@ const LandingPage = () => {
     const navigate = useNavigate();
     
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
+        <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 overflow-x-hidden">
             {/* Navbar */}
             <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
                         <AppLogo />
                         <div className="flex items-center gap-4">
-                            <button onClick={() => navigate('/login')} className="text-slate-600 font-medium hover:text-indigo-600 transition-colors">Entrar</button>
-                            <button onClick={() => navigate('/register')} className="bg-indigo-600 text-white px-5 py-2 rounded-full font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">Começar Grátis</button>
+                            <button onClick={() => navigate('/login')} className="text-slate-600 font-medium text-sm hover:text-indigo-600 transition-colors hidden sm:block">Login</button>
+                            <button onClick={() => navigate('/register')} className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 text-sm flex items-center gap-2">
+                                Criar Conta <ArrowRight size={16}/>
+                            </button>
                         </div>
                     </div>
                 </div>
             </nav>
 
-            {/* Hero */}
-            <section className="pt-32 pb-20 px-4">
-                <div className="max-w-7xl mx-auto text-center">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm font-bold mb-6 border border-indigo-100 animate-in fade-in slide-in-from-bottom-4">
-                        <Sparkles size={14}/> NovaCRM & Store Builder
+            {/* Hero V3 Announcement */}
+            <section className="pt-32 pb-20 px-4 relative overflow-hidden">
+                {/* Background Decor */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 opacity-30">
+                    <div className="absolute -top-20 -right-20 w-96 h-96 bg-indigo-200 rounded-full blur-3xl opacity-50 animate-pulse"></div>
+                    <div className="absolute top-40 -left-20 w-72 h-72 bg-violet-200 rounded-full blur-3xl opacity-50"></div>
+                </div>
+
+                <div className="max-w-7xl mx-auto text-center relative z-10">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900 text-indigo-400 text-xs font-bold mb-8 border border-slate-700 animate-in fade-in slide-in-from-bottom-4 hover:scale-105 transition-transform cursor-default">
+                        <Sparkles size={12} className="text-yellow-400"/> VEM AÍ: NOVACRM V3
                     </div>
-                    <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight mb-6 leading-tight animate-in fade-in slide-in-from-bottom-6 duration-700">
-                        Gerencie Clientes.<br/>
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Venda Mais.</span>
+                    
+                    <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight mb-6 leading-[1.1] animate-in fade-in slide-in-from-bottom-6 duration-700">
+                        O CRM do Futuro <br className="hidden md:block"/>
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600">está chegando.</span>
                     </h1>
-                    <p className="text-xl text-slate-500 max-w-2xl mx-auto mb-10 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-                        A plataforma tudo-em-um para pequenos negócios. Crie sua loja virtual, gerencie pedidos e fidelize clientes com nosso CRM inteligente integrado.
+                    
+                    <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto mb-10 animate-in fade-in slide-in-from-bottom-8 duration-1000 leading-relaxed">
+                        Prepare-se para a revolução. O <b>NovaCRM V3</b> trará inteligência artificial generativa, automação total de WhatsApp e funis de venda preditivos. Comece a usar a versão atual hoje e garanta migração gratuita.
                     </p>
+                    
                     <div className="flex flex-col sm:flex-row justify-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-150">
-                        <button onClick={() => navigate('/register')} className="px-8 py-4 bg-indigo-600 text-white text-lg font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 flex items-center justify-center gap-2">
-                            <Rocket size={20}/> Criar Minha Conta
+                        <button onClick={() => navigate('/register')} className="px-8 py-4 bg-slate-900 text-white text-lg font-bold rounded-xl hover:bg-slate-800 transition-all shadow-2xl hover:-translate-y-1 flex items-center justify-center gap-2 ring-4 ring-slate-100">
+                            <Rocket size={20}/> Garantir Acesso Antecipado
                         </button>
                         <button onClick={() => navigate('/login')} className="px-8 py-4 bg-white text-slate-700 border border-slate-200 text-lg font-bold rounded-xl hover:bg-slate-50 transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2">
-                            <UserIcon size={20}/> Já tenho conta
+                            Acessar Versão 2.0
                         </button>
+                    </div>
+
+                    <div className="mt-12 flex items-center justify-center gap-6 text-sm text-slate-400 font-medium">
+                        <span className="flex items-center gap-1"><CheckCircle2 size={14} className="text-emerald-500"/> Setup Grátis</span>
+                        <span className="flex items-center gap-1"><CheckCircle2 size={14} className="text-emerald-500"/> Sem Cartão de Crédito</span>
+                        <span className="flex items-center gap-1"><CheckCircle2 size={14} className="text-emerald-500"/> Suporte 24/7</span>
                     </div>
                 </div>
             </section>
 
-            {/* Features */}
-            <section className="py-20 bg-white">
+            {/* V3 Features Section (Updated to Light Theme) */}
+            <section className="py-20 bg-white relative overflow-hidden border-t border-b border-slate-100">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
+                <div className="max-w-7xl mx-auto px-4 relative z-10">
+                    <div className="text-center mb-16">
+                        <h2 className="text-3xl md:text-4xl font-bold mb-4 text-slate-900">O que muda na V3?</h2>
+                        <p className="text-slate-500">Três pilares que vão transformar seu negócio.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                            <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 mb-6 group-hover:scale-110 transition-transform">
+                                <Cpu size={28}/>
+                            </div>
+                            <h3 className="text-xl font-bold mb-3 text-slate-800">IA Nativa (Gemini)</h3>
+                            <p className="text-slate-500 leading-relaxed text-sm">
+                                Não apenas um chat. A IA vai analisar seu estoque, sugerir promoções e até criar imagens de produtos automaticamente.
+                            </p>
+                        </div>
+                        <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                            <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-6 group-hover:scale-110 transition-transform">
+                                <MessageCircle size={28}/>
+                            </div>
+                            <h3 className="text-xl font-bold mb-3 text-slate-800">Automação WhatsApp</h3>
+                            <p className="text-slate-500 leading-relaxed text-sm">
+                                Esqueça o envio manual. O bot da V3 recupera carrinhos abandonados e confirma pedidos sem intervenção humana.
+                            </p>
+                        </div>
+                        <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
+                            <div className="w-12 h-12 bg-fuchsia-100 rounded-2xl flex items-center justify-center text-fuchsia-600 mb-6 group-hover:scale-110 transition-transform">
+                                <TrendingUp size={28}/>
+                            </div>
+                            <h3 className="text-xl font-bold mb-3 text-slate-800">Funnels Preditivos</h3>
+                            <p className="text-slate-500 leading-relaxed text-sm">
+                                Saiba exatamente quem vai comprar antes mesmo do cliente. O CRM classifica leads por temperatura e potencial.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* Current Features (Legacy but polished) */}
+            <section className="py-24 bg-slate-50">
                 <div className="max-w-7xl mx-auto px-4">
+                    <div className="flex flex-col md:flex-row items-center justify-between mb-16 gap-8">
+                        <div>
+                            <h2 className="text-3xl font-bold text-slate-900 mb-2">Comece hoje com a V2</h2>
+                            <p className="text-slate-500">Nossa plataforma atual já é poderosa e pronta para usar.</p>
+                        </div>
+                        <button onClick={() => navigate('/register')} className="text-indigo-600 font-bold hover:text-indigo-800 flex items-center gap-2 group">
+                            Ver todas as funcionalidades <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform"/>
+                        </button>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                        <div className="p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-indigo-100 transition-colors">
-                            <div className="w-14 h-14 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 mb-6">
-                                <Store size={28}/>
+                        <div className="group">
+                            <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white aspect-video flex items-center justify-center relative">
+                                <Store size={48} className="text-slate-300 group-hover:text-indigo-500 transition-colors duration-500 group-hover:scale-110"/>
                             </div>
-                            <h3 className="text-xl font-bold text-slate-900 mb-3">Loja Virtual Pronta</h3>
-                            <p className="text-slate-500 leading-relaxed">Monte seu catálogo em minutos. Uma vitrine moderna que seus clientes podem acessar pelo celular e pedir via WhatsApp.</p>
+                            <h3 className="text-lg font-bold text-slate-900 mb-2">Loja Virtual Express</h3>
+                            <p className="text-slate-500 text-sm">Crie seu catálogo online em menos de 5 minutos e compartilhe o link.</p>
                         </div>
-                        <div className="p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-emerald-100 transition-colors">
-                            <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-6">
-                                <Users size={28}/>
+                        <div className="group">
+                            <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white aspect-video flex items-center justify-center">
+                                <Users size={48} className="text-slate-300 group-hover:text-emerald-500 transition-colors duration-500 group-hover:scale-110"/>
                             </div>
-                            <h3 className="text-xl font-bold text-slate-900 mb-3">CRM Inteligente</h3>
-                            <p className="text-slate-500 leading-relaxed">Organize contatos, acompanhe o funil de vendas e saiba exatamente quem são seus melhores clientes.</p>
+                            <h3 className="text-lg font-bold text-slate-900 mb-2">Gestão de Clientes</h3>
+                            <p className="text-slate-500 text-sm">Centralize seus contatos e histórico de pedidos em um lugar seguro.</p>
                         </div>
-                         <div className="p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-violet-100 transition-colors">
-                            <div className="w-14 h-14 bg-violet-100 rounded-xl flex items-center justify-center text-violet-600 mb-6">
-                                <BarChart3 size={28}/>
+                         <div className="group">
+                            <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white aspect-video flex items-center justify-center">
+                                <BarChart3 size={48} className="text-slate-300 group-hover:text-violet-500 transition-colors duration-500 group-hover:scale-110"/>
                             </div>
-                            <h3 className="text-xl font-bold text-slate-900 mb-3">Gestão Completa</h3>
-                            <p className="text-slate-500 leading-relaxed">Acompanhe pedidos, estoque e métricas financeiras em um único painel intuitivo e poderoso.</p>
+                            <h3 className="text-lg font-bold text-slate-900 mb-2">Dashboard Financeiro</h3>
+                            <p className="text-slate-500 text-sm">Acompanhe suas vendas diárias, ticket médio e metas mensais.</p>
                         </div>
                     </div>
                 </div>
             </section>
             
-            <footer className="bg-slate-900 text-slate-400 py-12 mt-auto">
-                <div className="max-w-7xl mx-auto px-4 text-center">
-                    <div className="flex justify-center mb-6"><AppLogo dark={true}/></div>
-                    <p>© {new Date().getFullYear()} NovaCRM. Todos os direitos reservados.</p>
+            <footer className="bg-white border-t border-slate-200 py-12">
+                <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <AppLogo dark={false}/>
+                    <div className="flex gap-6 text-sm text-slate-500 font-medium">
+                        <a href="#" className="hover:text-indigo-600 transition-colors">Termos</a>
+                        <a href="#" className="hover:text-indigo-600 transition-colors">Privacidade</a>
+                        <a href="#" className="hover:text-indigo-600 transition-colors">Contato</a>
+                    </div>
+                    <p className="text-slate-400 text-sm">© {new Date().getFullYear()} NovaCRM Inc.</p>
                 </div>
             </footer>
         </div>
     );
 };
-
-// ... [Keep ProductsManager, WhatsAppBot, ClientsManager, OrdersManager as they are] ...
-// Re-implementing StoreEditor for the request
 
 const ProductsManager = ({ user }: { user: User }) => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -459,7 +530,6 @@ const WhatsAppBot = ({ user }: { user: User }) => {
   );
 };
 
-// ... [Keep ClientsManager, OrdersManager] ...
 const CLIENT_STATUSES = {
     'potential': { label: 'Potencial', color: 'bg-slate-100 text-slate-600 border-slate-200' },
     'negotiation': { label: 'Em Negociação', color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -1118,8 +1188,6 @@ const StoreEditor = ({ user }: { user: User }) => {
   );
 };
 
-// ... [Keep AuthPage, PublicStore, AIAssistant, DashboardHome, Dashboard] ...
-
 const AuthPage = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
@@ -1646,7 +1714,7 @@ const DashboardHome = ({ user }: { user: User }) => {
         monthlyRevenue: monthlyRev,
         monthlyGoal: 20000,
         recentOrders: allOrders.slice(0, 5),
-        lowStockProducts: lowStock.slice(0, 5),
+        lowStockProducts: lowStock,
         topProducts: sortedProducts
       });
       setLoading(false);
@@ -1657,279 +1725,215 @@ const DashboardHome = ({ user }: { user: User }) => {
 
   if (loading) return <LoadingSpinner />;
 
-    return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="flex justify-between items-end">
-                <div>
-                    <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Olá, {user.displayName || 'Lojista'}</h2>
-                    <p className="text-slate-500 text-sm md:text-base">Aqui está o resumo da sua operação hoje.</p>
+  return (
+    <div className="space-y-6 animate-in fade-in">
+        {/* Welcome Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h2 className="text-2xl font-bold text-slate-800">Olá, {user.displayName || 'Empreendedor'}</h2>
+                <p className="text-slate-500 text-sm">Aqui está o resumo do seu negócio hoje.</p>
+            </div>
+            <div className="flex gap-2 text-xs font-bold bg-white p-2 rounded-lg shadow-sm border border-slate-100">
+                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded">Hoje: {new Date().toLocaleDateString()}</span>
+            </div>
+        </div>
+
+        {/* Metrics Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><DollarSign size={20}/></div>
+                    <span className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-full flex items-center gap-1"><TrendingUp size={12}/> Vendas</span>
                 </div>
-                <div className="text-right hidden md:block">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Data de Hoje</p>
-                    <p className="text-xl font-medium text-slate-700">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                <h3 className="text-2xl font-bold text-slate-800">R$ {metrics.salesToday.toFixed(2)}</h3>
+                <p className="text-xs text-slate-400 mt-1">Total vendido hoje</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="p-2 bg-violet-50 text-violet-600 rounded-lg"><ShoppingBag size={20}/></div>
+                    <span className="text-xs font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-full">Pedidos</span>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800">{metrics.ordersToday}</h3>
+                <p className="text-xs text-slate-400 mt-1">Pedidos realizados hoje</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                 <div className="flex justify-between items-start mb-4">
+                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Users size={20}/></div>
+                    <span className="text-xs font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-full">Clientes</span>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800">{metrics.newClientsToday}</h3>
+                <p className="text-xs text-slate-400 mt-1">Novos clientes hoje</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                 <div className="flex justify-between items-start mb-4">
+                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><BarChart3 size={20}/></div>
+                    <span className="text-xs font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-full">Ticket Médio</span>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800">R$ {metrics.avgTicketToday.toFixed(2)}</h3>
+                <p className="text-xs text-slate-400 mt-1">Média por pedido</p>
+            </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Sales Chart */}
+            <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="font-bold text-slate-800 mb-6">Vendas da Semana</h3>
+                <div className="h-64 flex items-end justify-between gap-2">
+                     <SimpleBarChart data={metrics.weeklySales} />
+                </div>
+                <div className="flex justify-between mt-4 text-xs text-slate-400 font-medium px-2">
+                    <span>Há 7 dias</span>
+                    <span>Hoje</span>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                {[
-                    { label: "Vendas Hoje", value: `R$ ${metrics.salesToday.toFixed(2)}`, icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50", trend: "Hoje" },
-                    { label: "Pedidos", value: metrics.ordersToday.toString(), icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50", trend: "Hoje" },
-                    { label: "Novos Clientes", value: metrics.newClientsToday.toString(), icon: Users, color: "text-violet-600", bg: "bg-violet-50", trend: "Hoje" },
-                    { label: "Ticket Médio", value: `R$ ${metrics.avgTicketToday.toFixed(2)}`, icon: TrendingUp, color: "text-amber-600", bg: "bg-amber-50", trend: "Hoje" },
-                ].map((stat, i) => (
-                    <div key={i} className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
-                                <stat.icon size={24} />
+            {/* Top Products */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="font-bold text-slate-800 mb-6">Mais Vendidos</h3>
+                <div className="space-y-4">
+                    {metrics.topProducts.map((p, i) => (
+                        <div key={i} className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${i===0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{i+1}</span>
+                                <span className="text-sm font-medium text-slate-700">{p.name}</span>
                             </div>
-                            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">{stat.trend}</span>
+                            <span className="text-sm font-bold text-slate-900">{p.count} un</span>
                         </div>
-                        <h3 className="text-slate-500 text-sm font-medium mb-1">{stat.label}</h3>
-                        <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
-                    </div>
-                ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-                {/* Sales Chart */}
-                <div className="lg:col-span-2 bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-slate-800 text-lg">Vendas da Semana</h3>
-                    </div>
-                    <div className="h-64">
-                        <SimpleBarChart data={metrics.weeklySales} height={250} />
-                    </div>
+                    ))}
+                    {metrics.topProducts.length === 0 && <p className="text-slate-400 text-sm">Sem dados ainda.</p>}
                 </div>
-
-                {/* Monthly Goal */}
-                <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
-                     <div>
-                        <h3 className="font-bold text-slate-800 text-lg mb-2">Meta Mensal</h3>
-                        <p className="text-slate-500 text-sm mb-6">Seu progresso</p>
-                        
-                        <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
-                            <svg className="w-full h-full transform -rotate-90">
-                                <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-100" />
-                                <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="12" fill="transparent" strokeDasharray={2 * Math.PI * 88} strokeDashoffset={2 * Math.PI * 88 * (1 - Math.min(metrics.monthlyRevenue / metrics.monthlyGoal, 1))} className="text-indigo-600" strokeLinecap="round" />
-                            </svg>
-                            <div className="absolute text-center">
-                                <span className="text-3xl font-bold text-slate-800">{Math.round((metrics.monthlyRevenue / metrics.monthlyGoal) * 100)}%</span>
-                                <p className="text-xs text-slate-400 font-bold uppercase">Atingido</p>
-                            </div>
-                        </div>
-                     </div>
-                     <div className="mt-4 pt-4 border-t border-slate-100">
-                         <div className="flex justify-between"><span className="text-sm text-slate-500">Receita</span><span className="font-bold">R$ {metrics.monthlyRevenue.toFixed(2)}</span></div>
-                     </div>
-                </div>
-            </div>
-
-            {/* Additional Tables and Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* Recent Orders Table */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2"><Clock size={18} className="text-slate-400"/> Últimos Pedidos</h3>
-                        <button className="text-xs text-indigo-600 font-bold hover:underline">Ver Todos</button>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left text-slate-500">
-                            <thead className="text-xs text-slate-400 uppercase bg-slate-50">
-                                <tr>
-                                    <th className="px-4 py-3 rounded-l-lg">Cliente</th>
-                                    <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3 rounded-r-lg text-right">Valor</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {metrics.recentOrders.map(order => (
-                                    <tr key={order.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-slate-900">{order.customerName}</td>
-                                        <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                                                order.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                                                order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                                'bg-amber-100 text-amber-700'
-                                            }`}>
-                                                {order.status === 'new' ? 'Novo' : order.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-right font-bold text-slate-700">R$ {order.total.toFixed(2)}</td>
-                                    </tr>
-                                ))}
-                                {metrics.recentOrders.length === 0 && <tr><td colSpan={3} className="text-center py-4">Sem pedidos recentes.</td></tr>}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* Top Products & Low Stock */}
-                <div className="space-y-6">
-                    {/* Top Products */}
-                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                        <h3 className="font-bold text-slate-800 text-lg mb-4 flex items-center gap-2"><Trophy size={18} className="text-amber-500"/> Mais Vendidos</h3>
-                        <div className="space-y-4">
-                            {metrics.topProducts.length > 0 ? metrics.topProducts.map((prod, idx) => (
-                                <div key={idx}>
-                                    <div className="flex justify-between text-sm mb-1">
-                                        <span className="font-medium text-slate-700">{prod.name}</span>
-                                        <span className="font-bold text-slate-900">{prod.count} un</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 rounded-full h-2">
-                                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${(prod.count / Math.max(...metrics.topProducts.map(p=>p.count))) * 100}%` }}></div>
-                                    </div>
-                                </div>
-                            )) : <p className="text-slate-400 text-sm">Sem dados suficientes.</p>}
-                        </div>
-                    </div>
-
-                    {/* Low Stock Alert */}
-                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm border-l-4 border-l-red-500">
-                        <h3 className="font-bold text-slate-800 text-lg mb-2 flex items-center gap-2"><AlertCircle size={18} className="text-red-500"/> Estoque Baixo</h3>
-                        <div className="space-y-2">
-                            {metrics.lowStockProducts.length > 0 ? metrics.lowStockProducts.map(p => (
-                                <div key={p.id} className="flex justify-between items-center text-sm p-2 bg-red-50 rounded-lg">
-                                    <span className="text-red-900 font-medium">{p.name}</span>
-                                    <span className="bg-white px-2 py-1 rounded text-red-600 font-bold border border-red-100">{p.stock} rest.</span>
-                                </div>
-                            )) : <p className="text-emerald-600 text-sm font-medium flex items-center gap-2"><CheckCircle2 size={16}/> Estoque saudável!</p>}
-                        </div>
+                <div className="mt-8 pt-6 border-t border-slate-100">
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><AlertCircle size={16} className="text-amber-500"/> Estoque Baixo</h3>
+                    <div className="space-y-3">
+                         {metrics.lowStockProducts.slice(0, 3).map(p => (
+                             <div key={p.id} className="flex justify-between items-center text-sm">
+                                 <span className="text-slate-600 truncate max-w-[150px]">{p.name}</span>
+                                 <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded text-xs font-bold">{p.stock} restam</span>
+                             </div>
+                         ))}
+                         {metrics.lowStockProducts.length === 0 && <p className="text-emerald-500 text-sm font-medium flex items-center gap-1"><CheckCircle2 size={14}/> Estoque saudável</p>}
                     </div>
                 </div>
             </div>
         </div>
-    );
+    </div>
+  );
 };
 
-const Dashboard = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser: User) => {
-      if (currentUser) {
-        setUser(currentUser);
-      } else {
-        // Allow access to dashboard sub-routes only if authenticated, handled by routing logic below
-        // If we are in Dashboard component and no user, we redirect.
-        navigate('/login');
-      }
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, [navigate]);
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate('/');
-  };
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600"/></div>;
-  if (!user) return null;
+  const navigate = useNavigate();
 
   const menuItems = [
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Visão Geral', exact: true },
-    { path: '/dashboard/orders', icon: ShoppingBag, label: 'Pedidos' },
-    { path: '/dashboard/products', icon: Package, label: 'Produtos' },
-    { path: '/dashboard/clients', icon: Users, label: 'Clientes' },
-    { path: '/dashboard/whatsapp', icon: MessageCircle, label: 'WhatsApp Bot' },
-    { path: '/dashboard/store', icon: Store, label: 'Loja Virtual' },
+    { path: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Visão Geral', exact: true },
+    { path: '/dashboard/orders', icon: <ShoppingBag size={20} />, label: 'Pedidos' },
+    { path: '/dashboard/products', icon: <Package size={20} />, label: 'Produtos' },
+    { path: '/dashboard/clients', icon: <Users size={20} />, label: 'Clientes' },
+    { path: '/dashboard/store', icon: <Store size={20} />, label: 'Minha Loja' },
+    { path: '/dashboard/whatsapp', icon: <MessageCircle size={20} />, label: 'WhatsApp Bot' },
   ];
 
+  const isActive = (path: string, exact = false) => {
+      if (exact) return location.pathname === path;
+      return location.pathname.startsWith(path);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900 overflow-hidden">
-      {mobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
+       {/* Mobile Sidebar Overlay */}
+       {sidebarOpen && <div className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)}></div>}
 
-      <aside 
-        className={`
-          fixed inset-y-0 left-0 z-50 bg-white border-r border-slate-200 transition-all duration-300 transform 
-          ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} 
-          md:translate-x-0 md:static 
-          ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'}
-          w-64
-          flex flex-col
-        `}
-      >
-        <div className="h-20 flex items-center justify-center border-b border-slate-100 relative">
-             <AppLogo collapsed={sidebarCollapsed} />
-             <button onClick={() => setMobileMenuOpen(false)} className="absolute right-4 md:hidden p-2 text-slate-400 hover:text-slate-600">
-               <X size={20} />
-             </button>
-        </div>
-        
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
-           {menuItems.map((item) => {
-             const active = item.exact ? location.pathname === item.path : location.pathname.startsWith(item.path);
-             return (
-               <Link 
-                 key={item.path} 
-                 to={item.path}
-                 onClick={() => setMobileMenuOpen(false)}
-                 className={`flex items-center gap-3 p-3 rounded-xl transition-all ${active ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'} ${sidebarCollapsed ? 'justify-center' : ''}`}
-                 title={sidebarCollapsed ? item.label : ''}
-               >
-                 <item.icon size={20} className="shrink-0" />
-                 {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
-               </Link>
-             )
-           })}
-        </nav>
+       {/* Sidebar */}
+       <aside className={`fixed lg:sticky top-0 h-screen w-72 bg-white border-r border-slate-200 z-50 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+          <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+             <AppLogo collapsed={false} />
+             <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400"><X size={24}/></button>
+          </div>
+          
+          <nav className="p-4 space-y-2 overflow-y-auto h-[calc(100vh-80px)]">
+              {menuItems.map(item => (
+                  <button 
+                    key={item.path}
+                    onClick={() => { navigate(item.path); setSidebarOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${isActive(item.path, item.exact) ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
+                  >
+                      {item.icon}
+                      {item.label}
+                  </button>
+              ))}
+          </nav>
 
-        <div className="p-4 border-t border-slate-100">
-            <button onClick={handleLogout} className={`flex items-center gap-3 p-3 rounded-xl w-full text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all ${sidebarCollapsed ? 'justify-center' : ''}`} title="Sair">
-                <LogOut size={20} className="shrink-0" />
-                {!sidebarCollapsed && <span className="font-medium truncate">Sair</span>}
-            </button>
-            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="mt-4 w-full justify-center text-slate-300 hover:text-indigo-600 hidden md:flex">
-                {sidebarCollapsed ? <ChevronRight size={20}/> : <ChevronLeft size={20}/>}
-            </button>
-        </div>
-      </aside>
+          <div className="absolute bottom-0 w-full p-4 border-t border-slate-100 bg-white">
+              <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-medium">
+                  <LogOut size={20}/> Sair
+              </button>
+          </div>
+       </aside>
 
-      <main className="flex-1 transition-all duration-300 overflow-y-auto h-screen relative w-full">
-         <div className="md:hidden h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-30">
-            <AppLogo />
-            <button onClick={() => setMobileMenuOpen(true)} className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg">
-                <Menu size={24}/>
-            </button>
-         </div>
+       {/* Main Content */}
+       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+           <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 shrink-0">
+               <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-slate-500 hover:bg-slate-50 rounded-lg"><Menu size={24}/></button>
+               
+               <div className="flex-1"></div>
 
-         <div className="p-4 md:p-10 max-w-7xl mx-auto pb-24 md:pb-10">
-            <Routes>
-              <Route path="/" element={<DashboardHome user={user} />} />
-              <Route path="/orders" element={<OrdersManager user={user} />} />
-              <Route path="/clients" element={<ClientsManager user={user} />} />
-              <Route path="/whatsapp" element={<WhatsAppBot user={user} />} />
-              <Route path="/store" element={<StoreEditor user={user} />} />
-              <Route path="/products" element={<ProductsManager user={user} />} />
-            </Routes>
-         </div>
-      </main>
-      
-      <AIAssistant user={user} />
+               <div className="flex items-center gap-4">
+                   <a href={`/#/store/${user.uid}`} target="_blank" rel="noopener" className="hidden md:flex items-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors">
+                       <ExternalLink size={14}/> Ver Loja Online
+                   </a>
+                   <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
+                       {user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}
+                   </div>
+               </div>
+           </header>
+           
+           <div className="flex-1 overflow-y-auto p-4 lg:p-8 relative">
+               <Routes>
+                   <Route path="/" element={<DashboardHome user={user} />} />
+                   <Route path="/products" element={<ProductsManager user={user} />} />
+                   <Route path="/orders" element={<OrdersManager user={user} />} />
+                   <Route path="/clients" element={<ClientsManager user={user} />} />
+                   <Route path="/store" element={<StoreEditor user={user} />} />
+                   <Route path="/whatsapp" element={<WhatsAppBot user={user} />} />
+               </Routes>
+               <AIAssistant user={user} />
+           </div>
+       </main>
     </div>
   );
 };
 
 const App = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  const logout = async () => {
+    await signOut(auth);
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><LoadingSpinner /></div>;
+
   return (
     <HashRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<AuthPage />} />
-        <Route path="/register" element={<AuthPage />} />
+        <Route path="/login" element={!user ? <AuthPage /> : <Navigate to="/dashboard" />} />
+        <Route path="/register" element={!user ? <AuthPage /> : <Navigate to="/dashboard" />} />
         <Route path="/store/:id" element={<PublicStore />} />
-        <Route path="/dashboard/*" element={<Dashboard />} />
+        
+        <Route path="/dashboard/*" element={
+            user ? <Dashboard user={user} logout={logout} /> : <Navigate to="/login" />
+        } />
       </Routes>
     </HashRouter>
   );
