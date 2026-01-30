@@ -18,7 +18,7 @@ import {
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical
+  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
@@ -84,6 +84,51 @@ const openWhatsApp = (phone: string | undefined, text: string) => {
   }
   const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(text)}`;
   window.open(url, '_blank');
+};
+
+// Updated convertFileToBase64 with image resizing/compression to fix Firestore size limit errors
+const convertFileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800; // Resize to max 800px width to keep size low
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+             ctx.drawImage(img, 0, 0, width, height);
+             // Return base64, compressed as JPEG 0.8 quality
+             resolve(canvas.toDataURL('image/jpeg', 0.8));
+        } else {
+             // Fallback
+             resolve(event.target?.result as string);
+        }
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (error) => reject(error);
+  });
 };
 
 // --- CHARTS ---
@@ -208,6 +253,7 @@ const ProductsManager = ({ user }: { user: User }) => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formData, setFormData] = useState<Partial<Product>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const q = query(collection(db, `merchants/${user.uid}/products`));
@@ -223,13 +269,16 @@ const ProductsManager = ({ user }: { user: User }) => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const priceVal = parseFloat(String(formData.price));
+      const stockVal = parseInt(String(formData.stock));
+
       const payload = {
         name: formData.name || 'Produto Sem Nome',
-        price: Number(formData.price) || 0,
+        price: isNaN(priceVal) ? 0 : priceVal,
         description: formData.description || '',
         category: formData.category || 'Geral',
         imageUrl: formData.imageUrl || '',
-        stock: Number(formData.stock) || 0,
+        stock: isNaN(stockVal) ? 0 : stockVal,
         updatedAt: serverTimestamp()
       };
 
@@ -243,8 +292,21 @@ const ProductsManager = ({ user }: { user: User }) => {
       }
       setEditing(null);
       setFormData({});
-    } catch (err) {
-      alert("Erro ao salvar produto.");
+    } catch (err: any) {
+      console.error(err);
+      alert(`Erro ao salvar produto: ${err.message || 'Erro desconhecido'}`);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const base64 = await convertFileToBase64(file);
+        setFormData({ ...formData, imageUrl: base64 });
+      } catch (error) {
+        alert("Erro ao processar imagem.");
+      }
     }
   };
 
@@ -276,12 +338,27 @@ const ProductsManager = ({ user }: { user: User }) => {
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-           <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg animate-in zoom-in-95">
+           <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                  <h3 className="font-bold text-lg">{editing.id ? 'Editar Produto' : 'Novo Produto'}</h3>
                  <button onClick={() => setEditing(null)}><X size={24} className="text-slate-400"/></button>
               </div>
               <form onSubmit={handleSave} className="space-y-4">
+                 <div className="flex justify-center mb-4">
+                    <div className="w-32 h-32 bg-slate-100 rounded-xl overflow-hidden border-2 border-dashed border-slate-300 relative group">
+                        {formData.imageUrl ? (
+                            <img src={formData.imageUrl} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-slate-400">
+                                <ImageIcon size={32}/>
+                            </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                            <span className="text-white text-xs font-bold flex items-center gap-1"><Upload size={14}/> Alterar</span>
+                        </div>
+                    </div>
+                 </div>
+                 
                  <div>
                     <label className="text-xs font-bold text-slate-500 uppercase">Nome do Produto</label>
                     <input required className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
@@ -301,8 +378,12 @@ const ProductsManager = ({ user }: { user: User }) => {
                     <input className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Lanches, Bebidas" value={formData.category || ''} onChange={e => setFormData({...formData, category: e.target.value})} />
                  </div>
                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase">URL da Imagem</label>
-                    <input className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://..." value={formData.imageUrl || ''} onChange={e => setFormData({...formData, imageUrl: e.target.value})} />
+                    <label className="text-xs font-bold text-slate-500 uppercase">Imagem</label>
+                    <div className="flex gap-2 mt-1">
+                        <input className="flex-1 p-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="URL da imagem ou upload" value={formData.imageUrl || ''} onChange={e => setFormData({...formData, imageUrl: e.target.value})} />
+                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-600"><Upload size={20}/></button>
+                    </div>
                  </div>
                  <div>
                     <label className="text-xs font-bold text-slate-500 uppercase">Descrição</label>
@@ -447,48 +528,211 @@ const ClientsManager = ({ user }: { user: User }) => {
   };
 
   const openEdit = (client: Client) => { setEditing(client); setFormData(client); };
-  const openNew = () => { setEditing({} as Client); setFormData({ clientType: activeTab, status: 'potential' }); };
+  const openNew = () => { setEditing({} as Client); setFormData({ clientType: activeTab, status: 'potential', address: { street: '', number: '', neighborhood: '', city: '', zip: '' } }); };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
         <div><h2 className="text-2xl font-bold text-slate-800">Gerenciar Clientes</h2></div>
-        <div className="flex gap-3"><PrimaryButton onClick={openNew}><Plus size={18} /> Novo Cliente</PrimaryButton></div>
+        <div className="flex gap-3">
+            <div className="flex bg-slate-100 rounded-lg p-1">
+                <button onClick={() => setViewMode('grid')} className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}><LayoutGrid size={18}/></button>
+                <button onClick={() => setViewMode('list')} className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}><List size={18}/></button>
+            </div>
+            <PrimaryButton onClick={openNew}><Plus size={18} /> Novo Cliente</PrimaryButton>
+        </div>
       </div>
+      
       <div className="flex justify-between items-center gap-4">
           <div className="flex p-1 bg-slate-100 rounded-xl w-full max-w-md">
             <button onClick={() => setActiveTab('common')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${activeTab === 'common' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>Consumidores</button>
             <button onClick={() => setActiveTab('commercial')} className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${activeTab === 'commercial' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>Pontos Comerciais</button>
           </div>
       </div>
+
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-             <div className="flex justify-between mb-4"><h3 className="font-bold">Cliente</h3><button onClick={()=>setEditing(null)}><X/></button></div>
+             <div className="flex justify-between mb-6">
+                 <h3 className="font-bold text-lg text-slate-800">{editing.id ? 'Editar Cliente' : 'Novo Cliente'}</h3>
+                 <button onClick={()=>setEditing(null)}><X className="text-slate-400 hover:text-slate-600"/></button>
+             </div>
              <form onSubmit={handleSave} className="space-y-4">
-                <input className="w-full p-2 border rounded" placeholder="Nome" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value})} required/>
-                <input className="w-full p-2 border rounded" placeholder="Telefone" value={formData.phone || ''} onChange={e=>setFormData({...formData, phone: e.target.value})} required/>
-                <div className="flex justify-end gap-2"><button type="button" onClick={()=>setEditing(null)} className="px-4 py-2 text-slate-600">Cancelar</button><button className="px-4 py-2 bg-indigo-600 text-white rounded">Salvar</button></div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Tipo</label>
+                        <select 
+                            className="w-full p-2 border rounded-lg mt-1" 
+                            value={formData.clientType || activeTab} 
+                            onChange={e => setFormData({...formData, clientType: e.target.value as ClientType})}
+                        >
+                            <option value="common">Consumidor Final</option>
+                            <option value="commercial">Ponto Comercial (B2B)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Status</label>
+                        <select 
+                            className="w-full p-2 border rounded-lg mt-1" 
+                            value={formData.status || 'potential'} 
+                            onChange={e => setFormData({...formData, status: e.target.value as any})}
+                            disabled={formData.clientType === 'common'}
+                        >
+                            <option value="potential">Potencial</option>
+                            <option value="negotiation">Em Negociação</option>
+                            <option value="converted">Convertido</option>
+                            <option value="active">Ativo</option>
+                            <option value="loyal">Fidelizado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase">Nome / Razão Social</label>
+                    <input className="w-full p-2 border rounded-lg mt-1" value={formData.name || ''} onChange={e=>setFormData({...formData, name: e.target.value})} required/>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
+                        <input type="email" className="w-full p-2 border rounded-lg mt-1" value={formData.email || ''} onChange={e=>setFormData({...formData, email: e.target.value})}/>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Telefone (WhatsApp)</label>
+                        <input className="w-full p-2 border rounded-lg mt-1" value={formData.phone || ''} onChange={e=>setFormData({...formData, phone: e.target.value})} required/>
+                    </div>
+                </div>
+
+                {formData.clientType === 'commercial' && (
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase">Responsável</label>
+                                <input className="w-full p-2 border rounded-lg mt-1 bg-white" value={formData.contactPerson || ''} onChange={e=>setFormData({...formData, contactPerson: e.target.value})}/>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase">Potencial de Compra (R$)</label>
+                                <input type="number" className="w-full p-2 border rounded-lg mt-1 bg-white" value={formData.purchasePotential || ''} onChange={e=>setFormData({...formData, purchasePotential: parseFloat(e.target.value)})}/>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase">Anotações</label>
+                            <textarea className="w-full p-2 border rounded-lg mt-1 bg-white" rows={2} value={formData.notes || ''} onChange={e=>setFormData({...formData, notes: e.target.value})}/>
+                        </div>
+                    </div>
+                )}
+
+                <div className="border-t pt-4">
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Endereço</label>
+                    <div className="grid grid-cols-2 gap-4 mb-2">
+                        <input className="w-full p-2 border rounded-lg" placeholder="Rua" value={formData.address?.street || ''} onChange={e=>setFormData({...formData, address: {...formData.address, street: e.target.value} as any})}/>
+                        <input className="w-full p-2 border rounded-lg" placeholder="Número" value={formData.address?.number || ''} onChange={e=>setFormData({...formData, address: {...formData.address, number: e.target.value} as any})}/>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <input className="w-full p-2 border rounded-lg" placeholder="Bairro" value={formData.address?.neighborhood || ''} onChange={e=>setFormData({...formData, address: {...formData.address, neighborhood: e.target.value} as any})}/>
+                        <input className="w-full p-2 border rounded-lg" placeholder="Cidade" value={formData.address?.city || ''} onChange={e=>setFormData({...formData, address: {...formData.address, city: e.target.value} as any})}/>
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                    <button type="button" onClick={()=>setEditing(null)} className="px-6 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg">Cancelar</button>
+                    <button className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 shadow-md">Salvar</button>
+                </div>
              </form>
           </div>
         </div>
       )}
+
       {loading ? <LoadingSpinner /> : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredClients.map(client => (
-                <div key={client.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative">
-                    <div className="flex justify-between">
-                        <h4 className="font-bold">{client.name}</h4>
-                        <div className="flex gap-2">
-                           <button onClick={() => openWhatsApp(client.phone, '')} className="text-emerald-500"><MessageCircle size={16}/></button>
-                           <button onClick={() => openEdit(client)} className="text-indigo-500"><Edit2 size={16}/></button>
-                           <button onClick={() => handleDelete(client.id)} className="text-red-500"><Trash2 size={16}/></button>
+        <>
+            {viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filteredClients.map(client => (
+                        <div key={client.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative hover:shadow-md transition-shadow group">
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-lg text-slate-800 truncate pr-2">{client.name}</h4>
+                                    {client.clientType === 'commercial' && (
+                                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${CLIENT_STATUSES[client.status || 'potential']?.color || 'bg-gray-100 text-gray-500'}`}>
+                                            {CLIENT_STATUSES[client.status || 'potential']?.label}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => openEdit(client)} className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-full"><Edit2 size={16}/></button>
+                                    <button onClick={() => handleDelete(client.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-full"><Trash2 size={16}/></button>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-2 text-sm text-slate-500">
+                                <div className="flex items-center gap-2">
+                                    <Phone size={14} className="text-slate-400"/>
+                                    <span>{client.phone}</span>
+                                    <button onClick={() => openWhatsApp(client.phone, '')} className="text-emerald-500 hover:text-emerald-600"><MessageCircle size={14}/></button>
+                                </div>
+                                {client.address?.street && (
+                                    <div className="flex items-start gap-2">
+                                        <MapPin size={14} className="text-slate-400 mt-0.5 shrink-0"/>
+                                        <span className="line-clamp-1">{client.address.street}, {client.address.number} - {client.address.neighborhood}</span>
+                                    </div>
+                                )}
+                                {client.clientType === 'commercial' && client.contactPerson && (
+                                    <div className="flex items-center gap-2">
+                                        <UserIcon size={14} className="text-slate-400"/>
+                                        <span>Resp: {client.contactPerson}</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                    <p className="text-sm text-slate-500">{client.phone}</p>
+                    ))}
                 </div>
-            ))}
-        </div>
+            ) : (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-xs font-bold text-slate-500 uppercase">
+                            <tr>
+                                <th className="px-6 py-4">Nome</th>
+                                <th className="px-6 py-4">Contato</th>
+                                <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {filteredClients.map(client => (
+                                <tr key={client.id} className="hover:bg-slate-50">
+                                    <td className="px-6 py-4 font-medium text-slate-900">
+                                        {client.name}
+                                        {client.clientType === 'commercial' && <div className="text-xs text-slate-400 font-normal">{client.contactPerson}</div>}
+                                    </td>
+                                    <td className="px-6 py-4 text-slate-500">
+                                        <div>{client.phone}</div>
+                                        <div className="text-xs">{client.email}</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {client.clientType === 'commercial' ? (
+                                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${CLIENT_STATUSES[client.status || 'potential']?.color}`}>
+                                                {CLIENT_STATUSES[client.status || 'potential']?.label}
+                                            </span>
+                                        ) : <span className="text-slate-400">-</span>}
+                                    </td>
+                                    <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                        <button onClick={() => openWhatsApp(client.phone, '')} className="text-emerald-500 hover:bg-emerald-50 p-2 rounded"><MessageCircle size={16}/></button>
+                                        <button onClick={() => openEdit(client)} className="text-indigo-500 hover:bg-indigo-50 p-2 rounded"><Edit2 size={16}/></button>
+                                        <button onClick={() => handleDelete(client.id)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+            
+            {filteredClients.length === 0 && (
+                <div className="text-center py-12">
+                    <p className="text-slate-400">Nenhum cliente encontrado nesta categoria.</p>
+                </div>
+            )}
+        </>
       )}
     </div>
   );
@@ -497,6 +741,7 @@ const ClientsManager = ({ user }: { user: User }) => {
 const OrdersManager = ({ user }: { user: User }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
       const q = query(collection(db, `merchants/${user.uid}/orders`), orderBy('createdAt', 'desc'));
       const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -507,18 +752,66 @@ const OrdersManager = ({ user }: { user: User }) => {
       });
       return unsubscribe;
   }, [user.uid]);
+
+  const updateStatus = async (orderId: string, newStatus: string) => {
+      try {
+          await updateDoc(doc(db, `merchants/${user.uid}/orders`, orderId), { status: newStatus });
+      } catch (e) {
+          alert("Erro ao atualizar status");
+      }
+  };
+
+  const statusColors: any = {
+      'new': 'bg-blue-100 text-blue-700 border-blue-200',
+      'processing': 'bg-amber-100 text-amber-700 border-amber-200',
+      'completed': 'bg-green-100 text-green-700 border-green-200',
+      'cancelled': 'bg-red-100 text-red-700 border-red-200'
+  };
+
   return (
       <div className="space-y-6">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><h2 className="text-2xl font-bold">Pedidos</h2></div>
           {loading ? <LoadingSpinner /> : (
             <div className="grid gap-4">
                 {orders.map(order => (
-                    <div key={order.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                        <div className="flex justify-between"><span className="font-bold">#{order.id.slice(0, 8)}</span><span className="font-bold text-indigo-600">R$ {order.total.toFixed(2)}</span></div>
-                        <p className="text-sm text-slate-500">{order.customerName}</p>
-                        <div className="mt-2 text-sm">{order.items.map(i => `${i.quantity}x ${i.productName}`).join(', ')}</div>
+                    <div key={order.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between gap-4">
+                        <div className="flex-1">
+                            <div className="flex justify-between md:justify-start items-center gap-4 mb-2">
+                                <span className="font-bold text-slate-900">#{order.id.slice(0, 8)}</span>
+                                <span className="font-bold text-indigo-600">R$ {order.total.toFixed(2)}</span>
+                            </div>
+                            <p className="text-sm text-slate-500 font-medium mb-1">{order.customerName}</p>
+                            <p className="text-xs text-slate-400 mb-3">{order.createdAt?.toDate ? order.createdAt.toDate().toLocaleString() : 'Data inválida'}</p>
+                            <div className="text-sm text-slate-600 space-y-1 bg-slate-50 p-3 rounded-lg">
+                                {order.items.map((i, idx) => (
+                                    <div key={idx} className="flex justify-between">
+                                        <span>{i.quantity}x {i.productName}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex flex-col justify-center items-end gap-2 min-w-[200px]">
+                            <label className="text-xs font-bold text-slate-400 uppercase">Status do Pedido</label>
+                            <select 
+                                value={order.status}
+                                onChange={(e) => updateStatus(order.id, e.target.value)}
+                                className={`p-2 rounded-lg text-sm font-bold border outline-none cursor-pointer w-full transition-colors ${statusColors[order.status] || 'bg-slate-100'}`}
+                            >
+                                <option value="new">Novo Pedido</option>
+                                <option value="processing">Em Preparo</option>
+                                <option value="completed">Concluído / Entregue</option>
+                                <option value="cancelled">Cancelado</option>
+                            </select>
+                            {order.deliveryAddress && (
+                                <div className="text-right text-xs text-slate-500 mt-2 max-w-[200px]">
+                                    <p className="truncate">{order.deliveryAddress.street}, {order.deliveryAddress.number}</p>
+                                    <p>{order.deliveryAddress.neighborhood}</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 ))}
+                {orders.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum pedido recebido ainda.</p>}
             </div>
           )}
       </div>
@@ -1047,16 +1340,31 @@ const PublicStore = () => {
 
 const AIAssistant = ({ user }: { user: User }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<{role: 'user' | 'model', text: string}[]>([]);
+  const [messages, setMessages] = useState<{role: 'user' | 'model', text: string, imageUrl?: string}[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [assigningImage, setAssigningImage] = useState<string | null>(null);
+  const [targetProduct, setTargetProduct] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Fetch products for dropdown assignment
+  useEffect(() => {
+    if (user) {
+        const q = query(collection(db, `merchants/${user.uid}/products`));
+        getDocs(q).then(snapshot => {
+            const items: Product[] = [];
+            snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() } as Product));
+            setProducts(items);
+        });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isOpen]);
+  }, [messages, isOpen, assigningImage]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -1066,59 +1374,121 @@ const AIAssistant = ({ user }: { user: User }) => {
     setLoading(true);
 
     try {
-      const history = messages.map(m => ({
-        role: m.role,
-        parts: [{ text: m.text }]
-      }));
-      
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [...history, { role: 'user', parts: [{ text: newMsg.text }] }],
-        config: {
-            systemInstruction: "Você é um assistente virtual especialista em negócios e CRM. Ajude o usuário a gerenciar sua loja, analisar métricas e melhorar vendas. Seja curto e eficiente."
-        }
-      });
+      // Check if user wants an image
+      const lowerInput = input.toLowerCase();
+      const isImageRequest = lowerInput.includes('imagem') || lowerInput.includes('foto') || lowerInput.includes('desenhe') || lowerInput.includes('crie um');
 
-      const reply = response.text || "Não consegui processar a resposta.";
-      setMessages(prev => [...prev, { role: 'model', text: reply }]);
+      if (isImageRequest) {
+          const response = await genAI.models.generateContent({
+              model: 'gemini-2.5-flash-image',
+              contents: { parts: [{ text: input }] }
+          });
+          
+          let imageUrl = '';
+          let text = '';
+
+          if (response.candidates?.[0]?.content?.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                } else if (part.text) {
+                    text += part.text;
+                }
+            }
+          }
+          
+          setMessages(prev => [...prev, { role: 'model', text: text || "Aqui está sua imagem:", imageUrl: imageUrl }]);
+      } else {
+          // Standard Text Chat
+          const history = messages.filter(m => !m.imageUrl).map(m => ({
+            role: m.role,
+            parts: [{ text: m.text }]
+          }));
+          
+          const response = await genAI.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: [...history, { role: 'user', parts: [{ text: newMsg.text }] }],
+            config: {
+                systemInstruction: "Você é um assistente virtual especialista em negócios e CRM. Ajude o usuário a gerenciar sua loja, analisar métricas e melhorar vendas. Seja curto e eficiente."
+            }
+          });
+
+          const reply = response.text || "Não consegui processar a resposta.";
+          setMessages(prev => [...prev, { role: 'model', text: reply }]);
+      }
+
     } catch (error) {
       console.error(error);
-      setMessages(prev => [...prev, { role: 'model', text: "Erro ao conectar com a IA." }]);
+      setMessages(prev => [...prev, { role: 'model', text: "Erro ao conectar com a IA. Tente novamente." }]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const assignImageToProduct = async () => {
+      if (!assigningImage || !targetProduct) return;
+      
+      try {
+          await updateDoc(doc(db, `merchants/${user.uid}/products`, targetProduct), {
+              imageUrl: assigningImage
+          });
+          setMessages(prev => [...prev, { role: 'model', text: 'Imagem atualizada no produto com sucesso!' }]);
+          setAssigningImage(null);
+          setTargetProduct('');
+      } catch (e) {
+          alert("Erro ao salvar imagem no produto.");
+      }
   };
 
   return (
     <>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 p-4 bg-indigo-600 text-white rounded-full shadow-xl hover:bg-indigo-700 hover:scale-105 transition-all z-50 group"
+        className="fixed bottom-6 right-6 p-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all z-50 group animate-in fade-in zoom-in"
       >
-        {isOpen ? <X size={24}/> : <Sparkles size={24} className="group-hover:animate-spin-slow"/>}
+        {isOpen ? <X size={24}/> : (
+            <div className="relative">
+                <Bot size={28} className="animate-pulse"/>
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
+                </span>
+            </div>
+        )}
       </button>
 
       {isOpen && (
         <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[500px] max-h-[70vh] bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
-           <div className="bg-indigo-600 p-4 text-white flex items-center justify-between shrink-0">
+           <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-4 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2 font-bold">
-                 <Bot size={20}/> Assistente IA
+                 <Bot size={20}/> Nova IA
               </div>
               <button onClick={() => setIsOpen(false)}><X size={18} className="opacity-70 hover:opacity-100"/></button>
            </div>
            
-           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50" ref={scrollRef}>
+           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 relative" ref={scrollRef}>
               {messages.length === 0 && (
                   <div className="text-center text-slate-400 mt-10">
                       <Sparkles size={32} className="mx-auto mb-2 text-indigo-300"/>
-                      <p className="text-sm">Olá! Pergunte sobre vendas, marketing ou gestão.</p>
+                      <p className="text-sm">Olá! Posso ajudar com vendas, ideias ou <span className="font-bold text-indigo-500">criar imagens</span> para seus produtos.</p>
                   </div>
               )}
               {messages.map((m, i) => (
-                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white text-slate-700 shadow-sm border border-slate-100 rounded-tl-sm'}`}>
-                          {m.text}
-                      </div>
+                  <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      {m.text && (
+                          <div className={`max-w-[85%] p-3 rounded-2xl text-sm mb-1 ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white text-slate-700 shadow-sm border border-slate-100 rounded-tl-sm'}`}>
+                              {m.text}
+                          </div>
+                      )}
+                      {m.imageUrl && (
+                          <div className="max-w-[85%] rounded-lg overflow-hidden border border-slate-200 shadow-sm mt-1 bg-white p-2">
+                              <img src={m.imageUrl} alt="Generated" className="w-full h-auto rounded" />
+                              <div className="flex gap-2 mt-2">
+                                  <a href={m.imageUrl} download="produto-ia.png" className="flex-1 text-center py-1 bg-slate-100 text-xs text-indigo-600 font-bold hover:bg-slate-200 rounded">Baixar</a>
+                                  <button onClick={() => setAssigningImage(m.imageUrl || null)} className="flex-1 py-1 bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 rounded">Usar em Produto</button>
+                              </div>
+                          </div>
+                      )}
                   </div>
               ))}
               {loading && (
@@ -1128,12 +1498,36 @@ const AIAssistant = ({ user }: { user: User }) => {
                       </div>
                   </div>
               )}
+
+              {/* Assignment Overlay */}
+              {assigningImage && (
+                  <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 animate-in fade-in">
+                      <h4 className="font-bold text-slate-800 mb-4 text-center">Onde salvar esta imagem?</h4>
+                      <div className="w-24 h-24 mb-4 rounded border shadow-sm overflow-hidden">
+                          <img src={assigningImage} className="w-full h-full object-cover"/>
+                      </div>
+                      <select 
+                        className="w-full p-2 border rounded-lg text-sm mb-4"
+                        value={targetProduct}
+                        onChange={(e) => setTargetProduct(e.target.value)}
+                      >
+                          <option value="">Selecione um produto...</option>
+                          {products.map(p => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                      </select>
+                      <div className="flex gap-2 w-full">
+                          <button onClick={() => setAssigningImage(null)} className="flex-1 py-2 text-slate-500 text-sm font-bold border rounded hover:bg-slate-50">Cancelar</button>
+                          <button onClick={assignImageToProduct} disabled={!targetProduct} className="flex-1 py-2 bg-indigo-600 text-white text-sm font-bold rounded hover:bg-indigo-700 disabled:opacity-50">Salvar</button>
+                      </div>
+                  </div>
+              )}
            </div>
            
            <div className="p-3 bg-white border-t border-slate-100 shrink-0 flex gap-2">
               <input 
                 className="flex-1 bg-slate-100 border-none rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-100"
-                placeholder="Digite sua mensagem..."
+                placeholder="Digite algo ou peça uma imagem..."
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && sendMessage()}
@@ -1157,7 +1551,10 @@ const DashboardHome = ({ user }: { user: User }) => {
     avgTicketToday: 0,
     weeklySales: [0,0,0,0,0,0,0],
     monthlyRevenue: 0,
-    monthlyGoal: 20000 
+    monthlyGoal: 20000,
+    recentOrders: [] as Order[],
+    lowStockProducts: [] as Product[],
+    topProducts: [] as {name: string, count: number}[]
   });
 
   useEffect(() => {
@@ -1173,18 +1570,30 @@ const DashboardHome = ({ user }: { user: User }) => {
 
       const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-      const ordersQ = query(collection(db, `merchants/${user.uid}/orders`));
+      // Orders Fetch
+      const ordersQ = query(collection(db, `merchants/${user.uid}/orders`), orderBy('createdAt', 'desc'));
       const ordersSnap = await getDocs(ordersQ);
       
       let salesT = 0;
       let ordersT = 0;
       let monthlyRev = 0;
       const weeklyData = [0,0,0,0,0,0,0]; 
+      const allOrders: Order[] = [];
+      const productCounts: Record<string, number> = {};
 
       ordersSnap.forEach(doc => {
         const data = doc.data();
         const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || Date.now()); 
         const total = data.total || 0;
+        const order = { id: doc.id, ...data } as Order;
+        allOrders.push(order);
+
+        // Count Products
+        if (order.items) {
+            order.items.forEach(item => {
+                productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity;
+            });
+        }
 
         if (date >= today) {
            salesT += total;
@@ -1203,6 +1612,16 @@ const DashboardHome = ({ user }: { user: User }) => {
         }
       });
 
+      // Products Fetch (for low stock)
+      const productsQ = query(collection(db, `merchants/${user.uid}/products`));
+      const productsSnap = await getDocs(productsQ);
+      const lowStock: Product[] = [];
+      productsSnap.forEach(doc => {
+          const p = {id: doc.id, ...doc.data()} as Product;
+          if (p.stock < 5) lowStock.push(p);
+      });
+
+      // Clients Fetch
       const clientsQ = query(collection(db, `merchants/${user.uid}/clients`));
       const clientsSnap = await getDocs(clientsQ);
       let newClientsT = 0;
@@ -1212,6 +1631,12 @@ const DashboardHome = ({ user }: { user: User }) => {
           if (date >= today) newClientsT++;
       });
 
+      // Top Products Logic
+      const sortedProducts = Object.entries(productCounts)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 3)
+        .map(([name, count]) => ({name, count}));
+
       setMetrics({
         salesToday: salesT,
         ordersToday: ordersT,
@@ -1219,7 +1644,10 @@ const DashboardHome = ({ user }: { user: User }) => {
         avgTicketToday: ordersT > 0 ? salesT / ordersT : 0,
         weeklySales: weeklyData,
         monthlyRevenue: monthlyRev,
-        monthlyGoal: 20000
+        monthlyGoal: 20000,
+        recentOrders: allOrders.slice(0, 5),
+        lowStockProducts: lowStock.slice(0, 5),
+        topProducts: sortedProducts
       });
       setLoading(false);
     };
@@ -1263,20 +1691,21 @@ const DashboardHome = ({ user }: { user: User }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+                {/* Sales Chart */}
                 <div className="lg:col-span-2 bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-slate-800 text-lg">Vendas da Semana</h3>
-                        <button className="text-slate-400 hover:text-indigo-600"><ExternalLink size={16}/></button>
                     </div>
                     <div className="h-64">
                         <SimpleBarChart data={metrics.weeklySales} height={250} />
                     </div>
                 </div>
 
+                {/* Monthly Goal */}
                 <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
                      <div>
                         <h3 className="font-bold text-slate-800 text-lg mb-2">Meta Mensal</h3>
-                        <p className="text-slate-500 text-sm mb-6">Seu progresso em relação à meta de R$ 20.000</p>
+                        <p className="text-slate-500 text-sm mb-6">Seu progresso</p>
                         
                         <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
                             <svg className="w-full h-full transform -rotate-90">
@@ -1289,18 +1718,84 @@ const DashboardHome = ({ user }: { user: User }) => {
                             </div>
                         </div>
                      </div>
-                     
-                     <div className="mt-6 pt-6 border-t border-slate-100">
-                         <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm text-slate-500">Receita Mês</span>
-                            <span className="font-bold text-slate-800">R$ {metrics.monthlyRevenue.toFixed(2)}</span>
-                         </div>
-                         <div className="flex justify-between items-center">
-                            <span className="text-sm text-slate-500">Despesas (Est.)</span>
-                            <span className="font-bold text-slate-800">R$ {(metrics.monthlyRevenue * 0.3).toFixed(2)}</span>
-                         </div>
-                         <ProfitLossChart income={metrics.monthlyRevenue} expense={metrics.monthlyRevenue * 0.3} />
+                     <div className="mt-4 pt-4 border-t border-slate-100">
+                         <div className="flex justify-between"><span className="text-sm text-slate-500">Receita</span><span className="font-bold">R$ {metrics.monthlyRevenue.toFixed(2)}</span></div>
                      </div>
+                </div>
+            </div>
+
+            {/* Additional Tables and Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Recent Orders Table */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2"><Clock size={18} className="text-slate-400"/> Últimos Pedidos</h3>
+                        <button className="text-xs text-indigo-600 font-bold hover:underline">Ver Todos</button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left text-slate-500">
+                            <thead className="text-xs text-slate-400 uppercase bg-slate-50">
+                                <tr>
+                                    <th className="px-4 py-3 rounded-l-lg">Cliente</th>
+                                    <th className="px-4 py-3">Status</th>
+                                    <th className="px-4 py-3 rounded-r-lg text-right">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {metrics.recentOrders.map(order => (
+                                    <tr key={order.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+                                        <td className="px-4 py-3 font-medium text-slate-900">{order.customerName}</td>
+                                        <td className="px-4 py-3">
+                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                                order.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                                                order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                                'bg-amber-100 text-amber-700'
+                                            }`}>
+                                                {order.status === 'new' ? 'Novo' : order.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-bold text-slate-700">R$ {order.total.toFixed(2)}</td>
+                                    </tr>
+                                ))}
+                                {metrics.recentOrders.length === 0 && <tr><td colSpan={3} className="text-center py-4">Sem pedidos recentes.</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Top Products & Low Stock */}
+                <div className="space-y-6">
+                    {/* Top Products */}
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <h3 className="font-bold text-slate-800 text-lg mb-4 flex items-center gap-2"><Trophy size={18} className="text-amber-500"/> Mais Vendidos</h3>
+                        <div className="space-y-4">
+                            {metrics.topProducts.length > 0 ? metrics.topProducts.map((prod, idx) => (
+                                <div key={idx}>
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span className="font-medium text-slate-700">{prod.name}</span>
+                                        <span className="font-bold text-slate-900">{prod.count} un</span>
+                                    </div>
+                                    <div className="w-full bg-slate-100 rounded-full h-2">
+                                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${(prod.count / Math.max(...metrics.topProducts.map(p=>p.count))) * 100}%` }}></div>
+                                    </div>
+                                </div>
+                            )) : <p className="text-slate-400 text-sm">Sem dados suficientes.</p>}
+                        </div>
+                    </div>
+
+                    {/* Low Stock Alert */}
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm border-l-4 border-l-red-500">
+                        <h3 className="font-bold text-slate-800 text-lg mb-2 flex items-center gap-2"><AlertCircle size={18} className="text-red-500"/> Estoque Baixo</h3>
+                        <div className="space-y-2">
+                            {metrics.lowStockProducts.length > 0 ? metrics.lowStockProducts.map(p => (
+                                <div key={p.id} className="flex justify-between items-center text-sm p-2 bg-red-50 rounded-lg">
+                                    <span className="text-red-900 font-medium">{p.name}</span>
+                                    <span className="bg-white px-2 py-1 rounded text-red-600 font-bold border border-red-100">{p.stock} rest.</span>
+                                </div>
+                            )) : <p className="text-emerald-600 text-sm font-medium flex items-center gap-2"><CheckCircle2 size={16}/> Estoque saudável!</p>}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
