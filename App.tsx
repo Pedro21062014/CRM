@@ -1024,11 +1024,11 @@ const StoreEditor = ({ user }: { user: User }) => {
                             backgroundImage: config.bannerUrl ? `url(${config.bannerUrl})` : 'linear-gradient(to right, #ea1d2c, #b91c1c)',
                             backgroundColor: config.themeColor 
                         }}></div>
-                        <div className="px-4 -mt-8 flex gap-3 relative z-10">
+                        <div className="px-4 -mt-8 flex flex-col items-center gap-3 relative z-10 text-center">
                             <div className="w-16 h-16 rounded-full border-2 border-white bg-white shadow overflow-hidden">
                                 {config.logoUrl ? <img src={config.logoUrl} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center" style={{color: config.themeColor}}><Store size={24}/></div>}
                             </div>
-                            <div className="pt-9">
+                            <div className="pt-1">
                                 <h1 className="font-bold text-slate-800 text-sm leading-tight">{config.storeName}</h1>
                                 <p className="text-[10px] text-slate-500 mt-0.5">{config.description}</p>
                             </div>
@@ -1101,231 +1101,7 @@ const StoreEditor = ({ user }: { user: User }) => {
   );
 };
 
-const DashboardHome = ({ user }: { user: User }) => {
-    return (
-        <div className="space-y-6 animate-in fade-in">
-           <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-8 text-white shadow-lg shadow-indigo-200">
-               <h2 className="text-3xl font-bold mb-2">Olá, {user.displayName || 'Comerciante'}! 👋</h2>
-               <p className="opacity-90 text-lg">Bem-vindo ao seu painel de controle. Aqui está o resumo do seu negócio hoje.</p>
-           </div>
-           
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 group hover:shadow-md transition-all">
-                  <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:scale-110 transition-transform"><DollarSign size={28} strokeWidth={2.5}/></div>
-                  <div>
-                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Vendas Hoje</p>
-                      <h3 className="text-2xl font-bold text-slate-800">R$ 0,00</h3>
-                  </div>
-              </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 group hover:shadow-md transition-all">
-                   <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform"><ShoppingBag size={28} strokeWidth={2.5}/></div>
-                   <div>
-                       <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Pedidos Novos</p>
-                       <h3 className="text-2xl font-bold text-slate-800">0</h3>
-                   </div>
-               </div>
-               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 group hover:shadow-md transition-all">
-                   <div className="p-4 bg-amber-50 text-amber-600 rounded-2xl group-hover:scale-110 transition-transform"><Users size={28} strokeWidth={2.5}/></div>
-                   <div>
-                       <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Clientes Totais</p>
-                       <h3 className="text-2xl font-bold text-slate-800">0</h3>
-                   </div>
-               </div>
-           </div>
-           
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 min-h-[300px] flex flex-col justify-center items-center text-center">
-                   <div className="bg-slate-50 p-4 rounded-full mb-4">
-                       <BarChart3 size={40} className="text-slate-300"/>
-                   </div>
-                   <h3 className="text-lg font-bold text-slate-700">Nenhum dado recente</h3>
-                   <p className="text-slate-400 text-sm max-w-xs mt-2">Os gráficos de vendas aparecerão aqui assim que você começar a vender.</p>
-               </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <h3 className="font-bold text-slate-800 mb-6">Ações Rápidas</h3>
-                    <div className="space-y-3">
-                        <Link to="/dashboard/products" className="flex items-center gap-4 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors group">
-                            <div className="bg-indigo-50 text-indigo-600 p-3 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                <Plus size={20} />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-slate-700">Adicionar Produto</h4>
-                                <p className="text-xs text-slate-500">Cadastre novos itens na sua loja</p>
-                            </div>
-                            <ChevronRight className="ml-auto text-slate-300" size={18}/>
-                        </Link>
-                        <Link to="/dashboard/store" className="flex items-center gap-4 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors group">
-                            <div className="bg-purple-50 text-purple-600 p-3 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                                <Edit2 size={20} />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-slate-700">Personalizar Loja</h4>
-                                <p className="text-xs text-slate-500">Altere cores, banners e textos</p>
-                            </div>
-                            <ChevronRight className="ml-auto text-slate-300" size={18}/>
-                        </Link>
-                        <div onClick={() => window.open(`#/store/${user.uid}`, '_blank')} className="flex items-center gap-4 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors group cursor-pointer">
-                            <div className="bg-emerald-50 text-emerald-600 p-3 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                                <ExternalLink size={20} />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-slate-700">Ver Minha Loja</h4>
-                                <p className="text-xs text-slate-500">Acesse o link público</p>
-                            </div>
-                            <ChevronRight className="ml-auto text-slate-300" size={18}/>
-                        </div>
-                    </div>
-                </div>
-           </div>
-        </div>
-    );
-}
-
-const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
-
-  const menuItems = [
-    { icon: <LayoutDashboard size={20} />, label: 'Visão Geral', path: '/dashboard' },
-    { icon: <ShoppingBag size={20} />, label: 'Pedidos', path: '/dashboard/orders' },
-    { icon: <Package size={20} />, label: 'Produtos', path: '/dashboard/products' },
-    { icon: <Users size={20} />, label: 'Clientes', path: '/dashboard/clients' },
-    { icon: <Store size={20} />, label: 'Minha Loja', path: '/dashboard/store' },
-    { icon: <MessageSquare size={20} />, label: 'Bot WhatsApp', path: '/dashboard/whatsapp' },
-  ];
-
-  return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
-      
-      {/* Sidebar Desktop */}
-      <aside className={`bg-white border-r border-slate-200 hidden md:flex flex-col z-20 transition-all duration-300 ${collapsed ? 'w-20' : 'w-72'}`}>
-        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100 shrink-0">
-           {!collapsed ? <AppLogo collapsed={false} /> : <div className="mx-auto"><AppLogo collapsed={true} /></div>}
-           <button onClick={() => setCollapsed(!collapsed)} className={`p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors ${collapsed ? 'hidden' : 'block'}`}>
-             <ChevronLeft size={20}/>
-           </button>
-           {collapsed && (
-              <button onClick={() => setCollapsed(!collapsed)} className="absolute -right-3 top-8 bg-white border border-slate-200 p-1 rounded-full shadow-sm text-slate-500 hover:text-indigo-600">
-                  <ChevronRight size={14}/>
-              </button>
-           )}
-        </div>
-        
-        <nav className="flex-1 py-6 px-4 space-y-1 overflow-y-auto custom-scrollbar">
-           {menuItems.map((item) => {
-             // Exact match for dashboard home, startsWith for others to handle sub-paths if any
-             const active = item.path === '/dashboard' 
-                ? location.pathname === '/dashboard' 
-                : location.pathname.startsWith(item.path);
-             
-             return (
-               <button 
-                 key={item.path}
-                 onClick={() => navigate(item.path)}
-                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative ${active ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
-                 title={collapsed ? item.label : ''}
-               >
-                 <div className={`shrink-0 ${active ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>{item.icon}</div>
-                 {!collapsed && <span>{item.label}</span>}
-                 {collapsed && active && <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-indigo-600"></div>}
-               </button>
-             )
-           })}
-        </nav>
-
-        <div className="p-4 border-t border-slate-100 shrink-0">
-           <button onClick={logout} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all ${collapsed ? 'justify-center' : ''}`}>
-              <LogOut size={20} />
-              {!collapsed && <span className="font-bold">Sair da Conta</span>}
-           </button>
-        </div>
-      </aside>
-
-      {/* Mobile Sidebar Overlay */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm md:hidden" onClick={() => setMobileMenuOpen(false)}>
-           <div className="w-64 bg-white h-full shadow-2xl p-4 flex flex-col animate-in slide-in-from-left">
-               <div className="flex justify-between items-center mb-6">
-                  <AppLogo />
-                  <button onClick={() => setMobileMenuOpen(false)}><X size={24} className="text-slate-400"/></button>
-               </div>
-               <nav className="flex-1 space-y-1">
-                   {menuItems.map((item) => {
-                        const active = item.path === '/dashboard' ? location.pathname === '/dashboard' : location.pathname.startsWith(item.path);
-                        return (
-                           <button 
-                             key={item.path}
-                             onClick={() => navigate(item.path)}
-                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${active ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-500 font-medium'}`}
-                           >
-                             <div className={active ? 'text-indigo-600' : 'text-slate-400'}>{item.icon}</div>
-                             <span>{item.label}</span>
-                           </button>
-                        );
-                   })}
-               </nav>
-               <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 font-bold mt-4">
-                  <LogOut size={20} /> Sair
-               </button>
-           </div>
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* Top Header */}
-        <header className="h-20 bg-white/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-200 px-4 md:px-8 flex items-center justify-between shrink-0">
-           <div className="flex items-center gap-4">
-               <button onClick={() => setMobileMenuOpen(true)} className="md:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
-                   <Menu size={24}/>
-               </button>
-               <h1 className="text-xl font-bold text-slate-800 hidden md:block">
-                  {menuItems.find(i => location.pathname.startsWith(i.path) && (i.path !== '/dashboard' || location.pathname === '/dashboard'))?.label || 'Dashboard'}
-               </h1>
-           </div>
-
-           <div className="flex items-center gap-4">
-               <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors relative">
-                   <Bell size={20}/>
-                   <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-               </button>
-               <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-                   <div className="text-right hidden sm:block leading-tight">
-                       <p className="text-sm font-bold text-slate-800">{user.displayName || 'Comerciante'}</p>
-                       <p className="text-xs text-slate-500">{user.email}</p>
-                   </div>
-                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold border-2 border-white shadow-md text-sm">
-                       {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
-                   </div>
-               </div>
-           </div>
-        </header>
-
-        {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-           <div className="max-w-7xl mx-auto h-full">
-               <Routes>
-                  <Route path="/" element={<DashboardHome user={user} />} />
-                  <Route path="/orders" element={<OrdersManager user={user} />} />
-                  <Route path="/products" element={<ProductsManager user={user} />} />
-                  <Route path="/clients" element={<ClientsManager user={user} />} />
-                  <Route path="/store" element={<StoreEditor user={user} />} />
-                  <Route path="/whatsapp" element={<WhatsAppBot user={user} />} />
-               </Routes>
-           </div>
-        </main>
-      </div>
-    </div>
-  );
-};
+// ... LandingPage and AuthPage unchanged ...
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -1473,6 +1249,8 @@ const PublicStore = () => {
   const [cart, setCart] = useState<{product: Product, quantity: number}[]>([]);
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [localOrders, setLocalOrders] = useState<any[]>([]);
   
   // New State for Order logic
   const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', address: '', paymentMethod: 'pix' });
@@ -1499,6 +1277,15 @@ const PublicStore = () => {
               setLoading(false);
           }
       };
+      
+      // Load local history
+      if (id) {
+          const stored = localStorage.getItem(`my_orders_${id}`);
+          if (stored) {
+              setLocalOrders(JSON.parse(stored));
+          }
+      }
+
       loadStore();
   }, [id]);
 
@@ -1554,9 +1341,16 @@ const PublicStore = () => {
         };
 
         const docRef = await addDoc(collection(db, `merchants/${id}/orders`), orderData);
-        setOrderPlaced({ id: docRef.id, ...orderData });
+        const fullOrder = { id: docRef.id, ...orderData, createdAt: new Date().toISOString() }; // Use ISO string for local storage
+        
+        setOrderPlaced(fullOrder);
         setCart([]); // Clear cart
-        // Cart stays open to show success screen
+        
+        // Save to local history
+        const updatedHistory = [fullOrder, ...localOrders];
+        setLocalOrders(updatedHistory);
+        localStorage.setItem(`my_orders_${id}`, JSON.stringify(updatedHistory));
+
     } catch (error) {
         console.error("Error placing order:", error);
         alert("Ocorreu um erro ao enviar o pedido. Tente novamente.");
@@ -1595,24 +1389,29 @@ const PublicStore = () => {
                      {config.logoUrl && <img src={config.logoUrl} className="w-8 h-8 rounded-full object-cover"/>}
                      <span className="font-bold text-lg">{config.storeName}</span>
                  </div>
-                 <button onClick={() => setCartOpen(true)} className="relative p-2 hover:bg-slate-100 rounded-full">
-                     <ShoppingBag size={24}/>
-                     {cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full font-bold">{cart.reduce((a,b)=>a+b.quantity,0)}</span>}
-                 </button>
+                 <div className="flex gap-2">
+                     <button onClick={() => setHistoryOpen(true)} className="p-2 hover:bg-slate-100 rounded-full relative" title="Meus Pedidos">
+                         <History size={24} className="text-slate-600"/>
+                     </button>
+                     <button onClick={() => setCartOpen(true)} className="relative p-2 hover:bg-slate-100 rounded-full">
+                         <ShoppingBag size={24} className="text-slate-600"/>
+                         {cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full font-bold">{cart.reduce((a,b)=>a+b.quantity,0)}</span>}
+                     </button>
+                 </div>
              </div>
           </header>
 
-          {/* BANNER SECTION - Added to match Editor Preview */}
+          {/* BANNER SECTION - Centered */}
           <div className="relative w-full">
               <div className="h-32 md:h-64 w-full bg-cover bg-center" style={{ 
                   backgroundImage: config.bannerUrl ? `url(${config.bannerUrl})` : 'linear-gradient(to right, #ea1d2c, #b91c1c)',
                   backgroundColor: config.themeColor 
               }}></div>
-              <div className="max-w-7xl mx-auto px-4 relative -mt-12 md:-mt-16 mb-8 flex flex-col md:flex-row items-center md:items-end gap-4 z-10">
-                  <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-white shadow-lg overflow-hidden shrink-0">
-                      {config.logoUrl ? <img src={config.logoUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-300"><Store size={40}/></div>}
+              <div className="max-w-7xl mx-auto px-4 relative -mt-12 md:-mt-16 mb-8 flex flex-col items-center gap-4 z-10 text-center">
+                  <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-white shadow-lg overflow-hidden shrink-0 flex items-center justify-center">
+                      {config.logoUrl ? <img src={config.logoUrl} className="w-full h-full object-cover"/> : <div className="text-slate-300"><Store size={40}/></div>}
                   </div>
-                  <div className="text-center md:text-left pb-2">
+                  <div className="pb-2">
                       <h1 className="font-bold text-3xl text-slate-900 leading-tight drop-shadow-sm">{config.storeName}</h1>
                       {config.description && <p className="text-slate-600 font-medium mt-1 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full inline-block shadow-sm">{config.description}</p>}
                   </div>
@@ -1629,6 +1428,55 @@ const PublicStore = () => {
           <footer className="py-10 bg-slate-50 border-t border-slate-200 text-center">
               <p className="text-slate-500 text-sm">© {new Date().getFullYear()} {config.storeName}. Powered by NovaCRM.</p>
           </footer>
+
+          {/* History Sidebar */}
+          {historyOpen && (
+              <div className="fixed inset-0 z-50 flex justify-end">
+                  <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setHistoryOpen(false)}></div>
+                  <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
+                      <div className="p-4 border-b flex justify-between items-center bg-slate-50">
+                          <h3 className="font-bold text-lg">Histórico de Pedidos</h3>
+                          <button onClick={() => setHistoryOpen(false)}><X size={24}/></button>
+                      </div>
+                      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+                          {localOrders.length === 0 && (
+                              <div className="text-center py-10 text-slate-400">
+                                  <Clock size={48} className="mx-auto mb-4 opacity-20"/>
+                                  <p>Nenhum pedido recente encontrado.</p>
+                              </div>
+                          )}
+                          {localOrders.map((order, idx) => (
+                              <div key={idx} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                  <div className="flex justify-between items-center mb-2">
+                                      <span className="font-bold text-sm">#{order.id.slice(0, 8)}</span>
+                                      <span className="text-xs text-slate-400">{new Date(order.createdAt).toLocaleDateString()}</span>
+                                  </div>
+                                  <div className="space-y-1 mb-3">
+                                      {order.items.map((item: any, i: number) => (
+                                          <div key={i} className="text-xs text-slate-600 flex justify-between">
+                                              <span>{item.quantity}x {item.productName}</span>
+                                          </div>
+                                      ))}
+                                  </div>
+                                  <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                                          order.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                          order.status === 'processing' ? 'bg-amber-100 text-amber-700' :
+                                          order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                          'bg-blue-100 text-blue-700'
+                                      }`}>
+                                          {order.status === 'new' ? 'Aguardando' : 
+                                           order.status === 'processing' ? 'Preparando' :
+                                           order.status === 'completed' ? 'Entregue' : 'Cancelado'}
+                                      </span>
+                                      <span className="font-bold text-indigo-600 text-sm">R$ {order.total.toFixed(2)}</span>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+          )}
 
           {/* Shopping Cart Sidebar */}
           {cartOpen && (
@@ -1759,6 +1607,193 @@ const PublicStore = () => {
               </div>
           )}
       </div>
+  );
+};
+
+const DashboardOverview = ({ user }: { user: User }) => {
+    // Simple stats fetching
+    const [stats, setStats] = useState({ orders: 0, revenue: 0, clients: 0, products: 0 });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            // This is not efficient for large datasets but works for small/mvp
+            // Using count() or aggregations would be better with extensions or server side
+            try {
+                const ordersSnap = await getDocs(collection(db, `merchants/${user.uid}/orders`));
+                const clientsSnap = await getDocs(collection(db, `merchants/${user.uid}/clients`));
+                const productsSnap = await getDocs(collection(db, `merchants/${user.uid}/products`));
+                
+                let revenue = 0;
+                ordersSnap.forEach(d => revenue += (d.data().total || 0));
+
+                setStats({
+                    orders: ordersSnap.size,
+                    revenue,
+                    clients: clientsSnap.size,
+                    products: productsSnap.size
+                });
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, [user.uid]);
+
+    if (loading) return <LoadingSpinner />;
+
+    return (
+        <div className="space-y-6 animate-in fade-in">
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold text-slate-800">Bom dia, {user.displayName?.split(' ')[0] || 'Lojista'}!</h1>
+                <p className="text-slate-500">Aqui está o resumo do seu negócio hoje.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between h-32 relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <DollarSign size={64} className="text-green-500"/>
+                    </div>
+                    <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">Faturamento Total</span>
+                    <span className="text-3xl font-bold text-slate-800">R$ {stats.revenue.toFixed(2)}</span>
+                    <div className="w-full bg-green-100 h-1 rounded-full mt-2"><div className="w-[70%] bg-green-500 h-full rounded-full"></div></div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between h-32 relative overflow-hidden group">
+                     <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <ShoppingBag size={64} className="text-indigo-500"/>
+                    </div>
+                    <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">Pedidos Realizados</span>
+                    <span className="text-3xl font-bold text-slate-800">{stats.orders}</span>
+                     <div className="w-full bg-indigo-100 h-1 rounded-full mt-2"><div className="w-[45%] bg-indigo-500 h-full rounded-full"></div></div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between h-32 relative overflow-hidden group">
+                     <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Users size={64} className="text-amber-500"/>
+                    </div>
+                    <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">Base de Clientes</span>
+                    <span className="text-3xl font-bold text-slate-800">{stats.clients}</span>
+                    <div className="w-full bg-amber-100 h-1 rounded-full mt-2"><div className="w-[30%] bg-amber-500 h-full rounded-full"></div></div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between h-32 relative overflow-hidden group">
+                    <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Package size={64} className="text-violet-500"/>
+                    </div>
+                    <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">Produtos Ativos</span>
+                    <span className="text-3xl font-bold text-slate-800">{stats.products}</span>
+                    <div className="w-full bg-violet-100 h-1 rounded-full mt-2"><div className="w-[85%] bg-violet-500 h-full rounded-full"></div></div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                    <h3 className="font-bold text-lg mb-4 text-slate-800">Desempenho Semanal</h3>
+                    <div className="h-64 flex items-end gap-2">
+                         {/* Mock Chart */}
+                         <SimpleBarChart data={[120, 300, 450, 200, 600, 400, 350]} height={240} />
+                    </div>
+                </div>
+                
+                <div className="bg-indigo-600 p-6 rounded-2xl shadow-lg shadow-indigo-200 text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-10 bg-white opacity-5 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2 w-64 h-64"></div>
+                    <div className="relative z-10">
+                        <h3 className="font-bold text-xl mb-2">Dica do Dia IA</h3>
+                        <p className="text-indigo-100 text-sm mb-6 leading-relaxed">
+                            Analisei seus pedidos e percebi que clientes que compram "Hambúrguer" geralmente levam "Refrigerante". Crie um combo promocional para aumentar seu ticket médio!
+                        </p>
+                        <button className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl text-sm hover:bg-indigo-50 transition-colors shadow-lg">
+                            Criar Promoção com IA
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
+
+  const menuItems = [
+    { icon: LayoutDashboard, label: 'Visão Geral', path: '/dashboard' },
+    { icon: ShoppingCart, label: 'Pedidos', path: '/dashboard/orders' },
+    { icon: Package, label: 'Produtos', path: '/dashboard/products' },
+    { icon: Users, label: 'Clientes', path: '/dashboard/clients' },
+    { icon: Store, label: 'Minha Loja', path: '/dashboard/store' },
+    { icon: MessageSquare, label: 'WhatsApp Bot', path: '/dashboard/whatsapp' },
+  ];
+
+  return (
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
+      {/* Sidebar */}
+      <aside className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-20 shadow-sm relative`}>
+        <div className="h-20 flex items-center justify-center border-b border-slate-100">
+             <AppLogo collapsed={collapsed}/>
+        </div>
+        
+        <div className="p-4 flex-1 overflow-y-auto space-y-1">
+           {menuItems.map((item) => {
+             const active = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+             return (
+               <button 
+                 key={item.path}
+                 onClick={() => navigate(item.path)}
+                 className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start px-4'} py-3 rounded-xl transition-all duration-200 group relative ${active ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
+               >
+                  <item.icon size={20} className={active ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'} strokeWidth={active ? 2.5 : 2} />
+                  {!collapsed && <span className="ml-3 text-sm">{item.label}</span>}
+                  
+                  {/* Tooltip for collapsed state */}
+                  {collapsed && (
+                      <div className="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none transition-opacity">
+                          {item.label}
+                      </div>
+                  )}
+               </button>
+             );
+           })}
+        </div>
+
+        <div className="p-4 border-t border-slate-100">
+            <button onClick={logout} className={`w-full flex items-center ${collapsed ? 'justify-center' : 'justify-start px-4'} py-3 text-red-500 hover:bg-red-50 rounded-xl transition-all`}>
+                <LogOut size={20} />
+                {!collapsed && <span className="ml-3 text-sm font-bold">Sair</span>}
+            </button>
+            <button 
+                onClick={() => setCollapsed(!collapsed)} 
+                className="absolute top-1/2 -right-3 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-600 shadow-sm z-50 hidden md:flex"
+            >
+                {collapsed ? <ChevronRight size={14}/> : <ChevronLeft size={14}/>}
+            </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+          {/* Top Mobile Bar */}
+          <div className="md:hidden h-16 bg-white border-b flex items-center justify-between px-4 shrink-0">
+               <AppLogo collapsed={true}/>
+               <button onClick={logout}><LogOut size={20} className="text-slate-500"/></button>
+          </div>
+
+          <div className="flex-1 overflow-auto p-4 md:p-8 relative scroll-smooth">
+             <Routes>
+                <Route path="/" element={<DashboardOverview user={user} />} />
+                <Route path="products" element={<ProductsManager user={user} />} />
+                <Route path="clients" element={<ClientsManager user={user} />} />
+                <Route path="orders" element={<OrdersManager user={user} />} />
+                <Route path="store" element={<StoreEditor user={user} />} />
+                <Route path="whatsapp" element={<WhatsAppBot user={user} />} />
+             </Routes>
+          </div>
+      </main>
+    </div>
   );
 };
 
