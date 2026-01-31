@@ -10,7 +10,7 @@ import {
   type User 
 } from 'firebase/auth';
 
-import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit, runTransaction } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit, runTransaction, writeBatch } from 'firebase/firestore';
 import { GoogleGenAI, Type, FunctionDeclaration, Schema } from "@google/genai";
 import XLSX from 'xlsx-js-style';
 import { 
@@ -87,7 +87,6 @@ const openWhatsApp = (phone: string | undefined, text: string) => {
   window.open(url, '_blank');
 };
 
-// Updated convertFileToBase64 with image resizing/compression to fix Firestore size limit errors
 const convertFileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -152,185 +151,25 @@ const SimpleBarChart = ({ data, color = "indigo", height = 60 }: { data: number[
   );
 };
 
-const ProfitLossChart = ({ income, expense }: { income: number, expense: number }) => {
-  const total = income + expense;
-  const incomePct = total > 0 ? (income / total) * 100 : 0;
-  const expensePct = total > 0 ? (expense / total) * 100 : 0;
-  return (
-    <div className="flex h-4 w-full rounded-full overflow-hidden bg-slate-100 mt-2">
-      <div className="bg-emerald-500 transition-all duration-1000" style={{ width: `${incomePct}%` }} title={`Receita: ${income}`}></div>
-      <div className="bg-rose-500 transition-all duration-1000" style={{ width: `${expensePct}%` }} title={`Despesas: ${expense}`}></div>
-    </div>
-  );
-};
-
-// --- LANDING PAGE ---
-const LandingPage = () => {
-    const navigate = useNavigate();
-    
-    return (
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 overflow-x-hidden">
-            {/* Navbar */}
-            <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16">
-                        <AppLogo />
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => navigate('/login')} className="text-slate-600 font-medium text-sm hover:text-indigo-600 transition-colors hidden sm:block">Login</button>
-                            <button onClick={() => navigate('/register')} className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 text-sm flex items-center gap-2">
-                                Criar Conta <ArrowRight size={16}/>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-
-            {/* Hero V3 Announcement */}
-            <section className="pt-32 pb-20 px-4 relative overflow-hidden">
-                {/* Background Decor */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 opacity-30">
-                    <div className="absolute -top-20 -right-20 w-96 h-96 bg-indigo-200 rounded-full blur-3xl opacity-50 animate-pulse"></div>
-                    <div className="absolute top-40 -left-20 w-72 h-72 bg-violet-200 rounded-full blur-3xl opacity-50"></div>
-                </div>
-
-                <div className="max-w-7xl mx-auto text-center relative z-10">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900 text-indigo-400 text-xs font-bold mb-8 border border-slate-700 animate-in fade-in slide-in-from-bottom-4 hover:scale-105 transition-transform cursor-default">
-                        <Sparkles size={12} className="text-yellow-400"/> VEM AÍ: NOVACRM V3
-                    </div>
-                    
-                    <h1 className="text-5xl md:text-7xl font-extrabold text-slate-900 tracking-tight mb-6 leading-[1.1] animate-in fade-in slide-in-from-bottom-6 duration-700">
-                        O CRM do Futuro <br className="hidden md:block"/>
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600">está chegando.</span>
-                    </h1>
-                    
-                    <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto mb-10 animate-in fade-in slide-in-from-bottom-8 duration-1000 leading-relaxed">
-                        Prepare-se para a revolução. O <b>NovaCRM V3</b> trará inteligência artificial generativa, automação total de WhatsApp e funis de venda preditivos. Comece a usar a versão atual hoje e garanta migração gratuita.
-                    </p>
-                    
-                    <div className="flex flex-col sm:flex-row justify-center gap-4 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-150">
-                        <button onClick={() => navigate('/register')} className="px-8 py-4 bg-slate-900 text-white text-lg font-bold rounded-xl hover:bg-slate-800 transition-all shadow-2xl hover:-translate-y-1 flex items-center justify-center gap-2 ring-4 ring-slate-100">
-                            <Rocket size={20}/> Garantir Acesso Antecipado
-                        </button>
-                        <button onClick={() => navigate('/login')} className="px-8 py-4 bg-white text-slate-700 border border-slate-200 text-lg font-bold rounded-xl hover:bg-slate-50 transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2">
-                            Acessar Versão 2.0
-                        </button>
-                    </div>
-
-                    <div className="mt-12 flex items-center justify-center gap-6 text-sm text-slate-400 font-medium">
-                        <span className="flex items-center gap-1"><CheckCircle2 size={14} className="text-emerald-500"/> Setup Grátis</span>
-                        <span className="flex items-center gap-1"><CheckCircle2 size={14} className="text-emerald-500"/> Sem Cartão de Crédito</span>
-                        <span className="flex items-center gap-1"><CheckCircle2 size={14} className="text-emerald-500"/> Suporte 24/7</span>
-                    </div>
-                </div>
-            </section>
-
-            {/* V3 Features Section (Updated to Light Theme) */}
-            <section className="py-20 bg-white relative overflow-hidden border-t border-b border-slate-100">
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]"></div>
-                <div className="max-w-7xl mx-auto px-4 relative z-10">
-                    <div className="text-center mb-16">
-                        <h2 className="text-3xl md:text-4xl font-bold mb-4 text-slate-900">O que muda na V3?</h2>
-                        <p className="text-slate-500">Três pilares que vão transformar seu negócio.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-                            <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 mb-6 group-hover:scale-110 transition-transform">
-                                <Cpu size={28}/>
-                            </div>
-                            <h3 className="text-xl font-bold mb-3 text-slate-800">IA Nativa (Gemini)</h3>
-                            <p className="text-slate-500 leading-relaxed text-sm">
-                                Não apenas um chat. A IA vai analisar seu estoque, sugerir promoções e até criar imagens de produtos automaticamente.
-                            </p>
-                        </div>
-                        <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-                            <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-6 group-hover:scale-110 transition-transform">
-                                <MessageCircle size={28}/>
-                            </div>
-                            <h3 className="text-xl font-bold mb-3 text-slate-800">Automação WhatsApp</h3>
-                            <p className="text-slate-500 leading-relaxed text-sm">
-                                Esqueça o envio manual. O bot da V3 recupera carrinhos abandonados e confirma pedidos sem intervenção humana.
-                            </p>
-                        </div>
-                        <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group">
-                            <div className="w-12 h-12 bg-fuchsia-100 rounded-2xl flex items-center justify-center text-fuchsia-600 mb-6 group-hover:scale-110 transition-transform">
-                                <TrendingUp size={28}/>
-                            </div>
-                            <h3 className="text-xl font-bold mb-3 text-slate-800">Funnels Preditivos</h3>
-                            <p className="text-slate-500 leading-relaxed text-sm">
-                                Saiba exatamente quem vai comprar antes mesmo do cliente. O CRM classifica leads por temperatura e potencial.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Current Features (Legacy but polished) */}
-            <section className="py-24 bg-slate-50">
-                <div className="max-w-7xl mx-auto px-4">
-                    <div className="flex flex-col md:flex-row items-center justify-between mb-16 gap-8">
-                        <div>
-                            <h2 className="text-3xl font-bold text-slate-900 mb-2">Comece hoje com a V2</h2>
-                            <p className="text-slate-500">Nossa plataforma atual já é poderosa e pronta para usar.</p>
-                        </div>
-                        <button onClick={() => navigate('/register')} className="text-indigo-600 font-bold hover:text-indigo-800 flex items-center gap-2 group">
-                            Ver todas as funcionalidades <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform"/>
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                        <div className="group">
-                            <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white aspect-video flex items-center justify-center relative">
-                                <Store size={48} className="text-slate-300 group-hover:text-indigo-500 transition-colors duration-500 group-hover:scale-110"/>
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-900 mb-2">Loja Virtual Express</h3>
-                            <p className="text-slate-500 text-sm">Crie seu catálogo online em menos de 5 minutos e compartilhe o link.</p>
-                        </div>
-                        <div className="group">
-                            <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white aspect-video flex items-center justify-center">
-                                <Users size={48} className="text-slate-300 group-hover:text-emerald-500 transition-colors duration-500 group-hover:scale-110"/>
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-900 mb-2">Gestão de Clientes</h3>
-                            <p className="text-slate-500 text-sm">Centralize seus contatos e histórico de pedidos em um lugar seguro.</p>
-                        </div>
-                         <div className="group">
-                            <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white aspect-video flex items-center justify-center">
-                                <BarChart3 size={48} className="text-slate-300 group-hover:text-violet-500 transition-colors duration-500 group-hover:scale-110"/>
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-900 mb-2">Dashboard Financeiro</h3>
-                            <p className="text-slate-500 text-sm">Acompanhe suas vendas diárias, ticket médio e metas mensais.</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-            
-            <footer className="bg-white border-t border-slate-200 py-12">
-                <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
-                    <AppLogo dark={false}/>
-                    <div className="flex gap-6 text-sm text-slate-500 font-medium">
-                        <a href="#" className="hover:text-indigo-600 transition-colors">Termos</a>
-                        <a href="#" className="hover:text-indigo-600 transition-colors">Privacidade</a>
-                        <a href="#" className="hover:text-indigo-600 transition-colors">Contato</a>
-                    </div>
-                    <p className="text-slate-400 text-sm">© {new Date().getFullYear()} NovaCRM Inc.</p>
-                </div>
-            </footer>
-        </div>
-    );
-};
-
 const ProductsManager = ({ user }: { user: User }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formData, setFormData] = useState<Partial<Product>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [draggedItem, setDraggedItem] = useState<number | null>(null);
+
+  // Derive unique categories from existing products for the datalist
+  const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
 
   useEffect(() => {
+    // Sort locally by orderIndex to ensure visual consistency
     const q = query(collection(db, `merchants/${user.uid}/products`));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items: Product[] = [];
       snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() } as Product));
+      // Sort by orderIndex
+      items.sort((a, b) => (a.orderIndex ?? 9999) - (b.orderIndex ?? 9999));
       setProducts(items);
       setLoading(false);
     });
@@ -342,6 +181,11 @@ const ProductsManager = ({ user }: { user: User }) => {
     try {
       const priceVal = parseFloat(String(formData.price));
       const stockVal = parseInt(String(formData.stock));
+      
+      // Calculate next order index if new
+      const nextIndex = products.length > 0 
+        ? Math.max(...products.map(p => p.orderIndex || 0)) + 1 
+        : 0;
 
       const payload = {
         name: formData.name || 'Produto Sem Nome',
@@ -358,6 +202,7 @@ const ProductsManager = ({ user }: { user: User }) => {
       } else {
         await addDoc(collection(db, `merchants/${user.uid}/products`), {
           ...payload,
+          orderIndex: nextIndex,
           createdAt: serverTimestamp()
         });
       }
@@ -387,6 +232,47 @@ const ProductsManager = ({ user }: { user: User }) => {
     }
   };
 
+  // Drag and Drop Logic
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+      setDraggedItem(index);
+      // Required for Firefox to allow drag
+      e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+      e.preventDefault(); // Necessary to allow dropping
+      e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+      e.preventDefault();
+      if (draggedItem === null || draggedItem === dropIndex) return;
+
+      const newProducts = [...products];
+      const [removed] = newProducts.splice(draggedItem, 1);
+      newProducts.splice(dropIndex, 0, removed);
+
+      // Optimistic Update
+      setProducts(newProducts);
+      setDraggedItem(null);
+
+      // Batch Update in Background
+      try {
+          const batch = writeBatch(db);
+          newProducts.forEach((prod, index) => {
+              // Only update if index changed to save writes
+              if (prod.orderIndex !== index) {
+                  const ref = doc(db, `merchants/${user.uid}/products`, prod.id);
+                  batch.update(ref, { orderIndex: index });
+              }
+          });
+          await batch.commit();
+      } catch (error) {
+          console.error("Failed to reorder:", error);
+          alert("Erro ao salvar a nova ordem dos produtos.");
+      }
+  };
+
   const openEdit = (product: Product) => {
     setEditing(product);
     setFormData(product);
@@ -399,10 +285,10 @@ const ProductsManager = ({ user }: { user: User }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in">
-      <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Gerenciar Produtos</h2>
-          <p className="text-slate-500 text-sm">Controle seu estoque e cardápio</p>
+          <p className="text-slate-500 text-sm">Arraste os produtos para mudar a ordem na loja.</p>
         </div>
         <PrimaryButton onClick={openNew}><Plus size={18}/> Novo Produto</PrimaryButton>
       </div>
@@ -446,7 +332,21 @@ const ProductsManager = ({ user }: { user: User }) => {
                  </div>
                  <div>
                     <label className="text-xs font-bold text-slate-500 uppercase">Categoria</label>
-                    <input className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Ex: Lanches, Bebidas" value={formData.category || ''} onChange={e => setFormData({...formData, category: e.target.value})} />
+                    <div className="relative mt-1">
+                        <input 
+                            list="categories-list"
+                            className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" 
+                            placeholder="Selecione ou digite uma nova..." 
+                            value={formData.category || ''} 
+                            onChange={e => setFormData({...formData, category: e.target.value})} 
+                        />
+                        <datalist id="categories-list">
+                            {uniqueCategories.map(cat => (
+                                <option key={cat} value={cat} />
+                            ))}
+                        </datalist>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 ml-1">Digite para criar uma nova categoria ou selecione da lista.</p>
                  </div>
                  <div>
                     <label className="text-xs font-bold text-slate-500 uppercase">Imagem</label>
@@ -471,10 +371,23 @@ const ProductsManager = ({ user }: { user: User }) => {
 
       {loading ? <LoadingSpinner/> : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {products.map(product => (
-            <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group hover:shadow-md transition-all">
+          {products.map((product, index) => (
+            <div 
+                key={product.id} 
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, index)}
+                className={`bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group hover:shadow-md transition-all cursor-move ${draggedItem === index ? 'opacity-50 ring-2 ring-indigo-500 ring-offset-2' : ''}`}
+            >
                <div className="h-40 bg-slate-100 relative overflow-hidden">
                   <img src={product.imageUrl || `https://picsum.photos/400/300?random=${product.id}`} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                  
+                  {/* Grip Icon for affordance */}
+                  <div className="absolute top-2 left-2 p-1 bg-black/30 text-white rounded backdrop-blur-sm opacity-50 group-hover:opacity-100 transition-opacity">
+                      <GripVertical size={16}/>
+                  </div>
+
                   <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                      <button onClick={() => openEdit(product)} className="p-2 bg-white rounded-full shadow text-indigo-600 hover:text-indigo-800"><Edit2 size={16}/></button>
                      <button onClick={() => handleDelete(product.id)} className="p-2 bg-white rounded-full shadow text-red-500 hover:text-red-700"><Trash2 size={16}/></button>
@@ -1188,6 +1101,285 @@ const StoreEditor = ({ user }: { user: User }) => {
   );
 };
 
+const DashboardHome = ({ user }: { user: User }) => {
+    return (
+        <div className="space-y-6 animate-in fade-in">
+           <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-3xl p-8 text-white shadow-lg shadow-indigo-200">
+               <h2 className="text-3xl font-bold mb-2">Olá, {user.displayName || 'Comerciante'}! 👋</h2>
+               <p className="opacity-90 text-lg">Bem-vindo ao seu painel de controle. Aqui está o resumo do seu negócio hoje.</p>
+           </div>
+           
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 group hover:shadow-md transition-all">
+                  <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:scale-110 transition-transform"><DollarSign size={28} strokeWidth={2.5}/></div>
+                  <div>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Vendas Hoje</p>
+                      <h3 className="text-2xl font-bold text-slate-800">R$ 0,00</h3>
+                  </div>
+              </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 group hover:shadow-md transition-all">
+                   <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform"><ShoppingBag size={28} strokeWidth={2.5}/></div>
+                   <div>
+                       <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Pedidos Novos</p>
+                       <h3 className="text-2xl font-bold text-slate-800">0</h3>
+                   </div>
+               </div>
+               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 group hover:shadow-md transition-all">
+                   <div className="p-4 bg-amber-50 text-amber-600 rounded-2xl group-hover:scale-110 transition-transform"><Users size={28} strokeWidth={2.5}/></div>
+                   <div>
+                       <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Clientes Totais</p>
+                       <h3 className="text-2xl font-bold text-slate-800">0</h3>
+                   </div>
+               </div>
+           </div>
+           
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 min-h-[300px] flex flex-col justify-center items-center text-center">
+                   <div className="bg-slate-50 p-4 rounded-full mb-4">
+                       <BarChart3 size={40} className="text-slate-300"/>
+                   </div>
+                   <h3 className="text-lg font-bold text-slate-700">Nenhum dado recente</h3>
+                   <p className="text-slate-400 text-sm max-w-xs mt-2">Os gráficos de vendas aparecerão aqui assim que você começar a vender.</p>
+               </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h3 className="font-bold text-slate-800 mb-6">Ações Rápidas</h3>
+                    <div className="space-y-3">
+                        <Link to="/dashboard/products" className="flex items-center gap-4 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors group">
+                            <div className="bg-indigo-50 text-indigo-600 p-3 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                <Plus size={20} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-slate-700">Adicionar Produto</h4>
+                                <p className="text-xs text-slate-500">Cadastre novos itens na sua loja</p>
+                            </div>
+                            <ChevronRight className="ml-auto text-slate-300" size={18}/>
+                        </Link>
+                        <Link to="/dashboard/store" className="flex items-center gap-4 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors group">
+                            <div className="bg-purple-50 text-purple-600 p-3 rounded-lg group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                <Edit2 size={20} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-slate-700">Personalizar Loja</h4>
+                                <p className="text-xs text-slate-500">Altere cores, banners e textos</p>
+                            </div>
+                            <ChevronRight className="ml-auto text-slate-300" size={18}/>
+                        </Link>
+                        <div onClick={() => window.open(`#/store/${user.uid}`, '_blank')} className="flex items-center gap-4 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors group cursor-pointer">
+                            <div className="bg-emerald-50 text-emerald-600 p-3 rounded-lg group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                <ExternalLink size={20} />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-slate-700">Ver Minha Loja</h4>
+                                <p className="text-xs text-slate-500">Acesse o link público</p>
+                            </div>
+                            <ChevronRight className="ml-auto text-slate-300" size={18}/>
+                        </div>
+                    </div>
+                </div>
+           </div>
+        </div>
+    );
+}
+
+const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  const menuItems = [
+    { icon: <LayoutDashboard size={20} />, label: 'Visão Geral', path: '/dashboard' },
+    { icon: <ShoppingBag size={20} />, label: 'Pedidos', path: '/dashboard/orders' },
+    { icon: <Package size={20} />, label: 'Produtos', path: '/dashboard/products' },
+    { icon: <Users size={20} />, label: 'Clientes', path: '/dashboard/clients' },
+    { icon: <Store size={20} />, label: 'Minha Loja', path: '/dashboard/store' },
+    { icon: <MessageSquare size={20} />, label: 'Bot WhatsApp', path: '/dashboard/whatsapp' },
+  ];
+
+  return (
+    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
+      
+      {/* Sidebar Desktop */}
+      <aside className={`bg-white border-r border-slate-200 hidden md:flex flex-col z-20 transition-all duration-300 ${collapsed ? 'w-20' : 'w-72'}`}>
+        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100 shrink-0">
+           {!collapsed ? <AppLogo collapsed={false} /> : <div className="mx-auto"><AppLogo collapsed={true} /></div>}
+           <button onClick={() => setCollapsed(!collapsed)} className={`p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors ${collapsed ? 'hidden' : 'block'}`}>
+             <ChevronLeft size={20}/>
+           </button>
+           {collapsed && (
+              <button onClick={() => setCollapsed(!collapsed)} className="absolute -right-3 top-8 bg-white border border-slate-200 p-1 rounded-full shadow-sm text-slate-500 hover:text-indigo-600">
+                  <ChevronRight size={14}/>
+              </button>
+           )}
+        </div>
+        
+        <nav className="flex-1 py-6 px-4 space-y-1 overflow-y-auto custom-scrollbar">
+           {menuItems.map((item) => {
+             // Exact match for dashboard home, startsWith for others to handle sub-paths if any
+             const active = item.path === '/dashboard' 
+                ? location.pathname === '/dashboard' 
+                : location.pathname.startsWith(item.path);
+             
+             return (
+               <button 
+                 key={item.path}
+                 onClick={() => navigate(item.path)}
+                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative ${active ? 'bg-indigo-50 text-indigo-700 font-bold shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
+                 title={collapsed ? item.label : ''}
+               >
+                 <div className={`shrink-0 ${active ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>{item.icon}</div>
+                 {!collapsed && <span>{item.label}</span>}
+                 {collapsed && active && <div className="absolute right-2 w-1.5 h-1.5 rounded-full bg-indigo-600"></div>}
+               </button>
+             )
+           })}
+        </nav>
+
+        <div className="p-4 border-t border-slate-100 shrink-0">
+           <button onClick={logout} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all ${collapsed ? 'justify-center' : ''}`}>
+              <LogOut size={20} />
+              {!collapsed && <span className="font-bold">Sair da Conta</span>}
+           </button>
+        </div>
+      </aside>
+
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm md:hidden" onClick={() => setMobileMenuOpen(false)}>
+           <div className="w-64 bg-white h-full shadow-2xl p-4 flex flex-col animate-in slide-in-from-left">
+               <div className="flex justify-between items-center mb-6">
+                  <AppLogo />
+                  <button onClick={() => setMobileMenuOpen(false)}><X size={24} className="text-slate-400"/></button>
+               </div>
+               <nav className="flex-1 space-y-1">
+                   {menuItems.map((item) => {
+                        const active = item.path === '/dashboard' ? location.pathname === '/dashboard' : location.pathname.startsWith(item.path);
+                        return (
+                           <button 
+                             key={item.path}
+                             onClick={() => navigate(item.path)}
+                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${active ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-500 font-medium'}`}
+                           >
+                             <div className={active ? 'text-indigo-600' : 'text-slate-400'}>{item.icon}</div>
+                             <span>{item.label}</span>
+                           </button>
+                        );
+                   })}
+               </nav>
+               <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 font-bold mt-4">
+                  <LogOut size={20} /> Sair
+               </button>
+           </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Top Header */}
+        <header className="h-20 bg-white/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-200 px-4 md:px-8 flex items-center justify-between shrink-0">
+           <div className="flex items-center gap-4">
+               <button onClick={() => setMobileMenuOpen(true)} className="md:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+                   <Menu size={24}/>
+               </button>
+               <h1 className="text-xl font-bold text-slate-800 hidden md:block">
+                  {menuItems.find(i => location.pathname.startsWith(i.path) && (i.path !== '/dashboard' || location.pathname === '/dashboard'))?.label || 'Dashboard'}
+               </h1>
+           </div>
+
+           <div className="flex items-center gap-4">
+               <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors relative">
+                   <Bell size={20}/>
+                   <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+               </button>
+               <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+                   <div className="text-right hidden sm:block leading-tight">
+                       <p className="text-sm font-bold text-slate-800">{user.displayName || 'Comerciante'}</p>
+                       <p className="text-xs text-slate-500">{user.email}</p>
+                   </div>
+                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold border-2 border-white shadow-md text-sm">
+                       {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                   </div>
+               </div>
+           </div>
+        </header>
+
+        {/* Scrollable Content */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+           <div className="max-w-7xl mx-auto h-full">
+               <Routes>
+                  <Route path="/" element={<DashboardHome user={user} />} />
+                  <Route path="/orders" element={<OrdersManager user={user} />} />
+                  <Route path="/products" element={<ProductsManager user={user} />} />
+                  <Route path="/clients" element={<ClientsManager user={user} />} />
+                  <Route path="/store" element={<StoreEditor user={user} />} />
+                  <Route path="/whatsapp" element={<WhatsAppBot user={user} />} />
+               </Routes>
+           </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+const LandingPage = () => {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-slate-900 text-white font-sans selection:bg-indigo-500 selection:text-white">
+        <nav className="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
+            <AppLogo dark />
+            <div className="flex gap-4">
+                <button onClick={() => navigate('/login')} className="text-slate-300 hover:text-white font-bold text-sm transition-colors">Entrar</button>
+                <button onClick={() => navigate('/register')} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-indigo-600/20">Criar Conta</button>
+            </div>
+        </nav>
+
+        <div className="max-w-7xl mx-auto px-6 pt-20 pb-32 flex flex-col items-center text-center">
+             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-bold mb-8 uppercase tracking-widest animate-in fade-in zoom-in">
+                 <Sparkles size={12} /> Nova Versão 3.0 Alpha
+             </div>
+             
+             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 leading-tight animate-in slide-in-from-bottom-5 duration-700">
+                 O CRM que <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">vende por você.</span>
+             </h1>
+             
+             <p className="text-xl text-slate-400 max-w-2xl mb-12 leading-relaxed animate-in slide-in-from-bottom-5 duration-1000">
+                 Crie sua loja online, gerencie pedidos e use Inteligência Artificial para atender seus clientes no WhatsApp. Tudo em um só lugar.
+             </p>
+
+             <div className="flex flex-col sm:flex-row gap-4 w-full justify-center animate-in slide-in-from-bottom-5 duration-1000 delay-200">
+                 <button onClick={() => navigate('/register')} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold rounded-xl transition-all shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-2">
+                    <Rocket size={20} /> Começar Grátis
+                 </button>
+                 <button onClick={() => navigate('/login')} className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-lg font-bold rounded-xl transition-all flex items-center justify-center gap-2">
+                    <LayoutDashboard size={20} /> Acessar Painel
+                 </button>
+             </div>
+
+             <div className="mt-24 relative w-full max-w-5xl mx-auto group animate-in slide-in-from-bottom-10 duration-1000 delay-300">
+                 <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+                 <div className="relative bg-slate-950 rounded-xl border border-slate-800 shadow-2xl overflow-hidden aspect-[16/9] flex items-center justify-center">
+                      <div className="text-center">
+                          <div className="flex gap-2 justify-center mb-4">
+                            <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                            <div className="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/50"></div>
+                            <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                          </div>
+                          <LayoutDashboard size={64} className="mx-auto text-slate-800 mb-4"/>
+                          <p className="text-slate-600 font-medium">Dashboard Preview</p>
+                      </div>
+                 </div>
+             </div>
+        </div>
+    </div>
+  );
+};
+
 const AuthPage = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
@@ -1273,6 +1465,7 @@ const AuthPage = () => {
   );
 };
 
+// --- REPLACED PublicStore COMPONENT ---
 const PublicStore = () => {
   const { id } = useParams();
   const [config, setConfig] = useState<StoreConfig | null>(null);
@@ -1280,6 +1473,11 @@ const PublicStore = () => {
   const [cart, setCart] = useState<{product: Product, quantity: number}[]>([]);
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
+  
+  // New State for Order logic
+  const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', address: '', paymentMethod: 'pix' });
+  const [orderPlaced, setOrderPlaced] = useState<any | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
       const loadStore = async () => {
@@ -1292,6 +1490,8 @@ const PublicStore = () => {
               const pSnap = await getDocs(collection(db, `merchants/${id}/products`));
               const pList: Product[] = [];
               pSnap.forEach(d => pList.push({id: d.id, ...d.data()} as Product));
+              // Sort by orderIndex to respect merchant's arrangement
+              pList.sort((a, b) => (a.orderIndex ?? 9999) - (b.orderIndex ?? 9999));
               setProducts(pList);
           } catch(e) {
               console.error(e);
@@ -1319,16 +1519,69 @@ const PublicStore = () => {
 
   const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
 
-  const checkout = () => {
-      const message = `Olá! Gostaria de fazer um pedido:\n\n${cart.map(i => `${i.quantity}x ${i.product.name}`).join('\n')}\n\nTotal: R$ ${total.toFixed(2)}`;
-      
-      // Se o estabelecimento tem um WhatsApp configurado, usa ele.
-      if (config?.whatsapp) {
-          openWhatsApp(config.whatsapp, message);
-      } else {
-          // Fallback antigo: abre sem número (usuário escolhe)
-          window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
-      }
+  const handlePlaceOrder = async () => {
+    if (!customerInfo.name.trim() || !customerInfo.phone.trim()) {
+        alert("Por favor, informe seu nome e telefone/WhatsApp.");
+        return;
+    }
+    
+    setSubmitting(true);
+    
+    try {
+        const orderData = {
+            customerName: customerInfo.name,
+            customerPhone: customerInfo.phone,
+            customerEmail: '',
+            deliveryAddress: {
+                street: customerInfo.address,
+                number: 'N/A',
+                neighborhood: '',
+                city: '',
+                zip: '',
+                complement: ''
+            },
+            items: cart.map(item => ({
+                productId: item.product.id,
+                productName: item.product.name,
+                quantity: item.quantity,
+                price: item.product.price,
+                imageUrl: item.product.imageUrl || ''
+            })),
+            total: total,
+            status: 'new',
+            createdAt: serverTimestamp(),
+            paymentMethod: customerInfo.paymentMethod
+        };
+
+        const docRef = await addDoc(collection(db, `merchants/${id}/orders`), orderData);
+        setOrderPlaced({ id: docRef.id, ...orderData });
+        setCart([]); // Clear cart
+        // Cart stays open to show success screen
+    } catch (error) {
+        console.error("Error placing order:", error);
+        alert("Ocorreu um erro ao enviar o pedido. Tente novamente.");
+    } finally {
+        setSubmitting(false);
+    }
+  };
+
+  const finalizeOnWhatsApp = () => {
+    if (!orderPlaced) return;
+    
+    const message = `*Novo Pedido #${orderPlaced.id.slice(0,5)}* ✅\n\n` +
+        `👤 *Cliente:* ${orderPlaced.customerName}\n` +
+        `📱 *Contato:* ${orderPlaced.customerPhone}\n\n` +
+        `🛒 *Resumo:*\n` +
+        orderPlaced.items.map((i:any) => `${i.quantity}x ${i.productName}`).join('\n') +
+        `\n\n💰 *Total: R$ ${orderPlaced.total.toFixed(2)}*\n` +
+        `📍 *Endereço:* ${orderPlaced.deliveryAddress.street || 'Retirada/Não informado'}\n` +
+        `💳 *Pagamento:* ${orderPlaced.paymentMethod === 'pix' ? 'Pix' : orderPlaced.paymentMethod === 'card' ? 'Cartão' : 'Dinheiro'}`;
+
+    if (config?.whatsapp) {
+        openWhatsApp(config.whatsapp, message);
+    } else {
+        window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+    }
   };
 
   if (loading) return <LoadingSpinner />;
@@ -1336,7 +1589,7 @@ const PublicStore = () => {
 
   return (
       <div className="min-h-screen bg-white font-sans text-slate-900">
-          <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 shadow-sm">
+          <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 shadow-sm">
              <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                  <div className="flex items-center gap-3">
                      {config.logoUrl && <img src={config.logoUrl} className="w-8 h-8 rounded-full object-cover"/>}
@@ -1348,6 +1601,23 @@ const PublicStore = () => {
                  </button>
              </div>
           </header>
+
+          {/* BANNER SECTION - Added to match Editor Preview */}
+          <div className="relative w-full">
+              <div className="h-32 md:h-64 w-full bg-cover bg-center" style={{ 
+                  backgroundImage: config.bannerUrl ? `url(${config.bannerUrl})` : 'linear-gradient(to right, #ea1d2c, #b91c1c)',
+                  backgroundColor: config.themeColor 
+              }}></div>
+              <div className="max-w-7xl mx-auto px-4 relative -mt-12 md:-mt-16 mb-8 flex flex-col md:flex-row items-center md:items-end gap-4 z-10">
+                  <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-white shadow-lg overflow-hidden shrink-0">
+                      {config.logoUrl ? <img src={config.logoUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-300"><Store size={40}/></div>}
+                  </div>
+                  <div className="text-center md:text-left pb-2">
+                      <h1 className="font-bold text-3xl text-slate-900 leading-tight drop-shadow-sm">{config.storeName}</h1>
+                      {config.description && <p className="text-slate-600 font-medium mt-1 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full inline-block shadow-sm">{config.description}</p>}
+                  </div>
+              </div>
+          </div>
 
           {config.sections.map(section => {
               if (section.type === 'hero') return <HeroSection key={section.id} section={section} />;
@@ -1363,545 +1633,132 @@ const PublicStore = () => {
           {/* Shopping Cart Sidebar */}
           {cartOpen && (
               <div className="fixed inset-0 z-50 flex justify-end">
-                  <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setCartOpen(false)}></div>
+                  <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !orderPlaced && setCartOpen(false)}></div>
                   <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
-                      <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-                          <h3 className="font-bold text-lg">Seu Pedido</h3>
-                          <button onClick={() => setCartOpen(false)}><X size={24}/></button>
+                      
+                      {/* Header */}
+                      <div className="p-4 border-b flex justify-between items-center bg-slate-50 shrink-0">
+                          <h3 className="font-bold text-lg text-slate-800">{orderPlaced ? 'Pedido Confirmado' : 'Seu Pedido'}</h3>
+                          <button onClick={() => { setCartOpen(false); if(orderPlaced) setOrderPlaced(null); }} className="p-1 hover:bg-slate-200 rounded-full"><X size={24} className="text-slate-500"/></button>
                       </div>
-                      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                          {cart.map(item => (
-                              <div key={item.product.id} className="flex gap-4">
-                                  <div className="w-16 h-16 bg-slate-100 rounded-lg flex-shrink-0 overflow-hidden">
-                                     {item.product.imageUrl && <img src={item.product.imageUrl} className="w-full h-full object-cover"/>}
+
+                      {/* Content Area */}
+                      {orderPlaced ? (
+                          // SUCCESS VIEW
+                          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-6 overflow-y-auto">
+                              <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2 animate-in zoom-in duration-300">
+                                  <CheckCircle2 size={48} strokeWidth={3} />
+                              </div>
+                              <div>
+                                  <h2 className="text-2xl font-bold text-slate-800">Pedido Recebido!</h2>
+                                  <p className="text-slate-500 mt-2">A loja já recebeu seu pedido.</p>
+                                  <div className="inline-block bg-slate-100 px-3 py-1 rounded-full mt-2 font-mono text-sm font-bold text-slate-700">#{orderPlaced.id.slice(0,8)}</div>
+                              </div>
+                              
+                              <div className="w-full bg-slate-50 p-5 rounded-2xl text-left text-sm text-slate-600 space-y-3 border border-slate-100 shadow-sm">
+                                  <div className="flex justify-between border-b border-slate-200 pb-2 mb-2">
+                                      <span className="font-bold text-slate-700">Resumo</span>
+                                      <span>{orderPlaced.items.length} itens</span>
                                   </div>
-                                  <div className="flex-1">
-                                      <h4 className="font-bold text-sm">{item.product.name}</h4>
-                                      <p className="text-xs text-slate-500">Un: R$ {item.product.price.toFixed(2)}</p>
-                                      <div className="flex items-center justify-between mt-2">
-                                          <span className="font-bold">R$ {(item.product.price * item.quantity).toFixed(2)}</span>
-                                          <div className="flex items-center gap-2">
-                                              <button onClick={() => removeFromCart(item.product.id)} className="text-red-500 text-xs font-bold">Remover</button>
-                                              <span className="bg-slate-100 px-2 py-1 rounded text-xs font-bold">x{item.quantity}</span>
+                                  <p className="flex justify-between"><span>Subtotal:</span> <span className="font-bold">R$ {orderPlaced.total.toFixed(2)}</span></p>
+                                  <p className="flex justify-between"><span>Pagamento:</span> <span className="uppercase font-bold text-xs bg-white px-2 py-0.5 rounded border">{orderPlaced.paymentMethod}</span></p>
+                              </div>
+
+                              <div className="w-full space-y-3">
+                                  <button 
+                                      onClick={finalizeOnWhatsApp} 
+                                      className="w-full py-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-all shadow-lg hover:shadow-green-200 flex items-center justify-center gap-2 animate-pulse"
+                                  >
+                                      <MessageCircle size={24}/> Enviar Comprovante
+                                  </button>
+                                  <p className="text-xs text-slate-400">Envie o comprovante no WhatsApp para agilizar a entrega.</p>
+                              </div>
+                          </div>
+                      ) : (
+                          // CART & CHECKOUT VIEW
+                          <>
+                              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                  {cart.map(item => (
+                                      <div key={item.product.id} className="flex gap-4 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
+                                          <div className="w-16 h-16 bg-slate-100 rounded-lg flex-shrink-0 overflow-hidden">
+                                             {item.product.imageUrl && <img src={item.product.imageUrl} className="w-full h-full object-cover"/>}
+                                          </div>
+                                          <div className="flex-1">
+                                              <h4 className="font-bold text-sm text-slate-800 line-clamp-1">{item.product.name}</h4>
+                                              <p className="text-xs text-slate-500 mb-2">Unitário: R$ {item.product.price.toFixed(2)}</p>
+                                              <div className="flex items-center justify-between">
+                                                  <span className="font-bold text-indigo-600">R$ {(item.product.price * item.quantity).toFixed(2)}</span>
+                                                  <div className="flex items-center gap-3 bg-slate-50 rounded-lg px-2 py-1">
+                                                      <button onClick={() => removeFromCart(item.product.id)} className="text-red-500 font-bold hover:bg-white rounded px-1">-</button>
+                                                      <span className="text-xs font-bold w-4 text-center">{item.quantity}</span>
+                                                      <button onClick={() => addToCart(item.product)} className="text-green-600 font-bold hover:bg-white rounded px-1">+</button>
+                                                  </div>
+                                              </div>
                                           </div>
                                       </div>
-                                  </div>
+                                  ))}
+                                  {cart.length === 0 && (
+                                      <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                                          <ShoppingBag size={48} className="mb-4 opacity-20"/>
+                                          <p>Seu carrinho está vazio</p>
+                                      </div>
+                                  )}
                               </div>
-                          ))}
-                          {cart.length === 0 && <p className="text-center text-slate-500 py-10">Carrinho vazio</p>}
-                      </div>
-                      <div className="p-4 border-t bg-slate-50">
-                          <div className="flex justify-between items-center mb-4">
-                              <span className="font-bold text-slate-500">Total</span>
-                              <span className="font-bold text-xl text-indigo-600">R$ {total.toFixed(2)}</span>
-                          </div>
-                          <button onClick={checkout} disabled={cart.length === 0} className="w-full py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                              <MessageSquare size={20}/> Pedir no WhatsApp
-                          </button>
-                      </div>
+
+                              {cart.length > 0 && (
+                                  <div className="p-5 border-t bg-slate-50 space-y-4">
+                                      <div className="space-y-3">
+                                          <input 
+                                              className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                              placeholder="Seu Nome (Obrigatório)" 
+                                              value={customerInfo.name}
+                                              onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})}
+                                          />
+                                          <input 
+                                              className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                              placeholder="WhatsApp / Telefone (Obrigatório)" 
+                                              value={customerInfo.phone}
+                                              onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})}
+                                          />
+                                          <textarea 
+                                              className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none" 
+                                              placeholder="Endereço de Entrega (Rua, Número, Bairro...)" 
+                                              rows={2}
+                                              value={customerInfo.address}
+                                              onChange={e => setCustomerInfo({...customerInfo, address: e.target.value})}
+                                          />
+                                          <select 
+                                              className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                              value={customerInfo.paymentMethod}
+                                              onChange={e => setCustomerInfo({...customerInfo, paymentMethod: e.target.value})}
+                                          >
+                                              <option value="pix">Pagamento via Pix</option>
+                                              <option value="card">Cartão de Crédito/Débito (Maquininha)</option>
+                                              <option value="cash">Dinheiro</option>
+                                          </select>
+                                      </div>
+
+                                      <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                                          <span className="font-bold text-slate-500">Total a Pagar</span>
+                                          <span className="font-bold text-2xl text-slate-900">R$ {total.toFixed(2)}</span>
+                                      </div>
+                                      
+                                      <button 
+                                          onClick={handlePlaceOrder} 
+                                          disabled={submitting} 
+                                          className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
+                                      >
+                                          {submitting ? <Loader2 className="animate-spin"/> : <Check size={20}/>}
+                                          Finalizar Pedido
+                                      </button>
+                                  </div>
+                              )}
+                          </>
+                      )}
                   </div>
               </div>
           )}
       </div>
-  );
-};
-
-const AIAssistant = ({ user }: { user: User }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<{role: 'user' | 'model', text: string, imageUrl?: string}[]>([]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [assigningImage, setAssigningImage] = useState<string | null>(null);
-  const [targetProduct, setTargetProduct] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Fetch products for dropdown assignment
-  useEffect(() => {
-    if (user) {
-        const q = query(collection(db, `merchants/${user.uid}/products`));
-        getDocs(q).then(snapshot => {
-            const items: Product[] = [];
-            snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() } as Product));
-            setProducts(items);
-        });
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isOpen, assigningImage]);
-
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-    const newMsg = { role: 'user' as const, text: input };
-    setMessages(prev => [...prev, newMsg]);
-    setInput('');
-    setLoading(true);
-
-    try {
-      // Check if user wants an image
-      const lowerInput = input.toLowerCase();
-      const isImageRequest = lowerInput.includes('imagem') || lowerInput.includes('foto') || lowerInput.includes('desenhe') || lowerInput.includes('crie um');
-
-      if (isImageRequest) {
-          const response = await genAI.models.generateContent({
-              model: 'gemini-2.5-flash-image',
-              contents: { parts: [{ text: input }] }
-          });
-          
-          let imageUrl = '';
-          let text = '';
-
-          if (response.candidates?.[0]?.content?.parts) {
-            for (const part of response.candidates[0].content.parts) {
-                if (part.inlineData) {
-                    imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                } else if (part.text) {
-                    text += part.text;
-                }
-            }
-          }
-          
-          setMessages(prev => [...prev, { role: 'model', text: text || "Aqui está sua imagem:", imageUrl: imageUrl }]);
-      } else {
-          // Standard Text Chat
-          const history = messages.filter(m => !m.imageUrl).map(m => ({
-            role: m.role,
-            parts: [{ text: m.text }]
-          }));
-          
-          const response = await genAI.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: [...history, { role: 'user', parts: [{ text: newMsg.text }] }],
-            config: {
-                systemInstruction: "Você é um assistente virtual especialista em negócios e CRM. Ajude o usuário a gerenciar sua loja, analisar métricas e melhorar vendas. Seja curto e eficiente."
-            }
-          });
-
-          const reply = response.text || "Não consegui processar a resposta.";
-          setMessages(prev => [...prev, { role: 'model', text: reply }]);
-      }
-
-    } catch (error) {
-      console.error(error);
-      setMessages(prev => [...prev, { role: 'model', text: "Erro ao conectar com a IA. Tente novamente." }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const assignImageToProduct = async () => {
-      if (!assigningImage || !targetProduct) return;
-      
-      try {
-          await updateDoc(doc(db, `merchants/${user.uid}/products`, targetProduct), {
-              imageUrl: assigningImage
-          });
-          setMessages(prev => [...prev, { role: 'model', text: 'Imagem atualizada no produto com sucesso!' }]);
-          setAssigningImage(null);
-          setTargetProduct('');
-      } catch (e) {
-          alert("Erro ao salvar imagem no produto.");
-      }
-  };
-
-  return (
-    <>
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 p-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all z-50 group animate-in fade-in zoom-in"
-      >
-        {isOpen ? <X size={24}/> : (
-            <div className="relative">
-                <Bot size={28} className="animate-pulse"/>
-                <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
-                </span>
-            </div>
-        )}
-      </button>
-
-      {isOpen && (
-        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[500px] max-h-[70vh] bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
-           <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-4 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2 font-bold">
-                 <Bot size={20}/> Nova IA
-              </div>
-              <button onClick={() => setIsOpen(false)}><X size={18} className="opacity-70 hover:opacity-100"/></button>
-           </div>
-           
-           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 relative" ref={scrollRef}>
-              {messages.length === 0 && (
-                  <div className="text-center text-slate-400 mt-10">
-                      <Sparkles size={32} className="mx-auto mb-2 text-indigo-300"/>
-                      <p className="text-sm">Olá! Posso ajudar com vendas, ideias ou <span className="font-bold text-indigo-500">criar imagens</span> para seus produtos.</p>
-                  </div>
-              )}
-              {messages.map((m, i) => (
-                  <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                      {m.text && (
-                          <div className={`max-w-[85%] p-3 rounded-2xl text-sm mb-1 ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white text-slate-700 shadow-sm border border-slate-100 rounded-tl-sm'}`}>
-                              {m.text}
-                          </div>
-                      )}
-                      {m.imageUrl && (
-                          <div className="max-w-[85%] rounded-lg overflow-hidden border border-slate-200 shadow-sm mt-1 bg-white p-2">
-                              <img src={m.imageUrl} alt="Generated" className="w-full h-auto rounded" />
-                              <div className="flex gap-2 mt-2">
-                                  <a href={m.imageUrl} download="produto-ia.png" className="flex-1 text-center py-1 bg-slate-100 text-xs text-indigo-600 font-bold hover:bg-slate-200 rounded">Baixar</a>
-                                  <button onClick={() => setAssigningImage(m.imageUrl || null)} className="flex-1 py-1 bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 rounded">Usar em Produto</button>
-                              </div>
-                          </div>
-                      )}
-                  </div>
-              ))}
-              {loading && (
-                  <div className="flex justify-start">
-                      <div className="bg-white p-3 rounded-2xl rounded-tl-sm shadow-sm border border-slate-100">
-                          <Loader2 size={16} className="animate-spin text-indigo-500"/>
-                      </div>
-                  </div>
-              )}
-
-              {/* Assignment Overlay */}
-              {assigningImage && (
-                  <div className="absolute inset-0 bg-white/95 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 animate-in fade-in">
-                      <h4 className="font-bold text-slate-800 mb-4 text-center">Onde salvar esta imagem?</h4>
-                      <div className="w-24 h-24 mb-4 rounded border shadow-sm overflow-hidden">
-                          <img src={assigningImage} className="w-full h-full object-cover"/>
-                      </div>
-                      <select 
-                        className="w-full p-2 border rounded-lg text-sm mb-4"
-                        value={targetProduct}
-                        onChange={(e) => setTargetProduct(e.target.value)}
-                      >
-                          <option value="">Selecione um produto...</option>
-                          {products.map(p => (
-                              <option key={p.id} value={p.id}>{p.name}</option>
-                          ))}
-                      </select>
-                      <div className="flex gap-2 w-full">
-                          <button onClick={() => setAssigningImage(null)} className="flex-1 py-2 text-slate-500 text-sm font-bold border rounded hover:bg-slate-50">Cancelar</button>
-                          <button onClick={assignImageToProduct} disabled={!targetProduct} className="flex-1 py-2 bg-indigo-600 text-white text-sm font-bold rounded hover:bg-indigo-700 disabled:opacity-50">Salvar</button>
-                      </div>
-                  </div>
-              )}
-           </div>
-           
-           <div className="p-3 bg-white border-t border-slate-100 shrink-0 flex gap-2">
-              <input 
-                className="flex-1 bg-slate-100 border-none rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-100"
-                placeholder="Digite algo ou peça uma imagem..."
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && sendMessage()}
-              />
-              <button onClick={sendMessage} disabled={!input.trim() || loading} className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50">
-                  <Send size={20}/>
-              </button>
-           </div>
-        </div>
-      )}
-    </>
-  );
-};
-
-const DashboardHome = ({ user }: { user: User }) => {
-  const [loading, setLoading] = useState(true);
-  const [metrics, setMetrics] = useState({
-    salesToday: 0,
-    ordersToday: 0,
-    newClientsToday: 0,
-    avgTicketToday: 0,
-    weeklySales: [0,0,0,0,0,0,0],
-    monthlyRevenue: 0,
-    monthlyGoal: 20000,
-    recentOrders: [] as Order[],
-    lowStockProducts: [] as Product[],
-    topProducts: [] as {name: string, count: number}[]
-  });
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user) return;
-      
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(today.getDate() - 6);
-      sevenDaysAgo.setHours(0,0,0,0);
-
-      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-
-      // Orders Fetch
-      const ordersQ = query(collection(db, `merchants/${user.uid}/orders`), orderBy('createdAt', 'desc'));
-      const ordersSnap = await getDocs(ordersQ);
-      
-      let salesT = 0;
-      let ordersT = 0;
-      let monthlyRev = 0;
-      const weeklyData = [0,0,0,0,0,0,0]; 
-      const allOrders: Order[] = [];
-      const productCounts: Record<string, number> = {};
-
-      ordersSnap.forEach(doc => {
-        const data = doc.data();
-        const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || Date.now()); 
-        const total = data.total || 0;
-        const order = { id: doc.id, ...data } as Order;
-        allOrders.push(order);
-
-        // Count Products
-        if (order.items) {
-            order.items.forEach(item => {
-                productCounts[item.productName] = (productCounts[item.productName] || 0) + item.quantity;
-            });
-        }
-
-        if (date >= today) {
-           salesT += total;
-           ordersT += 1;
-        }
-
-        if (date >= firstDayOfMonth) {
-          monthlyRev += total;
-        }
-
-        if (date >= sevenDaysAgo) {
-           const dayDiff = Math.floor((date.getTime() - sevenDaysAgo.getTime()) / (1000 * 3600 * 24));
-           if (dayDiff >= 0 && dayDiff < 7) {
-             weeklyData[dayDiff] += total;
-           }
-        }
-      });
-
-      // Products Fetch (for low stock)
-      const productsQ = query(collection(db, `merchants/${user.uid}/products`));
-      const productsSnap = await getDocs(productsQ);
-      const lowStock: Product[] = [];
-      productsSnap.forEach(doc => {
-          const p = {id: doc.id, ...doc.data()} as Product;
-          if (p.stock < 5) lowStock.push(p);
-      });
-
-      // Clients Fetch
-      const clientsQ = query(collection(db, `merchants/${user.uid}/clients`));
-      const clientsSnap = await getDocs(clientsQ);
-      let newClientsT = 0;
-      clientsSnap.forEach(doc => {
-          const data = doc.data();
-          const date = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
-          if (date >= today) newClientsT++;
-      });
-
-      // Top Products Logic
-      const sortedProducts = Object.entries(productCounts)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 3)
-        .map(([name, count]) => ({name, count}));
-
-      setMetrics({
-        salesToday: salesT,
-        ordersToday: ordersT,
-        newClientsToday: newClientsT,
-        avgTicketToday: ordersT > 0 ? salesT / ordersT : 0,
-        weeklySales: weeklyData,
-        monthlyRevenue: monthlyRev,
-        monthlyGoal: 20000,
-        recentOrders: allOrders.slice(0, 5),
-        lowStockProducts: lowStock,
-        topProducts: sortedProducts
-      });
-      setLoading(false);
-    };
-
-    fetchData();
-  }, [user]);
-
-  if (loading) return <LoadingSpinner />;
-
-  return (
-    <div className="space-y-6 animate-in fade-in">
-        {/* Welcome Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-800">Olá, {user.displayName || 'Empreendedor'}</h2>
-                <p className="text-slate-500 text-sm">Aqui está o resumo do seu negócio hoje.</p>
-            </div>
-            <div className="flex gap-2 text-xs font-bold bg-white p-2 rounded-lg shadow-sm border border-slate-100">
-                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded">Hoje: {new Date().toLocaleDateString()}</span>
-            </div>
-        </div>
-
-        {/* Metrics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><DollarSign size={20}/></div>
-                    <span className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-full flex items-center gap-1"><TrendingUp size={12}/> Vendas</span>
-                </div>
-                <h3 className="text-2xl font-bold text-slate-800">R$ {metrics.salesToday.toFixed(2)}</h3>
-                <p className="text-xs text-slate-400 mt-1">Total vendido hoje</p>
-            </div>
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                    <div className="p-2 bg-violet-50 text-violet-600 rounded-lg"><ShoppingBag size={20}/></div>
-                    <span className="text-xs font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-full">Pedidos</span>
-                </div>
-                <h3 className="text-2xl font-bold text-slate-800">{metrics.ordersToday}</h3>
-                <p className="text-xs text-slate-400 mt-1">Pedidos realizados hoje</p>
-            </div>
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                 <div className="flex justify-between items-start mb-4">
-                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Users size={20}/></div>
-                    <span className="text-xs font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-full">Clientes</span>
-                </div>
-                <h3 className="text-2xl font-bold text-slate-800">{metrics.newClientsToday}</h3>
-                <p className="text-xs text-slate-400 mt-1">Novos clientes hoje</p>
-            </div>
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-                 <div className="flex justify-between items-start mb-4">
-                    <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><BarChart3 size={20}/></div>
-                    <span className="text-xs font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-full">Ticket Médio</span>
-                </div>
-                <h3 className="text-2xl font-bold text-slate-800">R$ {metrics.avgTicketToday.toFixed(2)}</h3>
-                <p className="text-xs text-slate-400 mt-1">Média por pedido</p>
-            </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Sales Chart */}
-            <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="font-bold text-slate-800 mb-6">Vendas da Semana</h3>
-                <div className="h-64 flex items-end justify-between gap-2">
-                     <SimpleBarChart data={metrics.weeklySales} />
-                </div>
-                <div className="flex justify-between mt-4 text-xs text-slate-400 font-medium px-2">
-                    <span>Há 7 dias</span>
-                    <span>Hoje</span>
-                </div>
-            </div>
-
-            {/* Top Products */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                <h3 className="font-bold text-slate-800 mb-6">Mais Vendidos</h3>
-                <div className="space-y-4">
-                    {metrics.topProducts.map((p, i) => (
-                        <div key={i} className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${i===0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{i+1}</span>
-                                <span className="text-sm font-medium text-slate-700">{p.name}</span>
-                            </div>
-                            <span className="text-sm font-bold text-slate-900">{p.count} un</span>
-                        </div>
-                    ))}
-                    {metrics.topProducts.length === 0 && <p className="text-slate-400 text-sm">Sem dados ainda.</p>}
-                </div>
-                
-                <div className="mt-8 pt-6 border-t border-slate-100">
-                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><AlertCircle size={16} className="text-amber-500"/> Estoque Baixo</h3>
-                    <div className="space-y-3">
-                         {metrics.lowStockProducts.slice(0, 3).map(p => (
-                             <div key={p.id} className="flex justify-between items-center text-sm">
-                                 <span className="text-slate-600 truncate max-w-[150px]">{p.name}</span>
-                                 <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded text-xs font-bold">{p.stock} restam</span>
-                             </div>
-                         ))}
-                         {metrics.lowStockProducts.length === 0 && <p className="text-emerald-500 text-sm font-medium flex items-center gap-1"><CheckCircle2 size={14}/> Estoque saudável</p>}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-  );
-};
-
-const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  const menuItems = [
-    { path: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Visão Geral', exact: true },
-    { path: '/dashboard/orders', icon: <ShoppingBag size={20} />, label: 'Pedidos' },
-    { path: '/dashboard/products', icon: <Package size={20} />, label: 'Produtos' },
-    { path: '/dashboard/clients', icon: <Users size={20} />, label: 'Clientes' },
-    { path: '/dashboard/store', icon: <Store size={20} />, label: 'Minha Loja' },
-    { path: '/dashboard/whatsapp', icon: <MessageCircle size={20} />, label: 'WhatsApp Bot' },
-  ];
-
-  const isActive = (path: string, exact = false) => {
-      if (exact) return location.pathname === path;
-      return location.pathname.startsWith(path);
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex">
-       {/* Mobile Sidebar Overlay */}
-       {sidebarOpen && <div className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)}></div>}
-
-       {/* Sidebar */}
-       <aside className={`fixed lg:sticky top-0 h-screen w-72 bg-white border-r border-slate-200 z-50 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-             <AppLogo collapsed={false} />
-             <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400"><X size={24}/></button>
-          </div>
-          
-          <nav className="p-4 space-y-2 overflow-y-auto h-[calc(100vh-80px)]">
-              {menuItems.map(item => (
-                  <button 
-                    key={item.path}
-                    onClick={() => { navigate(item.path); setSidebarOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${isActive(item.path, item.exact) ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
-                  >
-                      {item.icon}
-                      {item.label}
-                  </button>
-              ))}
-          </nav>
-
-          <div className="absolute bottom-0 w-full p-4 border-t border-slate-100 bg-white">
-              <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-medium">
-                  <LogOut size={20}/> Sair
-              </button>
-          </div>
-       </aside>
-
-       {/* Main Content */}
-       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-           <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 shrink-0">
-               <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-slate-500 hover:bg-slate-50 rounded-lg"><Menu size={24}/></button>
-               
-               <div className="flex-1"></div>
-
-               <div className="flex items-center gap-4">
-                   <a href={`/#/store/${user.uid}`} target="_blank" rel="noopener" className="hidden md:flex items-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors">
-                       <ExternalLink size={14}/> Ver Loja Online
-                   </a>
-                   <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
-                       {user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}
-                   </div>
-               </div>
-           </header>
-           
-           <div className="flex-1 overflow-y-auto p-4 lg:p-8 relative">
-               <Routes>
-                   <Route path="/" element={<DashboardHome user={user} />} />
-                   <Route path="/products" element={<ProductsManager user={user} />} />
-                   <Route path="/orders" element={<OrdersManager user={user} />} />
-                   <Route path="/clients" element={<ClientsManager user={user} />} />
-                   <Route path="/store" element={<StoreEditor user={user} />} />
-                   <Route path="/whatsapp" element={<WhatsAppBot user={user} />} />
-               </Routes>
-               <AIAssistant user={user} />
-           </div>
-       </main>
-    </div>
   );
 };
 

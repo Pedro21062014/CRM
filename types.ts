@@ -7,6 +7,7 @@ export interface Product {
   category: string;
   imageUrl?: string;
   stock: number;
+  orderIndex?: number;
   createdAt?: any;
   updatedAt?: any;
 }
@@ -77,6 +78,7 @@ export interface Order {
   createdAt: any;
   rating?: number; // 1 to 5
   review?: string;
+  paymentMethod?: string;
 }
 
 // Store Builder Types
