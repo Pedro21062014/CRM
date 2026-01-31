@@ -1278,11 +1278,16 @@ const PublicStore = () => {
           }
       };
       
-      // Load local history
+      // Load local history safely
       if (id) {
           const stored = localStorage.getItem(`my_orders_${id}`);
           if (stored) {
-              setLocalOrders(JSON.parse(stored));
+              try {
+                  setLocalOrders(JSON.parse(stored));
+              } catch (e) {
+                  console.error("Failed to parse history", e);
+                  setLocalOrders([]);
+              }
           }
       }
 
@@ -1341,7 +1346,8 @@ const PublicStore = () => {
         };
 
         const docRef = await addDoc(collection(db, `merchants/${id}/orders`), orderData);
-        const fullOrder = { id: docRef.id, ...orderData, createdAt: new Date().toISOString() }; // Use ISO string for local storage
+        // Explicitly set createdAt as string for local state to avoid serialization issues
+        const fullOrder = { id: docRef.id, ...orderData, createdAt: new Date().toISOString() }; 
         
         setOrderPlaced(fullOrder);
         setCart([]); // Clear cart
@@ -1445,34 +1451,39 @@ const PublicStore = () => {
                                   <p>Nenhum pedido recente encontrado.</p>
                               </div>
                           )}
-                          {localOrders.map((order, idx) => (
-                              <div key={idx} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                                  <div className="flex justify-between items-center mb-2">
-                                      <span className="font-bold text-sm">#{order.id.slice(0, 8)}</span>
-                                      <span className="text-xs text-slate-400">{new Date(order.createdAt).toLocaleDateString()}</span>
-                                  </div>
-                                  <div className="space-y-1 mb-3">
-                                      {order.items.map((item: any, i: number) => (
-                                          <div key={i} className="text-xs text-slate-600 flex justify-between">
-                                              <span>{item.quantity}x {item.productName}</span>
-                                          </div>
-                                      ))}
-                                  </div>
-                                  <div className="flex justify-between items-center pt-2 border-t border-slate-50">
-                                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                          order.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                          order.status === 'processing' ? 'bg-amber-100 text-amber-700' :
-                                          order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                          'bg-blue-100 text-blue-700'
-                                      }`}>
-                                          {order.status === 'new' ? 'Aguardando' : 
-                                           order.status === 'processing' ? 'Preparando' :
-                                           order.status === 'completed' ? 'Entregue' : 'Cancelado'}
-                                      </span>
-                                      <span className="font-bold text-indigo-600 text-sm">R$ {order.total.toFixed(2)}</span>
-                                  </div>
-                              </div>
-                          ))}
+                          {localOrders.map((order, idx) => {
+                              if (!order) return null;
+                              return (
+                                <div key={idx} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-bold text-sm">#{order.id?.slice(0, 8) || 'ID'}</span>
+                                        <span className="text-xs text-slate-400">
+                                            {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Data N/A'}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-1 mb-3">
+                                        {order.items?.map((item: any, i: number) => (
+                                            <div key={i} className="text-xs text-slate-600 flex justify-between">
+                                                <span>{item.quantity}x {item.productName}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-between items-center pt-2 border-t border-slate-50">
+                                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                                            order.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                            order.status === 'processing' ? 'bg-amber-100 text-amber-700' :
+                                            order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                            'bg-blue-100 text-blue-700'
+                                        }`}>
+                                            {order.status === 'new' ? 'Aguardando' : 
+                                            order.status === 'processing' ? 'Preparando' :
+                                            order.status === 'completed' ? 'Entregue' : 'Cancelado'}
+                                        </span>
+                                        <span className="font-bold text-indigo-600 text-sm">R$ {(order.total || 0).toFixed(2)}</span>
+                                    </div>
+                                </div>
+                              );
+                          })}
                       </div>
                   </div>
               </div>
@@ -1625,7 +1636,13 @@ const DashboardOverview = ({ user }: { user: User }) => {
                 const productsSnap = await getDocs(collection(db, `merchants/${user.uid}/products`));
                 
                 let revenue = 0;
-                ordersSnap.forEach(d => revenue += (d.data().total || 0));
+                ordersSnap.forEach(d => {
+                    const data = d.data();
+                    // Exclude cancelled orders for real revenue
+                    if (data.status !== 'cancelled') {
+                        revenue += (data.total || 0);
+                    }
+                });
 
                 setStats({
                     orders: ordersSnap.size,
@@ -1656,8 +1673,10 @@ const DashboardOverview = ({ user }: { user: User }) => {
                     <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                         <DollarSign size={64} className="text-green-500"/>
                     </div>
-                    <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">Faturamento Total</span>
-                    <span className="text-3xl font-bold text-slate-800">R$ {stats.revenue.toFixed(2)}</span>
+                    <span className="text-slate-500 font-bold text-xs uppercase tracking-wider">Faturamento Real</span>
+                    <span className="text-3xl font-bold text-slate-800">
+                        {stats.revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
                     <div className="w-full bg-green-100 h-1 rounded-full mt-2"><div className="w-[70%] bg-green-500 h-full rounded-full"></div></div>
                 </div>
 
