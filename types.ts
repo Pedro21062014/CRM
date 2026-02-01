@@ -93,6 +93,7 @@ export interface StoreSection {
   backgroundColor?: string;
   textColor?: string;
   layout?: 'grid' | 'list'; // For products
+  filterCategory?: string; // NEW: To filter products by category in the grid
 }
 
 export interface WhatsAppConfig {

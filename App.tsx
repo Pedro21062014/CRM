@@ -11,7 +11,7 @@ import {
 } from 'firebase/auth';
 
 import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit, runTransaction, writeBatch } from 'firebase/firestore';
-import { GoogleGenAI, Type, FunctionDeclaration, Schema } from "@google/genai";
+import { GoogleGenAI, Type, Schema } from "@google/genai";
 import XLSX from 'xlsx-js-style';
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, Store, Settings, 
@@ -809,8 +809,9 @@ const StoreEditor = ({ user }: { user: User }) => {
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [aiLoading, setAiLoading] = useState(false);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
-  const [previewProducts, setPreviewProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
 
   useEffect(() => {
@@ -829,11 +830,11 @@ const StoreEditor = ({ user }: { user: User }) => {
           });
         }
         
-        const pQuery = query(collection(db, `merchants/${user.uid}/products`), limit(4));
+        const pQuery = query(collection(db, `merchants/${user.uid}/products`));
         const pSnap = await getDocs(pQuery);
         const pList: Product[] = [];
         pSnap.forEach(d => pList.push({id: d.id, ...d.data()} as Product));
-        setPreviewProducts(pList);
+        setProducts(pList);
       } catch(e) {
         console.error(e);
       } finally {
@@ -881,6 +882,131 @@ const StoreEditor = ({ user }: { user: User }) => {
     }
   };
 
+  const handleAiOrganize = async () => {
+    if (products.length === 0) {
+      alert("Você precisa cadastrar produtos primeiro para a IA organizar sua loja!");
+      return;
+    }
+
+    if (!confirm("Isso irá substituir o layout atual da sua loja. Deseja continuar?")) return;
+
+    setAiLoading(true);
+    try {
+      // 1. Prepare data for the model
+      const productList = products.map(p => ({
+        name: p.name,
+        category: p.category,
+        price: p.price,
+        description: p.description
+      }));
+      
+      const existingCategories = Array.from(new Set(products.map(p => p.category)));
+
+      // 2. Define strict schema for StoreConfig structure
+      const schema: Schema = {
+        type: Type.OBJECT,
+        properties: {
+          themeColor: { type: Type.STRING, description: "A main hex color that fits the products vibe" },
+          description: { type: Type.STRING, description: "A catchy short description or slogan for the store" },
+          sections: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                type: { type: Type.STRING, enum: ["hero", "products", "text"] },
+                title: { type: Type.STRING },
+                content: { type: Type.STRING },
+                backgroundColor: { type: Type.STRING },
+                textColor: { type: Type.STRING },
+                filterCategory: { 
+                  type: Type.STRING, 
+                  description: "The EXACT category name to filter products by, or null/empty for all products.",
+                  nullable: true
+                },
+                imageUrl: { type: Type.STRING, nullable: true }
+              },
+              required: ["type", "title", "backgroundColor", "textColor"]
+            }
+          }
+        },
+        required: ["themeColor", "sections", "description"]
+      };
+
+      // 3. Call Gemini
+      const response = await genAI.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [
+            {
+                role: 'user',
+                parts: [{ 
+                    text: `
+                    You are an expert Visual Merchandiser and Web Designer. 
+                    Reorganize my online store to look beautiful, professional, and sales-optimized.
+                    
+                    My Store Name: "${config.storeName}"
+                    My Products: ${JSON.stringify(productList)}
+                    Existing Product Categories: ${JSON.stringify(existingCategories)}
+
+                    INSTRUCTIONS:
+                    1. Create a "hero" section with a welcoming title and subtitle.
+                    2. Create separate "products" sections for different categories (e.g., "Best Burgers", "Refreshing Drinks").
+                       - IMPORTANT: Use the 'filterCategory' field to specify which product category goes in which section.
+                       - Use EXACTLY the category names from the provided product list.
+                    3. Choose a beautiful color palette (themeColor, section backgrounds) that fits the products (e.g., warm for food, clean for tech).
+                    4. Add a "text" section if you think a marketing message would help.
+                    5. Ensure text contrasts well with backgrounds.
+                    ` 
+                }]
+            }
+        ],
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: schema
+        }
+      });
+
+      // 4. Parse and Apply
+      let jsonString = response.text;
+      
+      // Cleanup markdown if present (just in case)
+      if (jsonString && jsonString.startsWith('```')) {
+        jsonString = jsonString.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+
+      if (jsonString) {
+          const aiConfig = JSON.parse(jsonString);
+          
+          // Map AI sections to valid StoreSection objects with IDs
+          const newSections: StoreSection[] = aiConfig.sections.map((s: any) => ({
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              type: s.type,
+              title: s.title,
+              content: s.content || '',
+              backgroundColor: s.backgroundColor,
+              textColor: s.textColor,
+              filterCategory: s.filterCategory || undefined,
+              imageUrl: s.imageUrl || undefined
+          }));
+
+          setConfig(prev => ({
+              ...prev,
+              themeColor: aiConfig.themeColor || prev.themeColor,
+              description: aiConfig.description || prev.description,
+              sections: newSections
+          }));
+          alert("Layout organizado com sucesso! Clique em 'Salvar' se gostou do resultado.");
+      } else {
+        throw new Error("Resposta vazia da IA");
+      }
+
+    } catch (error: any) {
+      console.error("AI Error:", error);
+      alert(`Ocorreu um erro ao organizar a loja: ${error.message}`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   // Drag and Drop Handlers
   const handleDragStart = (e: React.DragEvent, index: number) => {
       setDraggedItem(index);
@@ -911,7 +1037,16 @@ const StoreEditor = ({ user }: { user: User }) => {
     <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100 shrink-0 gap-4">
         <div><h2 className="text-xl font-bold text-slate-800">Editor Visual</h2></div>
-        <div className="flex gap-3 w-full md:w-auto">
+        <div className="flex flex-wrap gap-3 w-full md:w-auto">
+          <button 
+             onClick={handleAiOrganize}
+             disabled={aiLoading}
+             className="flex-1 md:flex-none px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold rounded-lg hover:from-indigo-600 hover:to-violet-600 shadow-md transition-all flex items-center gap-2 text-sm disabled:opacity-70 animate-in fade-in"
+          >
+             {aiLoading ? <Loader2 className="animate-spin" size={16}/> : <Sparkles size={16} fill="currentColor" className="text-yellow-200"/>}
+             {aiLoading ? 'Organizando...' : 'Organizar com IA'}
+          </button>
+          
           <a href={publicLink} target="_blank" rel="noopener noreferrer" className="flex-1 md:flex-none justify-center px-4 py-2 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 text-sm">
             <ExternalLink size={14} /> Ver Loja
           </a>
@@ -974,6 +1109,26 @@ const StoreEditor = ({ user }: { user: User }) => {
                                   const s = config.sections.find(sect => sect.id === activeSectionId)!;
                                   return (
                                     <>
+                                        {/* Filter for Product Grid */}
+                                        {s.type === 'products' && (
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase">Filtrar por Categoria</label>
+                                                <input 
+                                                    list="cat-filter-list"
+                                                    className="w-full p-2 border rounded text-xs bg-white mt-1" 
+                                                    value={s.filterCategory || ''} 
+                                                    onChange={e => updateSection(s.id, {filterCategory: e.target.value})} 
+                                                    placeholder="Todas as categorias"
+                                                />
+                                                <datalist id="cat-filter-list">
+                                                    {Array.from(new Set(products.map(p => p.category))).map(c => (
+                                                        <option key={c} value={c} />
+                                                    ))}
+                                                </datalist>
+                                                <p className="text-[10px] text-slate-400 mt-1">Deixe vazio para mostrar tudo.</p>
+                                            </div>
+                                        )}
+
                                         {(s.type === 'hero' || s.type === 'image') && (
                                             <div>
                                                 <label className="text-[10px] font-bold text-slate-500 uppercase">Imagem de Fundo (URL)</label>
@@ -1013,7 +1168,7 @@ const StoreEditor = ({ user }: { user: User }) => {
         <div className="w-full lg:w-2/3 bg-slate-100 rounded-2xl border border-slate-200 flex items-center justify-center p-4 md:p-8 relative overflow-hidden min-h-[500px]">
             <div className="absolute top-4 left-4 text-xs font-bold text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded shadow-sm">Editor Visual Interativo</div>
             
-            <div className="w-full max-w-[480px] h-[700px] bg-white rounded-[40px] shadow-2xl border-[8px] border-slate-800 overflow-hidden relative flex flex-col mx-auto">
+            <div className="w-full max-w-[480px] h-[80vh] max-h-[700px] bg-white rounded-[40px] shadow-2xl border-[8px] border-slate-800 overflow-hidden relative flex flex-col mx-auto">
                 {/* Phone Top Bar */}
                 <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-slate-800 rounded-b-2xl z-20"></div>
                 
@@ -1073,7 +1228,7 @@ const StoreEditor = ({ user }: { user: User }) => {
                                 {section.type === 'products' && (
                                     <ProductGridSection 
                                         section={section} 
-                                        products={previewProducts} 
+                                        products={products} // Pass ALL products, the component filters internally
                                         isEditable={true} 
                                         isActive={activeSectionId === section.id}
                                         onClick={() => setActiveSectionId(section.id)}
@@ -1106,52 +1261,108 @@ const StoreEditor = ({ user }: { user: User }) => {
 const LandingPage = () => {
   const navigate = useNavigate();
   return (
-    <div className="min-h-screen bg-slate-900 text-white font-sans selection:bg-indigo-500 selection:text-white">
-        <nav className="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
-            <AppLogo dark />
-            <div className="flex gap-4">
-                <button onClick={() => navigate('/login')} className="text-slate-300 hover:text-white font-bold text-sm transition-colors">Entrar</button>
-                <button onClick={() => navigate('/register')} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-indigo-600/20">Criar Conta</button>
-            </div>
+    <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
+        <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
+           <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
+             <AppLogo />
+             <div className="flex gap-4">
+                 <button onClick={() => navigate('/login')} className="text-slate-600 hover:text-indigo-600 font-bold text-sm transition-colors">Entrar</button>
+                 <button onClick={() => navigate('/register')} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20">Criar Conta</button>
+             </div>
+           </div>
         </nav>
 
-        <div className="max-w-7xl mx-auto px-6 pt-20 pb-32 flex flex-col items-center text-center">
-             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-bold mb-8 uppercase tracking-widest animate-in fade-in zoom-in">
-                 <Sparkles size={12} /> Nova Versão 3.0 Alpha
-             </div>
+        {/* Hero Section */}
+        <div className="relative pt-20 pb-32 overflow-hidden">
+             {/* Background Decoration */}
+             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full z-0 opacity-40 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 0%, #e0e7ff 0%, transparent 60%)' }}></div>
              
-             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 leading-tight animate-in slide-in-from-bottom-5 duration-700">
-                 O CRM que <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">vende por você.</span>
-             </h1>
-             
-             <p className="text-xl text-slate-400 max-w-2xl mb-12 leading-relaxed animate-in slide-in-from-bottom-5 duration-1000">
-                 Crie sua loja online, gerencie pedidos e use Inteligência Artificial para atender seus clientes no WhatsApp. Tudo em um só lugar.
-             </p>
+             <div className="relative z-10 max-w-7xl mx-auto px-6 text-center">
+                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 text-xs font-bold mb-8 uppercase tracking-widest animate-in fade-in zoom-in">
+                     <Sparkles size={12} fill="currentColor" /> Nova Versão 3.0 Alpha
+                 </div>
+                 
+                 <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 leading-tight text-slate-900 animate-in slide-in-from-bottom-5 duration-700">
+                     O CRM que <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">vende por você.</span>
+                 </h1>
+                 
+                 <p className="text-xl text-slate-500 max-w-2xl mx-auto mb-12 leading-relaxed animate-in slide-in-from-bottom-5 duration-1000">
+                     Crie sua loja online, gerencie pedidos e use Inteligência Artificial para atender seus clientes no WhatsApp. Tudo em um só lugar.
+                 </p>
 
-             <div className="flex flex-col sm:flex-row gap-4 w-full justify-center animate-in slide-in-from-bottom-5 duration-1000 delay-200">
-                 <button onClick={() => navigate('/register')} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold rounded-xl transition-all shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-2">
-                    <Rocket size={20} /> Começar Grátis
-                 </button>
-                 <button onClick={() => navigate('/login')} className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-lg font-bold rounded-xl transition-all flex items-center justify-center gap-2">
-                    <LayoutDashboard size={20} /> Acessar Painel
-                 </button>
-             </div>
+                 <div className="flex flex-col sm:flex-row gap-4 w-full justify-center animate-in slide-in-from-bottom-5 duration-1000 delay-200">
+                     <button onClick={() => navigate('/register')} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold rounded-xl transition-all shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-2 hover:-translate-y-1">
+                        <Rocket size={20} /> Começar Grátis
+                     </button>
+                     <button onClick={() => navigate('/login')} className="px-8 py-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-lg font-bold rounded-xl transition-all flex items-center justify-center gap-2 hover:shadow-md">
+                        <LayoutDashboard size={20} /> Acessar Painel
+                     </button>
+                 </div>
 
-             <div className="mt-24 relative w-full max-w-5xl mx-auto group animate-in slide-in-from-bottom-10 duration-1000 delay-300">
-                 <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
-                 <div className="relative bg-slate-950 rounded-xl border border-slate-800 shadow-2xl overflow-hidden aspect-[16/9] flex items-center justify-center">
-                      <div className="text-center">
-                          <div className="flex gap-2 justify-center mb-4">
-                            <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
-                            <div className="w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/50"></div>
-                            <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                 {/* Browser Mockup */}
+                 <div className="mt-24 relative w-full max-w-5xl mx-auto group animate-in slide-in-from-bottom-10 duration-1000 delay-300">
+                     <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-3xl blur opacity-10 group-hover:opacity-20 transition duration-1000"></div>
+                     <div className="relative bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden aspect-[16/9] flex flex-col">
+                          {/* Fake Browser Toolbar */}
+                          <div className="h-10 bg-slate-50 border-b border-slate-100 flex items-center px-4 gap-2">
+                             <div className="flex gap-1.5">
+                                <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                                <div className="w-3 h-3 rounded-full bg-amber-400"></div>
+                                <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
+                             </div>
+                             <div className="flex-1 mx-4 h-6 bg-white border border-slate-200 rounded-md shadow-sm"></div>
                           </div>
-                          <LayoutDashboard size={64} className="mx-auto text-slate-800 mb-4"/>
-                          <p className="text-slate-600 font-medium">Dashboard Preview</p>
-                      </div>
+                          
+                          {/* Dashboard Mock Content */}
+                          <div className="flex-1 bg-slate-50 p-6 flex flex-col items-center justify-center text-slate-400">
+                              <LayoutDashboard size={64} className="mb-4 text-indigo-100"/>
+                              <div className="grid grid-cols-3 gap-4 w-full max-w-3xl opacity-50 blur-[1px]">
+                                  <div className="h-32 bg-white rounded-xl shadow-sm border border-slate-200"></div>
+                                  <div className="h-32 bg-white rounded-xl shadow-sm border border-slate-200"></div>
+                                  <div className="h-32 bg-white rounded-xl shadow-sm border border-slate-200"></div>
+                                  <div className="col-span-2 h-48 bg-white rounded-xl shadow-sm border border-slate-200"></div>
+                                  <div className="h-48 bg-white rounded-xl shadow-sm border border-slate-200"></div>
+                              </div>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="bg-white/90 backdrop-blur px-6 py-2 rounded-full shadow-lg border border-slate-100 font-bold text-slate-800 text-sm">Dashboard Interativo</span>
+                              </div>
+                          </div>
+                     </div>
                  </div>
              </div>
         </div>
+
+        {/* Features Section */}
+        <section className="py-24 bg-slate-50 border-t border-slate-100">
+            <div className="max-w-7xl mx-auto px-6">
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl font-bold text-slate-900 mb-4">Tudo o que você precisa</h2>
+                    <p className="text-slate-500 max-w-xl mx-auto">Ferramentas poderosas para alavancar suas vendas sem complexidade.</p>
+                </div>
+                <div className="grid md:grid-cols-3 gap-8">
+                    {[
+                        { icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-50", title: "Loja Virtual", desc: "Crie seu catálogo online em minutos e receba pedidos no WhatsApp." },
+                        { icon: MessageCircle, color: "text-emerald-600", bg: "bg-emerald-50", title: "Automação WhatsApp", desc: "Integração oficial para recuperar carrinhos e enviar promoções." },
+                        { icon: BarChart3, color: "text-indigo-600", bg: "bg-indigo-50", title: "CRM Inteligente", desc: "Gestão completa de clientes com funil de vendas e IA." }
+                    ].map((feature, i) => (
+                        <div key={i} className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                            <div className={`w-12 h-12 ${feature.bg} ${feature.color} rounded-xl flex items-center justify-center mb-6`}>
+                                <feature.icon size={24} />
+                            </div>
+                            <h3 className="font-bold text-xl text-slate-900 mb-2">{feature.title}</h3>
+                            <p className="text-slate-500 leading-relaxed">{feature.desc}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+
+        <footer className="py-12 bg-white border-t border-slate-100 text-center">
+            <div className="flex justify-center mb-4 opacity-50 grayscale hover:grayscale-0 transition-all">
+                <AppLogo />
+            </div>
+            <p className="text-slate-400 text-sm">© {new Date().getFullYear()} NovaCRM. Todos os direitos reservados.</p>
+        </footer>
     </div>
   );
 };
@@ -1389,19 +1600,19 @@ const PublicStore = () => {
 
   return (
       <div className="min-h-screen bg-white font-sans text-slate-900">
-          <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 shadow-sm">
+          <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 shadow-sm transition-all">
              <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-                 <div className="flex items-center gap-3">
-                     {config.logoUrl && <img src={config.logoUrl} className="w-8 h-8 rounded-full object-cover"/>}
-                     <span className="font-bold text-lg">{config.storeName}</span>
+                 <div className="flex items-center gap-3 overflow-hidden">
+                     {config.logoUrl && <img src={config.logoUrl} className="w-9 h-9 rounded-full object-cover border border-slate-100 shadow-sm shrink-0"/>}
+                     <span className="font-bold text-lg truncate text-slate-900">{config.storeName}</span>
                  </div>
-                 <div className="flex gap-2">
-                     <button onClick={() => setHistoryOpen(true)} className="p-2 hover:bg-slate-100 rounded-full relative" title="Meus Pedidos">
-                         <History size={24} className="text-slate-600"/>
+                 <div className="flex gap-2 shrink-0">
+                     <button onClick={() => setHistoryOpen(true)} className="p-2.5 hover:bg-slate-100 rounded-full text-slate-600 transition-colors" aria-label="Histórico">
+                         <History size={22} />
                      </button>
-                     <button onClick={() => setCartOpen(true)} className="relative p-2 hover:bg-slate-100 rounded-full">
-                         <ShoppingBag size={24} className="text-slate-600"/>
-                         {cart.length > 0 && <span className="absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full font-bold">{cart.reduce((a,b)=>a+b.quantity,0)}</span>}
+                     <button onClick={() => setCartOpen(true)} className="relative p-2.5 hover:bg-slate-100 rounded-full text-slate-600 transition-colors" aria-label="Carrinho">
+                         <ShoppingBag size={22} />
+                         {cart.length > 0 && <span className="absolute top-0.5 right-0.5 bg-red-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-sm ring-2 ring-white">{cart.reduce((a,b)=>a+b.quantity,0)}</span>}
                      </button>
                  </div>
              </div>
@@ -1409,17 +1620,19 @@ const PublicStore = () => {
 
           {/* BANNER SECTION - Centered */}
           <div className="relative w-full">
-              <div className="h-32 md:h-64 w-full bg-cover bg-center" style={{ 
+              <div className="h-40 md:h-72 w-full bg-cover bg-center transition-all duration-500" style={{ 
                   backgroundImage: config.bannerUrl ? `url(${config.bannerUrl})` : 'linear-gradient(to right, #ea1d2c, #b91c1c)',
                   backgroundColor: config.themeColor 
-              }}></div>
-              <div className="max-w-7xl mx-auto px-4 relative -mt-12 md:-mt-16 mb-8 flex flex-col items-center gap-4 z-10 text-center">
-                  <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-white bg-white shadow-lg overflow-hidden shrink-0 flex items-center justify-center">
-                      {config.logoUrl ? <img src={config.logoUrl} className="w-full h-full object-cover"/> : <div className="text-slate-300"><Store size={40}/></div>}
+              }}>
+                <div className="absolute inset-0 bg-black/10"></div>
+              </div>
+              <div className="max-w-7xl mx-auto px-4 relative -mt-16 md:-mt-20 mb-10 flex flex-col items-center gap-4 z-10 text-center">
+                  <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-[6px] border-white bg-white shadow-xl overflow-hidden shrink-0 flex items-center justify-center transition-all duration-300">
+                      {config.logoUrl ? <img src={config.logoUrl} className="w-full h-full object-cover"/> : <div className="text-slate-300"><Store size={48}/></div>}
                   </div>
-                  <div className="pb-2">
-                      <h1 className="font-bold text-3xl text-slate-900 leading-tight drop-shadow-sm">{config.storeName}</h1>
-                      {config.description && <p className="text-slate-600 font-medium mt-1 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full inline-block shadow-sm">{config.description}</p>}
+                  <div className="pb-2 max-w-2xl px-2">
+                      <h1 className="font-bold text-3xl md:text-4xl text-slate-900 leading-tight drop-shadow-sm mb-2 break-words">{config.storeName}</h1>
+                      {config.description && <p className="text-slate-600 font-medium bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full inline-block shadow-sm text-sm md:text-base border border-slate-100/50 break-words">{config.description}</p>}
                   </div>
               </div>
           </div>
@@ -1538,19 +1751,19 @@ const PublicStore = () => {
                           <>
                               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                                   {cart.map(item => (
-                                      <div key={item.product.id} className="flex gap-4 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
+                                      <div key={item.product.id} className="flex gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
                                           <div className="w-16 h-16 bg-slate-100 rounded-lg flex-shrink-0 overflow-hidden">
                                              {item.product.imageUrl && <img src={item.product.imageUrl} className="w-full h-full object-cover"/>}
                                           </div>
-                                          <div className="flex-1">
-                                              <h4 className="font-bold text-sm text-slate-800 line-clamp-1">{item.product.name}</h4>
+                                          <div className="flex-1 min-w-0">
+                                              <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1">{item.product.name}</h4>
                                               <p className="text-xs text-slate-500 mb-2">Unitário: R$ {item.product.price.toFixed(2)}</p>
                                               <div className="flex items-center justify-between">
                                                   <span className="font-bold text-indigo-600">R$ {(item.product.price * item.quantity).toFixed(2)}</span>
                                                   <div className="flex items-center gap-3 bg-slate-50 rounded-lg px-2 py-1">
-                                                      <button onClick={() => removeFromCart(item.product.id)} className="text-red-500 font-bold hover:bg-white rounded px-1">-</button>
+                                                      <button onClick={() => removeFromCart(item.product.id)} className="text-red-500 font-bold hover:bg-white rounded px-1 w-6 h-6 flex items-center justify-center">-</button>
                                                       <span className="text-xs font-bold w-4 text-center">{item.quantity}</span>
-                                                      <button onClick={() => addToCart(item.product)} className="text-green-600 font-bold hover:bg-white rounded px-1">+</button>
+                                                      <button onClick={() => addToCart(item.product)} className="text-green-600 font-bold hover:bg-white rounded px-1 w-6 h-6 flex items-center justify-center">+</button>
                                                   </div>
                                               </div>
                                           </div>
@@ -1568,26 +1781,27 @@ const PublicStore = () => {
                                   <div className="p-5 border-t bg-slate-50 space-y-4">
                                       <div className="space-y-3">
                                           <input 
-                                              className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                              className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none" 
                                               placeholder="Seu Nome (Obrigatório)" 
                                               value={customerInfo.name}
                                               onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})}
                                           />
                                           <input 
-                                              className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                              className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none" 
                                               placeholder="WhatsApp / Telefone (Obrigatório)" 
                                               value={customerInfo.phone}
                                               onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})}
+                                              type="tel"
                                           />
                                           <textarea 
-                                              className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none" 
+                                              className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none resize-none" 
                                               placeholder="Endereço de Entrega (Rua, Número, Bairro...)" 
                                               rows={2}
                                               value={customerInfo.address}
                                               onChange={e => setCustomerInfo({...customerInfo, address: e.target.value})}
                                           />
                                           <select 
-                                              className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                              className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
                                               value={customerInfo.paymentMethod}
                                               onChange={e => setCustomerInfo({...customerInfo, paymentMethod: e.target.value})}
                                           >
