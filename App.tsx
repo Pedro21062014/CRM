@@ -1467,6 +1467,9 @@ const PublicStore = () => {
   const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', address: '', paymentMethod: 'pix' });
   const [orderPlaced, setOrderPlaced] = useState<any | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  
+  // 2-Step Checkout State
+  const [checkoutStep, setCheckoutStep] = useState<1 | 2>(1);
 
   useEffect(() => {
       const loadStore = async () => {
@@ -1514,6 +1517,7 @@ const PublicStore = () => {
           return [...prev, { product, quantity: 1 }];
       });
       setCartOpen(true);
+      setCheckoutStep(1); // Ensure we start at step 1 when adding
   };
 
   const removeFromCart = (productId: string) => {
@@ -1562,6 +1566,7 @@ const PublicStore = () => {
         
         setOrderPlaced(fullOrder);
         setCart([]); // Clear cart
+        setCheckoutStep(1); // Reset step
         
         // Save to local history
         const updatedHistory = [fullOrder, ...localOrders];
@@ -1595,6 +1600,13 @@ const PublicStore = () => {
     }
   };
 
+  const handleCloseCart = () => {
+      if(!orderPlaced) {
+          setCartOpen(false);
+          setCheckoutStep(1); // Reset step on close
+      }
+  };
+
   if (loading) return <LoadingSpinner />;
   if (!config) return <div className="text-center py-20">Loja não encontrada.</div>;
 
@@ -1610,7 +1622,7 @@ const PublicStore = () => {
                      <button onClick={() => setHistoryOpen(true)} className="p-2.5 hover:bg-slate-100 rounded-full text-slate-600 transition-colors" aria-label="Histórico">
                          <History size={22} />
                      </button>
-                     <button onClick={() => setCartOpen(true)} className="relative p-2.5 hover:bg-slate-100 rounded-full text-slate-600 transition-colors" aria-label="Carrinho">
+                     <button onClick={() => { setCartOpen(true); setCheckoutStep(1); }} className="relative p-2.5 hover:bg-slate-100 rounded-full text-slate-600 transition-colors" aria-label="Carrinho">
                          <ShoppingBag size={22} />
                          {cart.length > 0 && <span className="absolute top-0.5 right-0.5 bg-red-600 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-sm ring-2 ring-white">{cart.reduce((a,b)=>a+b.quantity,0)}</span>}
                      </button>
@@ -1705,13 +1717,15 @@ const PublicStore = () => {
           {/* Shopping Cart Sidebar */}
           {cartOpen && (
               <div className="fixed inset-0 z-50 flex justify-end">
-                  <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !orderPlaced && setCartOpen(false)}></div>
+                  <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={handleCloseCart}></div>
                   <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
                       
                       {/* Header */}
                       <div className="p-4 border-b flex justify-between items-center bg-slate-50 shrink-0">
-                          <h3 className="font-bold text-lg text-slate-800">{orderPlaced ? 'Pedido Confirmado' : 'Seu Pedido'}</h3>
-                          <button onClick={() => { setCartOpen(false); if(orderPlaced) setOrderPlaced(null); }} className="p-1 hover:bg-slate-200 rounded-full"><X size={24} className="text-slate-500"/></button>
+                          <h3 className="font-bold text-lg text-slate-800">
+                              {orderPlaced ? 'Pedido Confirmado' : checkoutStep === 1 ? 'Seu Pedido' : 'Finalizar Entrega'}
+                          </h3>
+                          <button onClick={() => { setCartOpen(false); if(orderPlaced) setOrderPlaced(null); setCheckoutStep(1); }} className="p-1 hover:bg-slate-200 rounded-full"><X size={24} className="text-slate-500"/></button>
                       </div>
 
                       {/* Content Area */}
@@ -1747,83 +1761,125 @@ const PublicStore = () => {
                               </div>
                           </div>
                       ) : (
-                          // CART & CHECKOUT VIEW
+                          // CART CHECKOUT FLOW
                           <>
-                              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                  {cart.map(item => (
-                                      <div key={item.product.id} className="flex gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-                                          <div className="w-16 h-16 bg-slate-100 rounded-lg flex-shrink-0 overflow-hidden">
-                                             {item.product.imageUrl && <img src={item.product.imageUrl} className="w-full h-full object-cover"/>}
-                                          </div>
-                                          <div className="flex-1 min-w-0">
-                                              <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1">{item.product.name}</h4>
-                                              <p className="text-xs text-slate-500 mb-2">Unitário: R$ {item.product.price.toFixed(2)}</p>
-                                              <div className="flex items-center justify-between">
-                                                  <span className="font-bold text-indigo-600">R$ {(item.product.price * item.quantity).toFixed(2)}</span>
-                                                  <div className="flex items-center gap-3 bg-slate-50 rounded-lg px-2 py-1">
-                                                      <button onClick={() => removeFromCart(item.product.id)} className="text-red-500 font-bold hover:bg-white rounded px-1 w-6 h-6 flex items-center justify-center">-</button>
-                                                      <span className="text-xs font-bold w-4 text-center">{item.quantity}</span>
-                                                      <button onClick={() => addToCart(item.product)} className="text-green-600 font-bold hover:bg-white rounded px-1 w-6 h-6 flex items-center justify-center">+</button>
+                              {/* STEP 1: ITENS DO CARRINHO */}
+                              {checkoutStep === 1 && (
+                                  <>
+                                      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                          {cart.map(item => (
+                                              <div key={item.product.id} className="flex gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
+                                                  <div className="w-16 h-16 bg-slate-100 rounded-lg flex-shrink-0 overflow-hidden">
+                                                     {item.product.imageUrl && <img src={item.product.imageUrl} className="w-full h-full object-cover"/>}
                                                   </div>
+                                                  <div className="flex-1 min-w-0">
+                                                      <h4 className="font-bold text-sm text-slate-800 line-clamp-2 leading-tight mb-1">{item.product.name}</h4>
+                                                      <p className="text-xs text-slate-500 mb-2">Unitário: R$ {item.product.price.toFixed(2)}</p>
+                                                      <div className="flex items-center justify-between">
+                                                          <span className="font-bold text-indigo-600">R$ {(item.product.price * item.quantity).toFixed(2)}</span>
+                                                          <div className="flex items-center gap-3 bg-slate-50 rounded-lg px-2 py-1">
+                                                              <button onClick={() => removeFromCart(item.product.id)} className="text-red-500 font-bold hover:bg-white rounded px-1 w-6 h-6 flex items-center justify-center">-</button>
+                                                              <span className="text-xs font-bold w-4 text-center">{item.quantity}</span>
+                                                              <button onClick={() => addToCart(item.product)} className="text-green-600 font-bold hover:bg-white rounded px-1 w-6 h-6 flex items-center justify-center">+</button>
+                                                          </div>
+                                                      </div>
+                                                  </div>
+                                              </div>
+                                          ))}
+                                          {cart.length === 0 && (
+                                              <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+                                                  <ShoppingBag size={48} className="mb-4 opacity-20"/>
+                                                  <p>Seu carrinho está vazio</p>
+                                              </div>
+                                          )}
+                                      </div>
+
+                                      {cart.length > 0 && (
+                                          <div className="p-5 border-t bg-slate-50 space-y-4">
+                                              <div className="flex justify-between items-center">
+                                                  <span className="font-bold text-slate-500">Subtotal</span>
+                                                  <span className="font-bold text-2xl text-slate-900">R$ {total.toFixed(2)}</span>
+                                              </div>
+                                              
+                                              <button 
+                                                  onClick={() => setCheckoutStep(2)} 
+                                                  className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
+                                              >
+                                                  Continuar
+                                                  <ArrowRight size={20}/>
+                                              </button>
+                                          </div>
+                                      )}
+                                  </>
+                              )}
+
+                              {/* STEP 2: DADOS DE ENTREGA */}
+                              {checkoutStep === 2 && (
+                                  <div className="flex flex-col flex-1 overflow-hidden">
+                                      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                                          <button onClick={() => setCheckoutStep(1)} className="text-sm text-slate-500 flex items-center gap-1 hover:text-indigo-600 transition-colors mb-2 font-medium">
+                                              <ChevronLeft size={16}/> Voltar para itens
+                                          </button>
+                                          
+                                          <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex justify-between items-center">
+                                              <span className="text-xs font-bold text-indigo-800 uppercase">Total do Pedido</span>
+                                              <span className="font-bold text-lg text-indigo-700">R$ {total.toFixed(2)}</span>
+                                          </div>
+
+                                          <div className="space-y-4">
+                                              <div>
+                                                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Dados Pessoais</label>
+                                                  <input 
+                                                      className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none mb-2" 
+                                                      placeholder="Seu Nome (Obrigatório)" 
+                                                      value={customerInfo.name}
+                                                      onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})}
+                                                  />
+                                                  <input 
+                                                      className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                                      placeholder="WhatsApp / Telefone (Obrigatório)" 
+                                                      value={customerInfo.phone}
+                                                      onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})}
+                                                      type="tel"
+                                                  />
+                                              </div>
+                                              
+                                              <div>
+                                                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Endereço de Entrega</label>
+                                                  <textarea 
+                                                      className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none resize-none" 
+                                                      placeholder="Rua, Número, Bairro, Ponto de Referência..." 
+                                                      rows={3}
+                                                      value={customerInfo.address}
+                                                      onChange={e => setCustomerInfo({...customerInfo, address: e.target.value})}
+                                                  />
+                                              </div>
+
+                                              <div>
+                                                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Forma de Pagamento</label>
+                                                  <select 
+                                                      className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                                      value={customerInfo.paymentMethod}
+                                                      onChange={e => setCustomerInfo({...customerInfo, paymentMethod: e.target.value})}
+                                                  >
+                                                      <option value="pix">Pagamento via Pix</option>
+                                                      <option value="card">Cartão de Crédito/Débito (Maquininha)</option>
+                                                      <option value="cash">Dinheiro</option>
+                                                  </select>
                                               </div>
                                           </div>
                                       </div>
-                                  ))}
-                                  {cart.length === 0 && (
-                                      <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                                          <ShoppingBag size={48} className="mb-4 opacity-20"/>
-                                          <p>Seu carrinho está vazio</p>
-                                      </div>
-                                  )}
-                              </div>
 
-                              {cart.length > 0 && (
-                                  <div className="p-5 border-t bg-slate-50 space-y-4">
-                                      <div className="space-y-3">
-                                          <input 
-                                              className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none" 
-                                              placeholder="Seu Nome (Obrigatório)" 
-                                              value={customerInfo.name}
-                                              onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})}
-                                          />
-                                          <input 
-                                              className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none" 
-                                              placeholder="WhatsApp / Telefone (Obrigatório)" 
-                                              value={customerInfo.phone}
-                                              onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})}
-                                              type="tel"
-                                          />
-                                          <textarea 
-                                              className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none resize-none" 
-                                              placeholder="Endereço de Entrega (Rua, Número, Bairro...)" 
-                                              rows={2}
-                                              value={customerInfo.address}
-                                              onChange={e => setCustomerInfo({...customerInfo, address: e.target.value})}
-                                          />
-                                          <select 
-                                              className="w-full p-3 border border-slate-200 rounded-xl text-base focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                                              value={customerInfo.paymentMethod}
-                                              onChange={e => setCustomerInfo({...customerInfo, paymentMethod: e.target.value})}
+                                      <div className="p-5 border-t bg-slate-50">
+                                          <button 
+                                              onClick={handlePlaceOrder} 
+                                              disabled={submitting} 
+                                              className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
                                           >
-                                              <option value="pix">Pagamento via Pix</option>
-                                              <option value="card">Cartão de Crédito/Débito (Maquininha)</option>
-                                              <option value="cash">Dinheiro</option>
-                                          </select>
+                                              {submitting ? <Loader2 className="animate-spin"/> : <Check size={20}/>}
+                                              Finalizar Pedido
+                                          </button>
                                       </div>
-
-                                      <div className="flex justify-between items-center pt-2 border-t border-slate-200">
-                                          <span className="font-bold text-slate-500">Total a Pagar</span>
-                                          <span className="font-bold text-2xl text-slate-900">R$ {total.toFixed(2)}</span>
-                                      </div>
-                                      
-                                      <button 
-                                          onClick={handlePlaceOrder} 
-                                          disabled={submitting} 
-                                          className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-70 flex items-center justify-center gap-2 shadow-lg shadow-indigo-200"
-                                      >
-                                          {submitting ? <Loader2 className="animate-spin"/> : <Check size={20}/>}
-                                          Finalizar Pedido
-                                      </button>
                                   </div>
                               )}
                           </>
