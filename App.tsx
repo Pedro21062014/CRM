@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut, 
+  sendPasswordResetEmail,
   onAuthStateChanged,
   type User 
 } from 'firebase/auth';
@@ -18,7 +19,7 @@ import {
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock
+  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
@@ -89,6 +90,12 @@ const openWhatsApp = (phone: string | undefined, text: string) => {
 
 const convertFileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
+    // Security: Check file size (limit to 4MB)
+    if (file.size > 4 * 1024 * 1024) {
+        reject(new Error("A imagem deve ter no máximo 4MB."));
+        return;
+    }
+    
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
@@ -189,11 +196,11 @@ const ProductsManager = ({ user }: { user: User }) => {
 
       const payload = {
         name: formData.name || 'Produto Sem Nome',
-        price: isNaN(priceVal) ? 0 : priceVal,
+        price: isNaN(priceVal) ? 0 : Math.abs(priceVal), // Ensure positive
         description: formData.description || '',
         category: formData.category || 'Geral',
         imageUrl: formData.imageUrl || '',
-        stock: isNaN(stockVal) ? 0 : stockVal,
+        stock: isNaN(stockVal) ? 0 : Math.abs(stockVal),
         updatedAt: serverTimestamp()
       };
 
@@ -210,7 +217,7 @@ const ProductsManager = ({ user }: { user: User }) => {
       setFormData({});
     } catch (err: any) {
       console.error(err);
-      alert(`Erro ao salvar produto: ${err.message || 'Erro desconhecido'}`);
+      alert(`Erro ao salvar produto: ${err.message || 'Verifique sua conexão'}`);
     }
   };
 
@@ -220,8 +227,8 @@ const ProductsManager = ({ user }: { user: User }) => {
       try {
         const base64 = await convertFileToBase64(file);
         setFormData({ ...formData, imageUrl: base64 });
-      } catch (error) {
-        alert("Erro ao processar imagem.");
+      } catch (error: any) {
+        alert(error.message || "Erro ao processar imagem.");
       }
     }
   };
@@ -239,7 +246,7 @@ const ProductsManager = ({ user }: { user: User }) => {
       e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, index: number) => {
       e.preventDefault(); // Necessary to allow dropping
       e.dataTransfer.dropEffect = "move";
   };
@@ -323,11 +330,11 @@ const ProductsManager = ({ user }: { user: User }) => {
                  <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-bold text-slate-500 uppercase">Preço (R$)</label>
-                        <input required type="number" step="0.01" className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.price || ''} onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} />
+                        <input required type="number" step="0.01" min="0" className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.price || ''} onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})} />
                     </div>
                     <div>
                         <label className="text-xs font-bold text-slate-500 uppercase">Estoque</label>
-                        <input type="number" className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.stock || ''} onChange={e => setFormData({...formData, stock: parseInt(e.target.value)})} />
+                        <input type="number" min="0" className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" value={formData.stock || ''} onChange={e => setFormData({...formData, stock: parseInt(e.target.value)})} />
                     </div>
                  </div>
                  <div>
@@ -501,8 +508,8 @@ const ClientsManager = ({ user }: { user: User }) => {
       }
       setEditing(null);
       setFormData({});
-    } catch (err) {
-      alert('Erro ao salvar cliente.');
+    } catch (err: any) {
+      alert(`Erro ao salvar cliente: ${err.message || 'Verifique sua conexão'}`);
     }
   };
 
@@ -1369,6 +1376,7 @@ const LandingPage = () => {
 
 const AuthPage = () => {
   const [isRegister, setIsRegister] = useState(false);
+  const [isReset, setIsReset] = useState(false); // State for Forgot Password
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1377,6 +1385,8 @@ const AuthPage = () => {
 
   useEffect(() => {
     setIsRegister(location.pathname === '/register');
+    // Ensure we reset the reset state when switching modes
+    if (location.pathname !== '/login') setIsReset(false);
   }, [location]);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -1405,48 +1415,122 @@ const AuthPage = () => {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      alert("Por favor, digite seu email.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      alert("Um email com um link de redefinição de senha foi enviado para você. Verifique sua caixa de entrada.");
+      setIsReset(false); // Return to login view
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+          alert("Usuário não encontrado. Verifique o email digitado.");
+      } else {
+          alert("Erro ao enviar email: " + error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
         <div className="text-center mb-8">
            <div className="flex justify-center mb-4"><AppLogo /></div>
-           <h2 className="text-2xl font-bold text-slate-800">{isRegister ? 'Crie sua conta' : 'Bem-vindo de volta'}</h2>
-           <p className="text-slate-500 text-sm mt-2">{isRegister ? 'Comece a gerenciar seu negócio hoje.' : 'Entre para acessar seu painel.'}</p>
+           <h2 className="text-2xl font-bold text-slate-800">
+             {isReset ? 'Recuperar Senha' : isRegister ? 'Crie sua conta' : 'Bem-vindo de volta'}
+           </h2>
+           <p className="text-slate-500 text-sm mt-2">
+             {isReset 
+                ? 'Enviaremos um link para você redefinir sua senha.' 
+                : isRegister 
+                    ? 'Comece a gerenciar seu negócio hoje.' 
+                    : 'Entre para acessar seu painel.'
+             }
+           </p>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-4">
-           <div>
-             <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
-             <input type="email" required className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={email} onChange={e => setEmail(e.target.value)} />
-           </div>
-           <div>
-             <label className="text-xs font-bold text-slate-500 uppercase">Senha</label>
-             <input type="password" required className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={password} onChange={e => setPassword(e.target.value)} />
-           </div>
-           
-           <button disabled={loading} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all flex justify-center items-center gap-2">
-             {loading && <Loader2 className="animate-spin" size={18}/>}
-             {isRegister ? 'Cadastrar' : 'Entrar'}
-           </button>
-        </form>
+        {isReset ? (
+            // --- RESET PASSWORD FORM ---
+            <form onSubmit={handleResetPassword} className="space-y-4">
+               <div>
+                 <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
+                 <div className="relative mt-1">
+                    <input 
+                        type="email" 
+                        required 
+                        className="w-full p-3 pl-10 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
+                        value={email} 
+                        onChange={e => setEmail(e.target.value)} 
+                        placeholder="seu@email.com"
+                    />
+                    <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+                 </div>
+               </div>
+               
+               <button disabled={loading} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all flex justify-center items-center gap-2 shadow-lg shadow-indigo-200">
+                 {loading && <Loader2 className="animate-spin" size={18}/>}
+                 Enviar Link de Redefinição
+               </button>
 
-        <div className="my-6 flex items-center gap-4">
-           <div className="h-px bg-slate-100 flex-1"></div>
-           <span className="text-slate-400 text-xs uppercase font-bold">Ou</span>
-           <div className="h-px bg-slate-100 flex-1"></div>
-        </div>
+               <button 
+                 type="button" 
+                 onClick={() => setIsReset(false)} 
+                 className="w-full py-3 text-slate-500 font-bold hover:text-slate-700 transition-colors text-sm"
+               >
+                 Voltar para Login
+               </button>
+            </form>
+        ) : (
+            // --- LOGIN / REGISTER FORM ---
+            <>
+                <form onSubmit={handleAuth} className="space-y-4">
+                   <div>
+                     <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
+                     <input type="email" required className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={email} onChange={e => setEmail(e.target.value)} />
+                   </div>
+                   <div>
+                     <label className="text-xs font-bold text-slate-500 uppercase">Senha</label>
+                     <input type="password" required className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={password} onChange={e => setPassword(e.target.value)} />
+                     {!isRegister && (
+                         <div className="flex justify-end mt-1">
+                             <button type="button" onClick={() => setIsReset(true)} className="text-xs text-indigo-600 font-bold hover:underline">
+                                 Esqueci minha senha
+                             </button>
+                         </div>
+                     )}
+                   </div>
+                   
+                   <button disabled={loading} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all flex justify-center items-center gap-2">
+                     {loading && <Loader2 className="animate-spin" size={18}/>}
+                     {isRegister ? 'Cadastrar' : 'Entrar'}
+                   </button>
+                </form>
 
-        <button onClick={handleGoogle} className="w-full py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex justify-center items-center gap-2">
-          <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-          Google
-        </button>
+                <div className="my-6 flex items-center gap-4">
+                   <div className="h-px bg-slate-100 flex-1"></div>
+                   <span className="text-slate-400 text-xs uppercase font-bold">Ou</span>
+                   <div className="h-px bg-slate-100 flex-1"></div>
+                </div>
 
-        <p className="text-center mt-6 text-sm text-slate-500">
-           {isRegister ? 'Já tem uma conta?' : 'Não tem conta?'}
-           <span onClick={() => navigate(isRegister ? '/login' : '/register')} className="text-indigo-600 font-bold cursor-pointer ml-1 hover:underline">
-              {isRegister ? 'Entrar' : 'Cadastrar'}
-           </span>
-        </p>
+                <button onClick={handleGoogle} className="w-full py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex justify-center items-center gap-2">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                  Google
+                </button>
+
+                <p className="text-center mt-6 text-sm text-slate-500">
+                   {isRegister ? 'Já tem uma conta?' : 'Não tem conta?'}
+                   <span onClick={() => navigate(isRegister ? '/login' : '/register')} className="text-indigo-600 font-bold cursor-pointer ml-1 hover:underline">
+                      {isRegister ? 'Entrar' : 'Cadastrar'}
+                   </span>
+                </p>
+            </>
+        )}
       </div>
     </div>
   );
@@ -1573,9 +1657,14 @@ const PublicStore = () => {
         setLocalOrders(updatedHistory);
         localStorage.setItem(`my_orders_${id}`, JSON.stringify(updatedHistory));
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error placing order:", error);
-        alert("Ocorreu um erro ao enviar o pedido. Tente novamente.");
+        // User friendly error for permission denied
+        if (error.code === 'permission-denied') {
+            alert("Erro de segurança: Não foi possível enviar o pedido. Verifique se todos os dados estão corretos.");
+        } else {
+            alert("Ocorreu um erro ao enviar o pedido. Tente novamente.");
+        }
     } finally {
         setSubmitting(false);
     }
