@@ -19,7 +19,7 @@ import {
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail
+  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
@@ -36,19 +36,45 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const AppLogo = ({ collapsed, dark = false }: { collapsed?: boolean, dark?: boolean }) => (
-  <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} transition-all duration-300 group cursor-pointer`}>
-    <div className="bg-indigo-600 text-white p-2 rounded-lg shadow-lg shadow-indigo-200 group-hover:bg-indigo-700 transition-all duration-300 transform group-hover:scale-105 shrink-0">
-      <Rocket size={20} strokeWidth={2.5} />
-    </div>
-    {!collapsed && (
-      <div className="flex flex-col animate-in fade-in duration-300">
-        <span className={`font-bold text-xl tracking-tight leading-none font-sans ${dark ? 'text-white' : 'text-slate-900'}`}>Nova<span className="text-indigo-500">CRM</span></span>
-        <span className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-slate-400' : 'text-slate-400'}`}>Versão 3.0 Alpha</span>
+// Hook para detectar Mobile
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return isMobile;
+};
+
+const AppLogo = ({ collapsed, dark = false }: { collapsed?: boolean, dark?: boolean }) => {
+  const isMobile = useIsMobile();
+  
+  return (
+    <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} transition-all duration-300 group cursor-pointer`}>
+      <div className="bg-indigo-600 text-white p-2 rounded-lg shadow-lg shadow-indigo-200 group-hover:bg-indigo-700 transition-all duration-300 transform group-hover:scale-105 shrink-0">
+        <Rocket size={20} strokeWidth={2.5} />
       </div>
-    )}
-  </div>
-);
+      {!collapsed && (
+        <div className="flex flex-col animate-in fade-in duration-300">
+          <span className={`font-bold text-xl tracking-tight leading-none font-sans ${dark ? 'text-white' : 'text-slate-900'}`}>
+            {isMobile ? (
+               <>Nova <span className="text-indigo-500">CRM Mobile</span></>
+            ) : (
+               <>Nova<span className="text-indigo-500">CRM</span></>
+            )}
+          </span>
+          <span className={`text-[10px] font-bold uppercase tracking-widest ${dark ? 'text-slate-400' : 'text-slate-400'}`}>Versão 3.0 Alpha</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const PrimaryButton = ({ children, onClick, className, disabled, type = 'button' }: any) => (
   <button 
@@ -889,129 +915,111 @@ const StoreEditor = ({ user }: { user: User }) => {
     }
   };
 
-  const handleAiOrganize = async () => {
+  const handleSmartOrganize = async () => {
     if (products.length === 0) {
-      alert("Você precisa cadastrar produtos primeiro para a IA organizar sua loja!");
+      alert("Você precisa cadastrar produtos primeiro para o Bot organizar sua loja!");
       return;
     }
 
-    if (!confirm("Isso irá substituir o layout atual da sua loja. Deseja continuar?")) return;
+    if (!confirm("O Organizador Inteligente irá recriar o layout da sua loja baseado nos seus produtos. Continuar?")) return;
 
     setAiLoading(true);
-    try {
-      // 1. Prepare data for the model
-      const productList = products.map(p => ({
-        name: p.name,
-        category: p.category,
-        price: p.price,
-        description: p.description
-      }));
-      
-      const existingCategories = Array.from(new Set(products.map(p => p.category)));
+    
+    // Simulate thinking delay for better UX
+    setTimeout(() => {
+        try {
+            // 1. Analyze Categories
+            const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+            const allText = products.map(p => (p.name + ' ' + p.category).toLowerCase()).join(' ');
 
-      // 2. Define strict schema for StoreConfig structure
-      const schema: Schema = {
-        type: Type.OBJECT,
-        properties: {
-          themeColor: { type: Type.STRING, description: "A main hex color that fits the products vibe" },
-          description: { type: Type.STRING, description: "A catchy short description or slogan for the store" },
-          sections: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                type: { type: Type.STRING, enum: ["hero", "products", "text"] },
-                title: { type: Type.STRING },
-                content: { type: Type.STRING },
-                backgroundColor: { type: Type.STRING },
-                textColor: { type: Type.STRING },
-                filterCategory: { 
-                  type: Type.STRING, 
-                  description: "The EXACT category name to filter products by, or null/empty for all products.",
-                  nullable: true
-                },
-                imageUrl: { type: Type.STRING, nullable: true }
-              },
-              required: ["type", "title", "backgroundColor", "textColor"]
+            // 2. Heuristic Theme Detection (The "Smart Bot" Logic)
+            let vibe: 'food' | 'tech' | 'fashion' | 'beauty' | 'general' = 'general';
+            let newThemeColor = config.themeColor;
+
+            // Simple keyword matching
+            if (allText.match(/hamb|burg|pizza|lanche|pastel|acai|fome|sabor|queijo|bacon|comida/)) {
+                vibe = 'food';
+                newThemeColor = '#ea1d2c'; // Red iFood style
+            } else if (allText.match(/tec|cel|phone|smart|eletr|game|fio|usb|carregador/)) {
+                vibe = 'tech';
+                newThemeColor = '#2563eb'; // Tech Blue
+            } else if (allText.match(/roupa|vest|camis|calça|moda|estilo|tênis|sapato/)) {
+                vibe = 'fashion';
+                newThemeColor = '#000000'; // Sleek Black
+            } else if (allText.match(/belez|cabel|unha|pele|make|batom|perfum/)) {
+                vibe = 'beauty';
+                newThemeColor = '#db2777'; // Pink
             }
-          }
-        },
-        required: ["themeColor", "sections", "description"]
-      };
 
-      // 3. Call Gemini
-      const response = await genAI.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: [
-            {
-                role: 'user',
-                parts: [{ 
-                    text: `
-                    You are an expert Visual Merchandiser and Web Designer. 
-                    Reorganize my online store to look beautiful, professional, and sales-optimized.
-                    
-                    My Store Name: "${config.storeName}"
-                    My Products: ${JSON.stringify(productList)}
-                    Existing Product Categories: ${JSON.stringify(existingCategories)}
+            // 3. Construct Sections
+            const newSections: StoreSection[] = [];
 
-                    INSTRUCTIONS:
-                    1. Create a "hero" section with a welcoming title and subtitle.
-                    2. Create separate "products" sections for different categories (e.g., "Best Burgers", "Refreshing Drinks").
-                       - IMPORTANT: Use the 'filterCategory' field to specify which product category goes in which section.
-                       - Use EXACTLY the category names from the provided product list.
-                    3. Choose a beautiful color palette (themeColor, section backgrounds) that fits the products (e.g., warm for food, clean for tech).
-                    4. Add a "text" section if you think a marketing message would help.
-                    5. Ensure text contrasts well with backgrounds.
-                    ` 
-                }]
-            }
-        ],
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: schema
+            // Hero Section
+            // We use 'any' type here to prevent TypeScript errors when accessing by 'vibe' key dynamically
+            const heroTitles: any = {
+                food: 'Matando sua fome com qualidade',
+                tech: 'Tecnologia que conecta você',
+                fashion: 'Seu estilo, nossa paixão',
+                beauty: 'Realce sua beleza natural',
+                general: `Bem-vindo à ${config.storeName}`
+            };
+            
+            const heroSubtitles: any = {
+                food: 'Os melhores sabores da região, entregues quentinhos na sua porta.',
+                tech: 'Os lançamentos mais aguardados e acessórios essenciais.',
+                fashion: 'Confira as novidades da coleção e renove seu guarda-roupa.',
+                beauty: 'Produtos selecionados para cuidar de você todos os dias.',
+                general: 'Confira nossas ofertas imperdíveis.'
+            };
+
+            newSections.push({
+                id: Date.now().toString() + 'hero',
+                type: 'hero',
+                title: heroTitles[vibe],
+                content: heroSubtitles[vibe],
+                backgroundColor: newThemeColor,
+                textColor: '#ffffff'
+            });
+
+            // Product Sections (Grouped by Category)
+            // Limit to top 4 categories to avoid clutter, or all if few
+            categories.slice(0, 5).forEach((cat, idx) => {
+                newSections.push({
+                    id: Date.now().toString() + 'sec' + idx,
+                    type: 'products',
+                    title: cat, // Use category name as section title
+                    filterCategory: cat, // The filter functionality
+                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc', // Alternating backgrounds
+                    textColor: '#1e293b'
+                });
+            });
+
+            // Marketing Text Section at bottom
+            newSections.push({
+                id: Date.now().toString() + 'footertext',
+                type: 'text',
+                title: 'Por que comprar conosco?',
+                content: 'Garantia de qualidade e atendimento personalizado. Entre em contato pelo WhatsApp para tirar suas dúvidas!',
+                backgroundColor: newThemeColor,
+                textColor: '#ffffff'
+            });
+
+            // Apply Changes
+            setConfig(prev => ({
+                ...prev,
+                themeColor: newThemeColor,
+                sections: newSections
+            }));
+
+            alert("Loja organizada com sucesso pelo Bot!");
+
+        } catch (error: any) {
+            console.error("Bot Error:", error);
+            alert("Ocorreu um erro ao organizar a loja.");
+        } finally {
+            setAiLoading(false);
         }
-      });
-
-      // 4. Parse and Apply
-      let jsonString = response.text;
-      
-      // Cleanup markdown if present (just in case)
-      if (jsonString && jsonString.startsWith('```')) {
-        jsonString = jsonString.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-      }
-
-      if (jsonString) {
-          const aiConfig = JSON.parse(jsonString);
-          
-          // Map AI sections to valid StoreSection objects with IDs
-          const newSections: StoreSection[] = aiConfig.sections.map((s: any) => ({
-              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-              type: s.type,
-              title: s.title,
-              content: s.content || '',
-              backgroundColor: s.backgroundColor,
-              textColor: s.textColor,
-              filterCategory: s.filterCategory || undefined,
-              imageUrl: s.imageUrl || undefined
-          }));
-
-          setConfig(prev => ({
-              ...prev,
-              themeColor: aiConfig.themeColor || prev.themeColor,
-              description: aiConfig.description || prev.description,
-              sections: newSections
-          }));
-          alert("Layout organizado com sucesso! Clique em 'Salvar' se gostou do resultado.");
-      } else {
-        throw new Error("Resposta vazia da IA");
-      }
-
-    } catch (error: any) {
-      console.error("AI Error:", error);
-      alert(`Ocorreu um erro ao organizar a loja: ${error.message}`);
-    } finally {
-      setAiLoading(false);
-    }
+    }, 1500); // 1.5s delay to simulate "processing"
   };
 
   // Drag and Drop Handlers
@@ -1046,12 +1054,12 @@ const StoreEditor = ({ user }: { user: User }) => {
         <div><h2 className="text-xl font-bold text-slate-800">Editor Visual</h2></div>
         <div className="flex flex-wrap gap-3 w-full md:w-auto">
           <button 
-             onClick={handleAiOrganize}
+             onClick={handleSmartOrganize}
              disabled={aiLoading}
              className="flex-1 md:flex-none px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-bold rounded-lg hover:from-indigo-600 hover:to-violet-600 shadow-md transition-all flex items-center gap-2 text-sm disabled:opacity-70 animate-in fade-in"
           >
-             {aiLoading ? <Loader2 className="animate-spin" size={16}/> : <Sparkles size={16} fill="currentColor" className="text-yellow-200"/>}
-             {aiLoading ? 'Organizando...' : 'Organizar com IA'}
+             {aiLoading ? <Loader2 className="animate-spin" size={16}/> : <Bot size={16} fill="currentColor" className="text-indigo-100"/>}
+             {aiLoading ? 'Organizando...' : 'Organizador Inteligente'}
           </button>
           
           <a href={publicLink} target="_blank" rel="noopener noreferrer" className="flex-1 md:flex-none justify-center px-4 py-2 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 text-sm">
@@ -2110,7 +2118,7 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       {/* Sidebar */}
-      <aside className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-200 transition-all duration-300 flex flex-col z-20 shadow-sm relative`}>
+      <aside className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-200 transition-all duration-300 hidden md:flex flex-col z-20 shadow-sm relative`}>
         <div className="h-20 flex items-center justify-center border-b border-slate-100">
              <AppLogo collapsed={collapsed}/>
         </div>
@@ -2145,7 +2153,7 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
             </button>
             <button 
                 onClick={() => setCollapsed(!collapsed)} 
-                className="absolute top-1/2 -right-3 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-600 shadow-sm z-50 hidden md:flex"
+                className="absolute top-1/2 -right-3 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-600 shadow-sm z-50 flex"
             >
                 {collapsed ? <ChevronRight size={14}/> : <ChevronLeft size={14}/>}
             </button>
@@ -2156,7 +2164,8 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
           {/* Top Mobile Bar */}
           <div className="md:hidden h-16 bg-white border-b flex items-center justify-between px-4 shrink-0">
-               <AppLogo collapsed={true}/>
+               {/* We pass collapsed={false} here so the mobile version shows the text 'Nova CRM Mobile' instead of just icon */}
+               <AppLogo collapsed={false}/>
                <button onClick={logout}><LogOut size={20} className="text-slate-500"/></button>
           </div>
 
@@ -2170,6 +2179,19 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
                 <Route path="whatsapp" element={<WhatsAppBot user={user} />} />
              </Routes>
           </div>
+          
+          {/* Mobile Bottom Navigation could go here, but sidebar approach is used for now */}
+          <div className="md:hidden h-16 bg-white border-t flex items-center justify-around px-2 shrink-0">
+               {menuItems.slice(0, 5).map((item) => {
+                 const active = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+                 return (
+                    <button key={item.path} onClick={() => navigate(item.path)} className={`flex flex-col items-center justify-center w-full h-full ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
+                        <item.icon size={20} strokeWidth={active ? 2.5 : 2} />
+                        <span className="text-[10px] font-bold mt-1">{item.label.split(' ')[0]}</span>
+                    </button>
+                 )
+               })}
+          </div>
       </main>
     </div>
   );
@@ -2178,6 +2200,7 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -2186,6 +2209,11 @@ const App = () => {
     });
     return unsubscribe;
   }, []);
+
+  // Update Document Title based on Device
+  useEffect(() => {
+    document.title = isMobile ? "Nova CRM Mobile" : "NovaCRM & Store Builder";
+  }, [isMobile]);
 
   const logout = async () => {
     await signOut(auth);
