@@ -975,8 +975,8 @@ const StoreEditor = ({ user }: { user: User }) => {
             newSections.push({
                 id: Date.now().toString() + 'hero',
                 type: 'hero',
-                title: heroTitles[vibe],
-                content: heroSubtitles[vibe],
+                title: heroTitles[vibe] as string,
+                content: heroSubtitles[vibe] as string,
                 backgroundColor: newThemeColor,
                 textColor: '#ffffff'
             });
@@ -1270,8 +1270,6 @@ const StoreEditor = ({ user }: { user: User }) => {
     </div>
   );
 };
-
-// ... LandingPage and AuthPage unchanged ...
 
 const LandingPage = () => {
   const navigate = useNavigate();
