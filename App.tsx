@@ -2600,13 +2600,17 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
           </div>
           
           {/* Mobile Bottom Navigation could go here, but sidebar approach is used for now */}
-          <div className="md:hidden h-16 bg-white border-t flex items-center justify-around px-2 shrink-0">
-               {menuItems.slice(0, 5).map((item) => {
+          <div className="md:hidden h-16 bg-white border-t flex items-center justify-around px-1 shrink-0 gap-1">
+               {menuItems.slice(0, 6).map((item) => {
                  const active = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+                 // Shorten labels for mobile
+                 let label = item.label.split(' ')[0];
+                 if (item.label === 'Minha Loja') label = 'Loja';
+                 
                  return (
                     <button key={item.path} onClick={() => navigate(item.path)} className={`flex flex-col items-center justify-center w-full h-full ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
-                        <item.icon size={20} strokeWidth={active ? 2.5 : 2} />
-                        <span className="text-[10px] font-bold mt-1">{item.label.split(' ')[0]}</span>
+                        <item.icon size={18} strokeWidth={active ? 2.5 : 2} />
+                        <span className="text-[9px] font-bold mt-1 leading-none">{label}</span>
                     </button>
                  )
                })}
