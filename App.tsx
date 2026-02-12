@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation, Navigate, Outlet } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
@@ -19,9 +20,9 @@ import {
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2
+  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2, TicketPercent, Tag
 } from 'lucide-react';
-import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig } from './types';
+import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig, Coupon } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
 
 // --- AI CONFIGURATION ---
@@ -180,6 +181,226 @@ const SimpleBarChart = ({ data, color = "indigo", height = 60 }: { data: number[
            </div>
         </div>
       ))}
+    </div>
+  );
+};
+
+const CouponsManager = ({ user }: { user: User }) => {
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<Coupon | null>(null);
+  const [formData, setFormData] = useState<Partial<Coupon>>({});
+
+  useEffect(() => {
+    const q = query(collection(db, `merchants/${user.uid}/coupons`), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items: Coupon[] = [];
+      snapshot.forEach(doc => items.push({ id: doc.id, ...doc.data() } as Coupon));
+      setCoupons(items);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, [user.uid]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        code: (formData.code || '').toUpperCase().trim(),
+        type: formData.type || 'percentage',
+        value: parseFloat(String(formData.value || 0)),
+        minPurchase: parseFloat(String(formData.minPurchase || 0)),
+        active: formData.active !== false, // default true
+        usageCount: formData.usageCount || 0,
+        updatedAt: serverTimestamp()
+      };
+
+      if (!payload.code) {
+        alert("O código do cupom é obrigatório.");
+        return;
+      }
+
+      if (editing && editing.id) {
+        await updateDoc(doc(db, `merchants/${user.uid}/coupons`, editing.id), payload);
+      } else {
+        await addDoc(collection(db, `merchants/${user.uid}/coupons`), {
+          ...payload,
+          createdAt: serverTimestamp()
+        });
+      }
+      setEditing(null);
+      setFormData({});
+    } catch (err: any) {
+      alert(`Erro ao salvar cupom: ${err.message}`);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Deseja excluir este cupom permanentemente?")) {
+      await deleteDoc(doc(db, `merchants/${user.uid}/coupons`, id));
+    }
+  };
+
+  const toggleStatus = async (coupon: Coupon) => {
+    await updateDoc(doc(db, `merchants/${user.uid}/coupons`, coupon.id), {
+      active: !coupon.active
+    });
+  };
+
+  const openNew = () => {
+    setEditing({} as Coupon);
+    setFormData({ type: 'percentage', active: true, value: 10 });
+  };
+
+  const openEdit = (coupon: Coupon) => {
+    setEditing(coupon);
+    setFormData(coupon);
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in">
+       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Gerenciar Cupons</h2>
+          <p className="text-slate-500 text-sm">Crie códigos de desconto para seus clientes.</p>
+        </div>
+        <PrimaryButton onClick={openNew}><Plus size={18}/> Novo Cupom</PrimaryButton>
+      </div>
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95">
+             <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-lg">{editing.id ? 'Editar Cupom' : 'Novo Cupom'}</h3>
+                <button onClick={() => setEditing(null)}><X size={24} className="text-slate-400"/></button>
+             </div>
+             <form onSubmit={handleSave} className="space-y-4">
+                <div>
+                   <label className="text-xs font-bold text-slate-500 uppercase">Código do Cupom</label>
+                   <input 
+                      required 
+                      className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none uppercase font-mono tracking-wider" 
+                      placeholder="EX: PROMO10"
+                      value={formData.code || ''} 
+                      onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})} 
+                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                   <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Tipo</label>
+                      <select 
+                        className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={formData.type || 'percentage'}
+                        onChange={e => setFormData({...formData, type: e.target.value as any})}
+                      >
+                         <option value="percentage">Porcentagem (%)</option>
+                         <option value="fixed">Valor Fixo (R$)</option>
+                      </select>
+                   </div>
+                   <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase">Valor</label>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        step="0.01"
+                        required
+                        className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={formData.value || ''}
+                        onChange={e => setFormData({...formData, value: parseFloat(e.target.value)})}
+                      />
+                   </div>
+                </div>
+                <div>
+                   <label className="text-xs font-bold text-slate-500 uppercase">Pedido Mínimo (R$)</label>
+                   <input 
+                      type="number" 
+                      min="0" 
+                      step="0.01"
+                      className="w-full p-3 border rounded-xl mt-1 focus:ring-2 focus:ring-indigo-500 outline-none" 
+                      placeholder="0.00"
+                      value={formData.minPurchase || ''} 
+                      onChange={e => setFormData({...formData, minPurchase: parseFloat(e.target.value)})} 
+                   />
+                   <p className="text-[10px] text-slate-400 mt-1">Deixe 0 para não ter mínimo.</p>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                   <input 
+                      type="checkbox" 
+                      id="activeCheck"
+                      className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      checked={formData.active !== false}
+                      onChange={e => setFormData({...formData, active: e.target.checked})}
+                   />
+                   <label htmlFor="activeCheck" className="text-sm font-bold text-slate-700">Cupom Ativo</label>
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                    <button type="button" onClick={() => setEditing(null)} className="flex-1 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl">Cancelar</button>
+                    <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg">Salvar</button>
+                </div>
+             </form>
+          </div>
+        </div>
+      )}
+
+      {loading ? <LoadingSpinner/> : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+           {coupons.map(coupon => (
+              <div key={coupon.id} className={`bg-white rounded-2xl p-5 shadow-sm border ${coupon.active ? 'border-indigo-100' : 'border-slate-200 bg-slate-50'} relative group`}>
+                 <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${coupon.active ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-400'}`}>
+                          <TicketPercent size={20}/>
+                       </div>
+                       <div>
+                          <h3 className="font-bold text-lg text-slate-800 tracking-wide font-mono">{coupon.code}</h3>
+                          <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${coupon.active ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
+                             {coupon.active ? 'Ativo' : 'Inativo'}
+                          </span>
+                       </div>
+                    </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <button onClick={() => openEdit(coupon)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-full"><Edit2 size={16}/></button>
+                       <button onClick={() => handleDelete(coupon.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-full"><Trash2 size={16}/></button>
+                    </div>
+                 </div>
+                 
+                 <div className="space-y-2 mb-4">
+                    <div className="flex justify-between text-sm">
+                       <span className="text-slate-500">Desconto:</span>
+                       <span className="font-bold text-slate-700">
+                          {coupon.type === 'percentage' ? `${coupon.value}% OFF` : `R$ ${coupon.value.toFixed(2)} OFF`}
+                       </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                       <span className="text-slate-500">Pedido Mínimo:</span>
+                       <span className="font-bold text-slate-700">
+                          {coupon.minPurchase ? `R$ ${coupon.minPurchase.toFixed(2)}` : 'Sem mínimo'}
+                       </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                       <span className="text-slate-500">Usos:</span>
+                       <span className="font-bold text-slate-700">{coupon.usageCount}</span>
+                    </div>
+                 </div>
+
+                 <button 
+                    onClick={() => toggleStatus(coupon)}
+                    className={`w-full py-2 rounded-lg text-xs font-bold transition-colors ${coupon.active ? 'bg-white border border-red-200 text-red-500 hover:bg-red-50' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+                 >
+                    {coupon.active ? 'Desativar Cupom' : 'Ativar Cupom'}
+                 </button>
+              </div>
+           ))}
+           {coupons.length === 0 && (
+             <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-200 rounded-2xl">
+                <TicketPercent size={48} className="mx-auto text-slate-300 mb-4"/>
+                <p className="text-slate-500 font-medium">Nenhum cupom criado.</p>
+                <button onClick={openNew} className="text-indigo-600 font-bold hover:underline mt-2">Criar Primeiro Cupom</button>
+             </div>
+           )}
+        </div>
+      )}
     </div>
   );
 };
@@ -447,7 +668,7 @@ const ProductsManager = ({ user }: { user: User }) => {
                 <p className="text-slate-500 font-medium">Você ainda não tem produtos.</p>
                 <button onClick={openNew} className="text-indigo-600 font-bold hover:underline mt-2">Cadastrar Primeiro Produto</button>
              </div>
-          )}
+           )}
         </div>
       )}
     </div>
@@ -794,7 +1015,14 @@ const OrdersManager = ({ user }: { user: User }) => {
                         <div className="flex-1">
                             <div className="flex justify-between md:justify-start items-center gap-4 mb-2">
                                 <span className="font-bold text-slate-900">#{order.id.slice(0, 8)}</span>
-                                <span className="font-bold text-indigo-600">R$ {order.total.toFixed(2)}</span>
+                                <div className="flex flex-col">
+                                   <span className="font-bold text-indigo-600">R$ {order.total.toFixed(2)}</span>
+                                   {order.discount && order.discount > 0 && (
+                                     <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1 rounded">
+                                        Desc. R$ {order.discount.toFixed(2)} {order.couponCode ? `(${order.couponCode})` : ''}
+                                     </span>
+                                   )}
+                                </div>
                             </div>
                             <p className="text-sm text-slate-500 font-medium mb-1">{order.customerName}</p>
                             <p className="text-xs text-slate-400 mb-3">{order.createdAt?.toDate ? order.createdAt.toDate().toLocaleString() : 'Data inválida'}</p>
@@ -921,105 +1149,107 @@ const StoreEditor = ({ user }: { user: User }) => {
       return;
     }
 
-    if (!confirm("O Organizador Inteligente irá recriar o layout da sua loja baseado nos seus produtos. Continuar?")) return;
+    if (!confirm("A Inteligência Artificial irá analisar seus produtos e recriar o design da loja. O layout atual será substituído. Continuar?")) return;
 
     setAiLoading(true);
-    
-    // Simulate thinking delay for better UX
-    setTimeout(() => {
-        try {
-            // 1. Analyze Categories
-            const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
-            const allText = products.map(p => (p.name + ' ' + p.category).toLowerCase()).join(' ');
 
-            // 2. Heuristic Theme Detection (The "Smart Bot" Logic)
-            let vibe: 'food' | 'tech' | 'fashion' | 'beauty' | 'general' = 'general';
-            let newThemeColor = config.themeColor;
+    try {
+      const productSummary = products
+        .map(p => `${p.name} (${p.category || 'Geral'})`)
+        .slice(0, 30) // Limit context
+        .join(', ');
 
-            // Simple keyword matching
-            if (allText.match(/hamb|burg|pizza|lanche|pastel|acai|fome|sabor|queijo|bacon|comida/)) {
-                vibe = 'food';
-                newThemeColor = '#ea1d2c'; // Red iFood style
-            } else if (allText.match(/tec|cel|phone|smart|eletr|game|fio|usb|carregador/)) {
-                vibe = 'tech';
-                newThemeColor = '#2563eb'; // Tech Blue
-            } else if (allText.match(/roupa|vest|camis|calça|moda|estilo|tênis|sapato/)) {
-                vibe = 'fashion';
-                newThemeColor = '#000000'; // Sleek Black
-            } else if (allText.match(/belez|cabel|unha|pele|make|batom|perfum/)) {
-                vibe = 'beauty';
-                newThemeColor = '#db2777'; // Pink
-            }
+      const response = await genAI.models.generateContent({
+        model: "gemini-3-flash-preview", 
+        contents: `
+          Você é um especialista em Visual Merchandising e Web Design.
+          Analise esta lista de produtos de uma loja: "${productSummary}".
 
-            // 3. Construct Sections
-            const newSections: StoreSection[] = [];
+          Gere um arquivo JSON de configuração para montar uma loja virtual atraente.
+          
+          Regras:
+          1. Escolha uma 'themeColor' (hex) que combine com o nicho (ex: vermelho para comida, azul para tech, preto para moda).
+          2. Crie um 'heroTitle' curto e impactante.
+          3. Crie um 'heroSubtitle' convidativo.
+          4. Crie um 'marketingTitle' para uma seção de diferenciais.
+          5. Crie um 'marketingContent' com 2 frases vendendo a loja.
+          6. Liste até 4 'categories' principais encontradas ou sugeridas para agrupar os produtos.
 
-            // Hero Section
-            // We use 'any' type here to prevent TypeScript errors when accessing by 'vibe' key dynamically
-            const heroTitles: any = {
-                food: 'Matando sua fome com qualidade',
-                tech: 'Tecnologia que conecta você',
-                fashion: 'Seu estilo, nossa paixão',
-                beauty: 'Realce sua beleza natural',
-                general: `Bem-vindo à ${config.storeName}`
-            };
-            
-            const heroSubtitles: any = {
-                food: 'Os melhores sabores da região, entregues quentinhos na sua porta.',
-                tech: 'Os lançamentos mais aguardados e acessórios essenciais.',
-                fashion: 'Confira as novidades da coleção e renove seu guarda-roupa.',
-                beauty: 'Produtos selecionados para cuidar de você todos os dias.',
-                general: 'Confira nossas ofertas imperdíveis.'
-            };
-
-            newSections.push({
-                id: Date.now().toString() + 'hero',
-                type: 'hero',
-                title: heroTitles[vibe] as string,
-                content: heroSubtitles[vibe] as string,
-                backgroundColor: newThemeColor,
-                textColor: '#ffffff'
-            });
-
-            // Product Sections (Grouped by Category)
-            // Limit to top 4 categories to avoid clutter, or all if few
-            categories.slice(0, 5).forEach((cat, idx) => {
-                newSections.push({
-                    id: Date.now().toString() + 'sec' + idx,
-                    type: 'products',
-                    title: cat, // Use category name as section title
-                    filterCategory: cat, // The filter functionality
-                    backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc', // Alternating backgrounds
-                    textColor: '#1e293b'
-                });
-            });
-
-            // Marketing Text Section at bottom
-            newSections.push({
-                id: Date.now().toString() + 'footertext',
-                type: 'text',
-                title: 'Por que comprar conosco?',
-                content: 'Garantia de qualidade e atendimento personalizado. Entre em contato pelo WhatsApp para tirar suas dúvidas!',
-                backgroundColor: newThemeColor,
-                textColor: '#ffffff'
-            });
-
-            // Apply Changes
-            setConfig(prev => ({
-                ...prev,
-                themeColor: newThemeColor,
-                sections: newSections
-            }));
-
-            alert("Loja organizada com sucesso pelo Bot!");
-
-        } catch (error: any) {
-            console.error("Bot Error:", error);
-            alert("Ocorreu um erro ao organizar a loja.");
-        } finally {
-            setAiLoading(false);
+          Responda APENAS o JSON no formato:
+          {
+            "themeColor": string,
+            "heroTitle": string,
+            "heroSubtitle": string,
+            "marketingTitle": string,
+            "marketingContent": string,
+            "categories": string[]
+          }
+        `,
+        config: {
+            responseMimeType: "application/json"
         }
-    }, 1500); // 1.5s delay to simulate "processing"
+      });
+
+      const text = response.text;
+      if (!text) throw new Error("Falha na resposta da IA");
+      const data = JSON.parse(text);
+
+      const newSections: StoreSection[] = [];
+
+      // 1. Hero
+      newSections.push({
+        id: Date.now().toString() + 'hero',
+        type: 'hero',
+        title: data.heroTitle,
+        content: data.heroSubtitle,
+        backgroundColor: data.themeColor,
+        textColor: '#ffffff'
+      });
+
+      // 2. Products by Category
+      if (data.categories && Array.isArray(data.categories)) {
+          data.categories.forEach((cat: string, i: number) => {
+              newSections.push({
+                  id: Date.now().toString() + 'cat' + i,
+                  type: 'products',
+                  title: cat,
+                  filterCategory: cat, 
+                  backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc',
+                  textColor: '#1e293b'
+              });
+          });
+      } else {
+          // Fallback if no categories returned
+          newSections.push({
+              id: Date.now().toString() + 'prod_all',
+              type: 'products',
+              title: 'Nossos Produtos',
+              backgroundColor: '#ffffff'
+          });
+      }
+
+      // 3. Marketing
+      newSections.push({
+        id: Date.now().toString() + 'mkt',
+        type: 'text',
+        title: data.marketingTitle,
+        content: data.marketingContent,
+        backgroundColor: data.themeColor,
+        textColor: '#ffffff'
+      });
+
+      setConfig(prev => ({
+          ...prev,
+          themeColor: data.themeColor,
+          sections: newSections
+      }));
+
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao conectar com o cérebro da IA. Verifique se você tem produtos cadastrados ou tente novamente.");
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // Drag and Drop Handlers
@@ -1271,6 +1501,8 @@ const StoreEditor = ({ user }: { user: User }) => {
   );
 };
 
+// ... LandingPage and AuthPage unchanged ...
+
 const LandingPage = () => {
   const navigate = useNavigate();
   return (
@@ -1444,99 +1676,155 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
-        <div className="text-center mb-8">
-           <div className="flex justify-center mb-4"><AppLogo /></div>
-           <h2 className="text-2xl font-bold text-slate-800">
-             {isReset ? 'Recuperar Senha' : isRegister ? 'Crie sua conta' : 'Bem-vindo de volta'}
-           </h2>
-           <p className="text-slate-500 text-sm mt-2">
-             {isReset 
-                ? 'Enviaremos um link para você redefinir sua senha.' 
-                : isRegister 
-                    ? 'Comece a gerenciar seu negócio hoje.' 
-                    : 'Entre para acessar seu painel.'
-             }
-           </p>
-        </div>
+    <div className="min-h-screen w-full flex bg-white overflow-hidden">
+      {/* Left Side - Form Section */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12 xl:p-24 bg-white relative z-10">
+        <div className="w-full max-w-sm space-y-8 animate-in slide-in-from-left duration-700">
+            <div className="text-center lg:text-left">
+               <div className="flex justify-center lg:justify-start mb-6"><AppLogo /></div>
+               <h2 className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
+                 {isReset ? 'Recuperar Acesso' : isRegister ? 'Crie sua conta' : 'Bem-vindo de volta'}
+               </h2>
+               <p className="text-slate-500 mt-3 text-lg">
+                 {isReset 
+                    ? 'Informe seu email para redefinir a senha.' 
+                    : isRegister 
+                        ? 'Comece a gerenciar seu negócio hoje.' 
+                        : 'Entre com seus dados para acessar o painel.'
+                 }
+               </p>
+            </div>
 
-        {isReset ? (
-            // --- RESET PASSWORD FORM ---
-            <form onSubmit={handleResetPassword} className="space-y-4">
-               <div>
-                 <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
-                 <div className="relative mt-1">
-                    <input 
-                        type="email" 
-                        required 
-                        className="w-full p-3 pl-10 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all" 
-                        value={email} 
-                        onChange={e => setEmail(e.target.value)} 
-                        placeholder="seu@email.com"
-                    />
-                    <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                 </div>
-               </div>
-               
-               <button disabled={loading} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all flex justify-center items-center gap-2 shadow-lg shadow-indigo-200">
-                 {loading && <Loader2 className="animate-spin" size={18}/>}
-                 Enviar Link de Redefinição
-               </button>
-
-               <button 
-                 type="button" 
-                 onClick={() => setIsReset(false)} 
-                 className="w-full py-3 text-slate-500 font-bold hover:text-slate-700 transition-colors text-sm"
-               >
-                 Voltar para Login
-               </button>
-            </form>
-        ) : (
-            // --- LOGIN / REGISTER FORM ---
-            <>
-                <form onSubmit={handleAuth} className="space-y-4">
+            {isReset ? (
+                // --- RESET PASSWORD FORM ---
+                <form onSubmit={handleResetPassword} className="space-y-5">
                    <div>
-                     <label className="text-xs font-bold text-slate-500 uppercase">Email</label>
-                     <input type="email" required className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={email} onChange={e => setEmail(e.target.value)} />
-                   </div>
-                   <div>
-                     <label className="text-xs font-bold text-slate-500 uppercase">Senha</label>
-                     <input type="password" required className="w-full p-3 mt-1 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none" value={password} onChange={e => setPassword(e.target.value)} />
-                     {!isRegister && (
-                         <div className="flex justify-end mt-1">
-                             <button type="button" onClick={() => setIsReset(true)} className="text-xs text-indigo-600 font-bold hover:underline">
-                                 Esqueci minha senha
-                             </button>
-                         </div>
-                     )}
+                     <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Email Corporativo</label>
+                     <div className="relative">
+                        <input 
+                            type="email" 
+                            required 
+                            className="w-full p-4 pl-11 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-900 placeholder:text-slate-400" 
+                            value={email} 
+                            onChange={e => setEmail(e.target.value)} 
+                            placeholder="seu@email.com"
+                        />
+                        <Mail size={20} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"/>
+                     </div>
                    </div>
                    
-                   <button disabled={loading} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all flex justify-center items-center gap-2">
-                     {loading && <Loader2 className="animate-spin" size={18}/>}
-                     {isRegister ? 'Cadastrar' : 'Entrar'}
+                   <button disabled={loading} className="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold rounded-xl transition-all flex justify-center items-center gap-2 shadow-lg shadow-indigo-200 transform active:scale-[0.98]">
+                     {loading && <Loader2 className="animate-spin" size={20}/>}
+                     Enviar Link de Redefinição
+                   </button>
+
+                   <button 
+                     type="button" 
+                     onClick={() => setIsReset(false)} 
+                     className="w-full py-2 text-slate-500 font-semibold hover:text-slate-800 transition-colors text-sm"
+                   >
+                     <ArrowRight className="inline mr-1 rotate-180" size={16}/> Voltar para Login
                    </button>
                 </form>
+            ) : (
+                // --- LOGIN / REGISTER FORM ---
+                <>
+                    <form onSubmit={handleAuth} className="space-y-5">
+                       <div>
+                         <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Email</label>
+                         <input 
+                            type="email" 
+                            required 
+                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-900 placeholder:text-slate-400" 
+                            value={email} 
+                            onChange={e => setEmail(e.target.value)} 
+                            placeholder="exemplo@loja.com"
+                         />
+                       </div>
+                       <div>
+                         <div className="flex justify-between items-center mb-1.5">
+                             <label className="text-sm font-semibold text-slate-700">Senha</label>
+                             {!isRegister && (
+                                 <button type="button" onClick={() => setIsReset(true)} className="text-sm text-indigo-600 font-bold hover:text-indigo-800 hover:underline">
+                                     Esqueceu?
+                                 </button>
+                             )}
+                         </div>
+                         <input 
+                            type="password" 
+                            required 
+                            className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-900 placeholder:text-slate-400" 
+                            value={password} 
+                            onChange={e => setPassword(e.target.value)} 
+                            placeholder="••••••••"
+                         />
+                       </div>
+                       
+                       <button disabled={loading} className="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold rounded-xl transition-all flex justify-center items-center gap-2 shadow-xl shadow-indigo-200/50 transform active:scale-[0.98]">
+                         {loading && <Loader2 className="animate-spin" size={20}/>}
+                         {isRegister ? 'Criar Conta Grátis' : 'Entrar na Plataforma'}
+                       </button>
+                    </form>
 
-                <div className="my-6 flex items-center gap-4">
-                   <div className="h-px bg-slate-100 flex-1"></div>
-                   <span className="text-slate-400 text-xs uppercase font-bold">Ou</span>
-                   <div className="h-px bg-slate-100 flex-1"></div>
+                    <div className="relative my-8">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-slate-200"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                            <span className="px-4 bg-white text-slate-400 font-medium uppercase text-xs">Ou continue com</span>
+                        </div>
+                    </div>
+
+                    <button onClick={handleGoogle} className="w-full py-3.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all flex justify-center items-center gap-3 transform active:scale-[0.98]">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                      Google
+                    </button>
+
+                    <p className="text-center mt-8 text-slate-500 text-sm">
+                       {isRegister ? 'Já é membro?' : 'Novo por aqui?'}
+                       <span onClick={() => navigate(isRegister ? '/login' : '/register')} className="text-indigo-600 font-bold cursor-pointer ml-1 hover:underline hover:text-indigo-700">
+                          {isRegister ? 'Fazer Login' : 'Criar conta agora'}
+                       </span>
+                    </p>
+                </>
+            )}
+        </div>
+      </div>
+
+      {/* Right Side - Visuals (Desktop Only) */}
+      <div className="hidden lg:flex w-1/2 bg-slate-900 relative items-center justify-center overflow-hidden">
+         {/* Background Gradients/Blobs with movement */}
+         <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 z-0"></div>
+         
+         <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-purple-600/30 rounded-full blur-[120px] animate-pulse"></div>
+         <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[100px] animate-pulse" style={{animationDuration: '4s'}}></div>
+         <div className="absolute top-[40%] left-[30%] w-[300px] h-[300px] bg-orange-500/20 rounded-full blur-[80px] animate-pulse" style={{animationDuration: '7s'}}></div>
+
+         {/* Glassmorphism Card */}
+         <div className="relative z-10 p-12 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl max-w-lg shadow-2xl mx-12 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-200">
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mb-8 shadow-lg shadow-indigo-500/30">
+                <BarChart3 className="text-white" size={32} />
+            </div>
+            <h2 className="text-4xl font-bold text-white mb-6 leading-tight">
+               Escale suas vendas com inteligência de dados.
+            </h2>
+            <p className="text-lg text-slate-300 leading-relaxed mb-8">
+               "A plataforma ideal para quem quer parar de anotar pedidos no caderno e começar a gerenciar um negócio de verdade."
+            </p>
+            
+            <div className="flex items-center gap-4">
+                <div className="flex -space-x-3">
+                    {[1,2,3,4].map(i => (
+                        <div key={i} className={`w-10 h-10 rounded-full border-2 border-slate-800 bg-slate-700 flex items-center justify-center text-xs text-white font-bold overflow-hidden`}>
+                            <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" className="w-full h-full object-cover"/>
+                        </div>
+                    ))}
                 </div>
-
-                <button onClick={handleGoogle} className="w-full py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex justify-center items-center gap-2">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                  Google
-                </button>
-
-                <p className="text-center mt-6 text-sm text-slate-500">
-                   {isRegister ? 'Já tem uma conta?' : 'Não tem conta?'}
-                   <span onClick={() => navigate(isRegister ? '/login' : '/register')} className="text-indigo-600 font-bold cursor-pointer ml-1 hover:underline">
-                      {isRegister ? 'Entrar' : 'Cadastrar'}
-                   </span>
-                </p>
-            </>
-        )}
+                <div className="text-sm text-slate-400">
+                    <span className="text-white font-bold">+2.000</span> lojistas ativos
+                </div>
+            </div>
+         </div>
       </div>
     </div>
   );
@@ -1557,6 +1845,11 @@ const PublicStore = () => {
   const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', address: '', paymentMethod: 'pix' });
   const [orderPlaced, setOrderPlaced] = useState<any | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Coupon State
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
   
   // 2-Step Checkout State
   const [checkoutStep, setCheckoutStep] = useState<1 | 2>(1);
@@ -1608,13 +1901,66 @@ const PublicStore = () => {
       });
       setCartOpen(true);
       setCheckoutStep(1); // Ensure we start at step 1 when adding
+      setAppliedCoupon(null); // Reset coupon on cart change just in case to force re-validate logic if needed, or keep it.
+      // Better: keep coupon but re-validate total? For MVP, we remove coupon on cart changes to avoid inconsistencies.
   };
 
   const removeFromCart = (productId: string) => {
       setCart(prev => prev.filter(p => p.product.id !== productId));
+      setAppliedCoupon(null); // Reset coupon
   };
 
-  const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+  // Calculate totals
+  const subtotal = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+  
+  let discount = 0;
+  if (appliedCoupon) {
+      if (appliedCoupon.type === 'percentage') {
+          discount = subtotal * (appliedCoupon.value / 100);
+      } else {
+          discount = appliedCoupon.value;
+      }
+      // Ensure discount doesn't exceed subtotal
+      if (discount > subtotal) discount = subtotal;
+  }
+  
+  const total = subtotal - discount;
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    setAppliedCoupon(null);
+
+    try {
+        // Query to find coupon by code
+        const q = query(
+            collection(db, `merchants/${id}/coupons`), 
+            where("code", "==", couponCode.toUpperCase().trim())
+        );
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            alert("Cupom não encontrado.");
+        } else {
+            const couponData = querySnapshot.docs[0].data() as Coupon;
+            const couponId = querySnapshot.docs[0].id;
+            
+            // Validation
+            if (!couponData.active) {
+                alert("Este cupom expirou ou está inativo.");
+            } else if (couponData.minPurchase && subtotal < couponData.minPurchase) {
+                alert(`Este cupom requer um valor mínimo de R$ ${couponData.minPurchase.toFixed(2)}.`);
+            } else {
+                setAppliedCoupon({ ...couponData, id: couponId });
+            }
+        }
+    } catch (error) {
+        console.error("Error applying coupon", error);
+        alert("Erro ao validar cupom.");
+    } finally {
+        setCouponLoading(false);
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (!customerInfo.name.trim() || !customerInfo.phone.trim()) {
@@ -1645,18 +1991,34 @@ const PublicStore = () => {
                 imageUrl: item.product.imageUrl || ''
             })),
             total: total,
+            subtotal: subtotal,
+            discount: discount,
+            couponCode: appliedCoupon ? appliedCoupon.code : null,
             status: 'new',
             createdAt: serverTimestamp(),
             paymentMethod: customerInfo.paymentMethod
         };
 
         const docRef = await addDoc(collection(db, `merchants/${id}/orders`), orderData);
+        
+        // Update coupon usage count if used
+        if (appliedCoupon) {
+            // Using a simple update here. In high concurrency, transaction is better.
+            const couponRef = doc(db, `merchants/${id}/coupons`, appliedCoupon.id);
+            // We use increment from firestore ideally, but for now standard update
+            await updateDoc(couponRef, {
+                 usageCount: (appliedCoupon.usageCount || 0) + 1
+            });
+        }
+
         // Explicitly set createdAt as string for local state to avoid serialization issues
         const fullOrder = { id: docRef.id, ...orderData, createdAt: new Date().toISOString() }; 
         
         setOrderPlaced(fullOrder);
         setCart([]); // Clear cart
         setCheckoutStep(1); // Reset step
+        setAppliedCoupon(null);
+        setCouponCode('');
         
         // Save to local history
         const updatedHistory = [fullOrder, ...localOrders];
@@ -1684,7 +2046,8 @@ const PublicStore = () => {
         `📱 *Contato:* ${orderPlaced.customerPhone}\n\n` +
         `🛒 *Resumo:*\n` +
         orderPlaced.items.map((i:any) => `${i.quantity}x ${i.productName}`).join('\n') +
-        `\n\n💰 *Total: R$ ${orderPlaced.total.toFixed(2)}*\n` +
+        (orderPlaced.discount > 0 ? `\n\n🏷️ *Subtotal:* R$ ${orderPlaced.subtotal?.toFixed(2)}\n✂️ *Desconto (${orderPlaced.couponCode}):* -R$ ${orderPlaced.discount?.toFixed(2)}` : '') +
+        `\n\n💰 *Total Final: R$ ${orderPlaced.total.toFixed(2)}*\n` +
         `📍 *Endereço:* ${orderPlaced.deliveryAddress.street || 'Retirada/Não informado'}\n` +
         `💳 *Pagamento:* ${orderPlaced.paymentMethod === 'pix' ? 'Pix' : orderPlaced.paymentMethod === 'card' ? 'Cartão' : 'Dinheiro'}`;
 
@@ -1841,8 +2204,17 @@ const PublicStore = () => {
                                       <span className="font-bold text-slate-700">Resumo</span>
                                       <span>{orderPlaced.items.length} itens</span>
                                   </div>
-                                  <p className="flex justify-between"><span>Subtotal:</span> <span className="font-bold">R$ {orderPlaced.total.toFixed(2)}</span></p>
-                                  <p className="flex justify-between"><span>Pagamento:</span> <span className="uppercase font-bold text-xs bg-white px-2 py-0.5 rounded border">{orderPlaced.paymentMethod}</span></p>
+                                  <p className="flex justify-between"><span>Subtotal:</span> <span>R$ {orderPlaced.subtotal?.toFixed(2)}</span></p>
+                                  {orderPlaced.discount > 0 && (
+                                     <p className="flex justify-between text-green-600 font-bold">
+                                         <span>Desconto {orderPlaced.couponCode ? `(${orderPlaced.couponCode})` : ''}:</span> 
+                                         <span>- R$ {orderPlaced.discount.toFixed(2)}</span>
+                                     </p>
+                                  )}
+                                  <div className="border-t border-slate-200 pt-2 mt-2">
+                                     <p className="flex justify-between text-base"><span>Total Final:</span> <span className="font-bold text-slate-900">R$ {orderPlaced.total.toFixed(2)}</span></p>
+                                  </div>
+                                  <p className="flex justify-between mt-2"><span>Pagamento:</span> <span className="uppercase font-bold text-xs bg-white px-2 py-0.5 rounded border">{orderPlaced.paymentMethod}</span></p>
                               </div>
 
                               <div className="w-full space-y-3">
@@ -1891,9 +2263,53 @@ const PublicStore = () => {
 
                                       {cart.length > 0 && (
                                           <div className="p-5 border-t bg-slate-50 space-y-4">
-                                              <div className="flex justify-between items-center">
-                                                  <span className="font-bold text-slate-500">Subtotal</span>
-                                                  <span className="font-bold text-2xl text-slate-900">R$ {total.toFixed(2)}</span>
+                                              
+                                              {/* Area de Cupom - Step 1 */}
+                                              <div className="bg-white p-3 rounded-xl border border-dashed border-slate-300">
+                                                <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1 mb-2">
+                                                    <Tag size={12}/> Cupom de Desconto
+                                                </label>
+                                                <div className="flex gap-2">
+                                                    <input 
+                                                        value={couponCode}
+                                                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                                        placeholder="DIGITE O CÓDIGO"
+                                                        className="flex-1 p-2 border rounded-lg text-sm uppercase font-mono tracking-wider outline-none focus:ring-2 focus:ring-indigo-100"
+                                                        disabled={!!appliedCoupon}
+                                                    />
+                                                    {appliedCoupon ? (
+                                                        <button onClick={() => { setAppliedCoupon(null); setCouponCode(''); }} className="px-3 bg-red-100 text-red-600 rounded-lg text-xs font-bold hover:bg-red-200">
+                                                            <X size={16}/>
+                                                        </button>
+                                                    ) : (
+                                                        <button onClick={handleApplyCoupon} disabled={couponLoading || !couponCode} className="px-3 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700 disabled:opacity-50">
+                                                            {couponLoading ? <Loader2 className="animate-spin" size={16}/> : 'Aplicar'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {appliedCoupon && (
+                                                    <div className="mt-2 text-xs text-green-600 font-bold flex items-center gap-1">
+                                                        <Check size={12}/> Cupom {appliedCoupon.code} aplicado: 
+                                                        {appliedCoupon.type === 'percentage' ? `${appliedCoupon.value}% OFF` : `R$ ${appliedCoupon.value} OFF`}
+                                                    </div>
+                                                )}
+                                              </div>
+
+                                              <div className="space-y-1">
+                                                  <div className="flex justify-between items-center text-sm text-slate-500">
+                                                      <span>Subtotal</span>
+                                                      <span>R$ {subtotal.toFixed(2)}</span>
+                                                  </div>
+                                                  {discount > 0 && (
+                                                      <div className="flex justify-between items-center text-sm text-green-600 font-bold">
+                                                          <span>Desconto</span>
+                                                          <span>- R$ {discount.toFixed(2)}</span>
+                                                      </div>
+                                                  )}
+                                                  <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                                                      <span className="font-bold text-slate-800">Total</span>
+                                                      <span className="font-bold text-2xl text-indigo-600">R$ {total.toFixed(2)}</span>
+                                                  </div>
                                               </div>
                                               
                                               <button 
@@ -1918,7 +2334,10 @@ const PublicStore = () => {
                                           
                                           <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex justify-between items-center">
                                               <span className="text-xs font-bold text-indigo-800 uppercase">Total do Pedido</span>
-                                              <span className="font-bold text-lg text-indigo-700">R$ {total.toFixed(2)}</span>
+                                              <div className="text-right">
+                                                <span className="font-bold text-lg text-indigo-700">R$ {total.toFixed(2)}</span>
+                                                {discount > 0 && <p className="text-[10px] text-indigo-400">Desconto aplicado</p>}
+                                              </div>
                                           </div>
 
                                           <div className="space-y-4">
@@ -2109,6 +2528,7 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
     { icon: ShoppingCart, label: 'Pedidos', path: '/dashboard/orders' },
     { icon: Package, label: 'Produtos', path: '/dashboard/products' },
     { icon: Users, label: 'Clientes', path: '/dashboard/clients' },
+    { icon: TicketPercent, label: 'Cupons', path: '/dashboard/coupons' },
     { icon: Store, label: 'Minha Loja', path: '/dashboard/store' },
     { icon: MessageSquare, label: 'WhatsApp Bot', path: '/dashboard/whatsapp' },
   ];
@@ -2173,6 +2593,7 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
                 <Route path="products" element={<ProductsManager user={user} />} />
                 <Route path="clients" element={<ClientsManager user={user} />} />
                 <Route path="orders" element={<OrdersManager user={user} />} />
+                <Route path="coupons" element={<CouponsManager user={user} />} />
                 <Route path="store" element={<StoreEditor user={user} />} />
                 <Route path="whatsapp" element={<WhatsAppBot user={user} />} />
              </Routes>

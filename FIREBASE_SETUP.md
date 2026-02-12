@@ -1,3 +1,4 @@
+
 # Configuração do Firebase Firestore
 
 Para que o aplicativo funcione corretamente com as funcionalidades de Loja Virtual (Pública), CRM (Privado) e os novos **Pontos Comerciais**, copie e cole as regras abaixo no seu Console do Firebase.
@@ -65,6 +66,17 @@ service cloud.firestore {
         // 1. Enviar avaliação (rating e review)
         // 2. Cancelar o pedido (alterar status) se necessário
         allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'review', 'status']); 
+      }
+
+      // 5. CUPONS (COUPONS)
+      match /coupons/{couponId} {
+        // Público pode ler (para validar se o cupom existe no checkout)
+        // Idealmente, em produção, usaria uma Cloud Function para validar sem expor a lista, 
+        // mas para MVP client-side, permitimos leitura.
+        allow read: if true; 
+
+        // Apenas o dono pode criar/editar/apagar cupons
+        allow write: if request.auth != null && request.auth.uid == userId;
       }
     }
   }

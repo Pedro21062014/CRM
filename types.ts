@@ -1,4 +1,5 @@
 
+
 export interface Product {
   id: string;
   name: string;
@@ -74,6 +75,9 @@ export interface Order {
     imageUrl?: string;
   }>;
   total: number;
+  subtotal?: number; // Preço sem desconto
+  discount?: number; // Valor do desconto
+  couponCode?: string; // Código usado
   status: OrderStatus;
   createdAt: any;
   rating?: number; // 1 to 5
@@ -114,4 +118,15 @@ export interface StoreConfig {
   ratingCount?: number;
   // Integração Meta
   metaWhatsApp?: WhatsAppConfig;
+}
+
+export interface Coupon {
+  id: string;
+  code: string; // Ex: PROMO10
+  type: 'percentage' | 'fixed';
+  value: number; // Ex: 10 (10% ou R$ 10,00)
+  minPurchase?: number; // Valor mínimo para aplicar
+  usageCount: number;
+  active: boolean;
+  createdAt: any;
 }
