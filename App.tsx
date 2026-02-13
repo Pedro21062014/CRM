@@ -20,7 +20,7 @@ import {
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2, TicketPercent, Tag
+  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2, TicketPercent, Tag, Utensils
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig, Coupon } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
@@ -1501,6 +1501,184 @@ const StoreEditor = ({ user }: { user: User }) => {
   );
 };
 
+const Marketplace = () => {
+    const navigate = useNavigate();
+    const [stores, setStores] = useState<{id: string, config: StoreConfig}[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => {
+        const fetchStores = async () => {
+            try {
+                // Fetch all merchants
+                // Note: In a real production app, we would query only active/verified stores
+                // For this MVP, we fetch the merchants collection
+                const querySnapshot = await getDocs(collection(db, "merchants"));
+                const items: {id: string, config: StoreConfig}[] = [];
+                
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if (data.storeConfig && data.storeConfig.storeName) {
+                        items.push({
+                            id: doc.id,
+                            config: data.storeConfig
+                        });
+                    }
+                });
+                
+                setStores(items);
+            } catch (error) {
+                console.error("Error fetching stores:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStores();
+    }, []);
+
+    const filteredStores = stores.filter(store => 
+        store.config.storeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (store.config.description && store.config.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
+    const categories = [
+        { name: "Restaurantes", icon: Utensils, color: "bg-red-100 text-red-600" },
+        { name: "Mercado", icon: ShoppingBag, color: "bg-green-100 text-green-600" },
+        { name: "Lanches", icon: MapPin, color: "bg-orange-100 text-orange-600" }, // Using MapPin as placeholder for burger
+        { name: "Doces", icon: Star, color: "bg-pink-100 text-pink-600" }, // Using Star as placeholder
+    ];
+
+    return (
+        <div className="min-h-screen bg-slate-50 font-sans pb-20">
+            {/* Header / Search Area */}
+            <div className="bg-white sticky top-0 z-30 shadow-sm">
+                <div className="max-w-7xl mx-auto px-4 py-4">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+                             <div className="bg-red-600 text-white p-1.5 rounded-lg">
+                                <Rocket size={20} fill="currentColor"/>
+                             </div>
+                             <span className="font-bold text-xl tracking-tight text-slate-900">Nova<span className="text-red-600">Delivery</span></span>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                             <button onClick={() => navigate('/login')} className="text-sm font-bold text-slate-600 hover:text-red-600 px-3 py-1.5 rounded-full hover:bg-slate-100 transition-colors">
+                                 Sou Lojista
+                             </button>
+                        </div>
+                    </div>
+
+                    <div className="relative max-w-2xl mx-auto mb-2">
+                        <input 
+                            type="text" 
+                            placeholder="Buscar loja ou item..." 
+                            className="w-full pl-12 pr-4 py-3.5 bg-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-red-200 transition-all text-slate-700 font-medium placeholder:text-slate-400"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-red-500" size={20} />
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
+                {/* Categories */}
+                <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+                    {categories.map((cat, i) => (
+                        <div key={i} className="flex flex-col items-center gap-2 min-w-[80px] cursor-pointer hover:scale-105 transition-transform">
+                            <div className={`w-16 h-16 ${cat.color} rounded-2xl flex items-center justify-center shadow-sm`}>
+                                <cat.icon size={24} />
+                            </div>
+                            <span className="text-xs font-bold text-slate-600">{cat.name}</span>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Banner Promo */}
+                <div className="w-full h-40 md:h-56 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl relative overflow-hidden shadow-lg flex items-center px-8 text-white">
+                    <div className="absolute right-0 top-0 h-full w-1/2 bg-white/10 skew-x-12 transform translate-x-20"></div>
+                    <div className="relative z-10 max-w-lg">
+                        <span className="bg-white/20 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-2 inline-block">Destaque</span>
+                        <h2 className="text-2xl md:text-4xl font-extrabold mb-2">Fome de quê?</h2>
+                        <p className="text-white/90 text-sm md:text-base mb-4">Descubra os melhores restaurantes e lojas da sua região.</p>
+                    </div>
+                </div>
+
+                {/* Store List */}
+                <div>
+                    <h3 className="font-bold text-xl text-slate-800 mb-6 flex items-center gap-2">
+                        <Store size={20} className="text-slate-400"/> Lojas Disponíveis
+                    </h3>
+                    
+                    {loading ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[1,2,3,4,5,6].map(i => (
+                                <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-100 h-48 animate-pulse"></div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredStores.length > 0 ? filteredStores.map((store) => (
+                                <div 
+                                    key={store.id} 
+                                    onClick={() => navigate(`/store/${store.id}`)}
+                                    className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer group"
+                                >
+                                    {/* Store Banner */}
+                                    <div className="h-24 w-full bg-slate-200 relative">
+                                        {store.config.bannerUrl ? (
+                                            <img src={store.config.bannerUrl} className="w-full h-full object-cover" alt="Capa" />
+                                        ) : (
+                                            <div className="w-full h-full" style={{backgroundColor: store.config.themeColor || '#ea1d2c'}}></div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="px-5 pb-5 relative">
+                                        {/* Store Logo Overlapping Banner */}
+                                        <div className="w-16 h-16 bg-white rounded-full border-4 border-white shadow-md -mt-8 mb-3 overflow-hidden flex items-center justify-center">
+                                            {store.config.logoUrl ? (
+                                                <img src={store.config.logoUrl} className="w-full h-full object-cover" alt="Logo" />
+                                            ) : (
+                                                <Store size={24} className="text-slate-300"/>
+                                            )}
+                                        </div>
+                                        
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h4 className="font-bold text-lg text-slate-800 leading-tight mb-1">{store.config.storeName}</h4>
+                                                <p className="text-xs text-slate-500 line-clamp-1">{store.config.description || 'Loja de Conveniência'}</p>
+                                            </div>
+                                            <div className="flex items-center gap-1 bg-yellow-50 px-1.5 py-0.5 rounded text-xs font-bold text-yellow-700">
+                                                <Star size={10} fill="currentColor" />
+                                                <span>4.8</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-4 flex items-center gap-4 text-xs text-slate-400 font-medium">
+                                             <span className="flex items-center gap-1"><Clock size={12}/> 30-45 min</span>
+                                             <span>•</span>
+                                             <span className="text-green-600">Grátis</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="col-span-full py-20 text-center">
+                                    <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                                        <Search size={32}/>
+                                    </div>
+                                    <p className="text-slate-500 font-medium">Nenhuma loja encontrada.</p>
+                                    <p className="text-sm text-slate-400">Tente buscar por outro nome.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ... LandingPage and AuthPage unchanged ...
 
 const LandingPage = () => {
@@ -1539,8 +1717,8 @@ const LandingPage = () => {
                      <button onClick={() => navigate('/register')} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-bold rounded-xl transition-all shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-2 hover:-translate-y-1">
                         <Rocket size={20} /> Começar Grátis
                      </button>
-                     <button onClick={() => navigate('/login')} className="px-8 py-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-lg font-bold rounded-xl transition-all flex items-center justify-center gap-2 hover:shadow-md">
-                        <LayoutDashboard size={20} /> Acessar Painel
+                     <button onClick={() => navigate('/marketplace')} className="px-8 py-4 bg-white hover:bg-slate-50 text-red-600 border border-red-100 text-lg font-bold rounded-xl transition-all flex items-center justify-center gap-2 hover:shadow-md shadow-sm">
+                        <ShoppingBag size={20} /> Ver Lojas
                      </button>
                  </div>
 
@@ -1830,7 +2008,7 @@ const AuthPage = () => {
   );
 };
 
-// --- REPLACED PublicStore COMPONENT ---
+// ... PublicStore COMPONENT ...
 const PublicStore = () => {
   const { id } = useParams();
   const [config, setConfig] = useState<StoreConfig | null>(null);
@@ -2650,6 +2828,10 @@ const App = () => {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={!user ? <AuthPage /> : <Navigate to="/dashboard" />} />
         <Route path="/register" element={!user ? <AuthPage /> : <Navigate to="/dashboard" />} />
+        
+        {/* New Marketplace Route */}
+        <Route path="/marketplace" element={<Marketplace />} />
+        
         <Route path="/store/:id" element={<PublicStore />} />
         
         <Route path="/dashboard/*" element={
