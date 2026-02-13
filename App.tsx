@@ -998,6 +998,16 @@ const OrdersManager = ({ user }: { user: User }) => {
       }
   };
 
+  const handleDeleteOrder = async (orderId: string) => {
+      if (confirm("Tem certeza que deseja excluir este pedido?")) {
+          try {
+            await deleteDoc(doc(db, `merchants/${user.uid}/orders`, orderId));
+          } catch (e) {
+            alert("Erro ao excluir pedido.");
+          }
+      }
+  };
+
   const statusColors: any = {
       'new': 'bg-blue-100 text-blue-700 border-blue-200',
       'processing': 'bg-amber-100 text-amber-700 border-amber-200',
@@ -1006,13 +1016,22 @@ const OrdersManager = ({ user }: { user: User }) => {
   };
 
   return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-in fade-in">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><h2 className="text-2xl font-bold">Pedidos</h2></div>
           {loading ? <LoadingSpinner /> : (
             <div className="grid gap-4">
                 {orders.map(order => (
-                    <div key={order.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between gap-4">
-                        <div className="flex-1">
+                    <div key={order.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between gap-4 relative group">
+                        {/* Delete Button (Absolute on Desktop, visible on hover) */}
+                        <button 
+                            onClick={() => handleDeleteOrder(order.id)}
+                            className="absolute top-4 right-4 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 z-10"
+                            title="Excluir Pedido"
+                        >
+                            <Trash2 size={18}/>
+                        </button>
+
+                        <div className="flex-1 pr-10">
                             <div className="flex justify-between md:justify-start items-center gap-4 mb-2">
                                 <span className="font-bold text-slate-900">#{order.id.slice(0, 8)}</span>
                                 <div className="flex flex-col">
