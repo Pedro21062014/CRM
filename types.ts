@@ -109,6 +109,7 @@ export interface WhatsAppConfig {
 export interface StoreConfig {
   storeName: string;
   description?: string; // Slogan ou info extra (ex: "Aberto das 18h as 23h")
+  category?: string; // Categoria Principal da Loja (Ex: Moda, Alimentação)
   whatsapp?: string; // Número para receber pedidos
   themeColor: string;
   logoUrl?: string;
@@ -118,6 +119,10 @@ export interface StoreConfig {
   ratingCount?: number;
   // Integração Meta
   metaWhatsApp?: WhatsAppConfig;
+  // Location
+  latitude?: number;
+  longitude?: number;
+  fullAddress?: string; // Endereço formatado do OpenStreetMap
 }
 
 export interface Coupon {

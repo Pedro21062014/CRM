@@ -1,5 +1,7 @@
 {
   "name": "NovaCRM & Store Builder",
   "description": "A modern CRM and customizable Store Builder backed by Firebase. Features product management, client tracking, real-time order notifications, and a drag-and-drop style store editor.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }
