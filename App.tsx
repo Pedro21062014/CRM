@@ -1118,6 +1118,8 @@ const StoreEditor = ({ user }: { user: User }) => {
   const [addressQuery, setAddressQuery] = useState('');
   const [addressResults, setAddressResults] = useState<any[]>([]);
   const [searchingAddress, setSearchingAddress] = useState(false);
+  // NEW STATE for GPS Button Loading
+  const [loadingLocation, setLoadingLocation] = useState(false);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -1165,17 +1167,44 @@ const StoreEditor = ({ user }: { user: User }) => {
       alert("Geolocalização não é suportada pelo seu navegador.");
       return;
     }
+
+    setLoadingLocation(true);
+
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setConfig({
-          ...config,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        });
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        
+        // Try Reverse Geocoding to get actual address
+        try {
+            // Using OpenStreetMap Nominatim API for reverse geocoding
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+            const data = await response.json();
+            
+            setConfig({
+                ...config,
+                latitude: lat,
+                longitude: lon,
+                fullAddress: data.display_name // Use the address returned by API
+            });
+        } catch (error) {
+            console.error("Reverse geocoding failed", error);
+            // Fallback: just coords
+            setConfig({
+                ...config,
+                latitude: lat,
+                longitude: lon,
+                fullAddress: `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`
+            });
+        } finally {
+            setLoadingLocation(false);
+        }
       },
       (error) => {
         alert("Erro ao obter localização. Verifique as permissões.");
-      }
+        setLoadingLocation(false);
+      },
+      { enableHighAccuracy: true }
     );
   };
   
@@ -1457,7 +1486,7 @@ const StoreEditor = ({ user }: { user: User }) => {
                                 </div>
                                 
                                 {addressResults.length > 0 && (
-                                    <div className="max-h-40 overflow-y-auto border rounded-lg bg-white shadow-sm">
+                                    <div className="max-h-40 overflow-y-auto border rounded-lg bg-white shadow-sm scrollbar-thin scrollbar-thumb-slate-200">
                                         {addressResults.map((result: any, idx) => (
                                             <div 
                                                 key={idx} 
@@ -1472,9 +1501,11 @@ const StoreEditor = ({ user }: { user: User }) => {
                                 
                                 <button 
                                     onClick={getMyLocation}
-                                    className="w-full py-2 bg-slate-100 text-slate-600 font-bold text-xs rounded-lg hover:bg-slate-200 flex items-center justify-center gap-2 mt-2"
+                                    disabled={loadingLocation}
+                                    className="w-full py-2 bg-slate-100 text-slate-600 font-bold text-xs rounded-lg hover:bg-slate-200 flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
                                 >
-                                    <MapPin size={14}/> Usar GPS Atual
+                                    {loadingLocation ? <Loader2 size={14} className="animate-spin"/> : <MapPin size={14}/>}
+                                    {loadingLocation ? 'Buscando Localização...' : 'Usar Localização Atual (GPS)'}
                                 </button>
                             </div>
                         )}
@@ -2731,3 +2762,4 @@ const App = () => {
 };
 
 export default App;
+
