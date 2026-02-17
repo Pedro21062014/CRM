@@ -2063,6 +2063,7 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
+  const [collapsed, setCollapsed] = useState(false);
   
   const menuItems = [
     { icon: LayoutDashboard, label: 'Visão Geral', path: '/dashboard' },
@@ -2077,9 +2078,17 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       {/* Sidebar Desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-100 z-20 shadow-sm">
-         <div className="h-20 flex items-center justify-center border-b border-slate-50">
-            <AppLogo />
+      <aside className={`hidden md:flex flex-col ${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-slate-100 z-20 shadow-sm transition-all duration-300 relative`}>
+         {/* Toggle Button */}
+         <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="absolute -right-3 top-9 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 rounded-full p-1.5 shadow-sm hover:shadow transition-all z-30"
+         >
+            {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+         </button>
+
+         <div className="h-20 flex items-center justify-center border-b border-slate-50 overflow-hidden">
+            <AppLogo collapsed={collapsed} />
          </div>
          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {menuItems.map(item => {
@@ -2088,18 +2097,19 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
                    <button 
                       key={item.path}
                       onClick={() => navigate(item.path)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm ${active ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
+                      title={collapsed ? item.label : undefined}
+                      className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl transition-all font-medium text-sm ${active ? 'bg-indigo-50 text-indigo-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
                    >
                        <item.icon size={20} strokeWidth={active ? 2.5 : 2} />
-                       {item.label}
+                       {!collapsed && <span className="animate-in fade-in duration-300">{item.label}</span>}
                    </button>
                )
             })}
          </nav>
          <div className="p-4 border-t border-slate-50">
-             <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all font-medium text-sm">
+             <button onClick={logout} title={collapsed ? "Sair" : undefined} className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all font-medium text-sm`}>
                  <LogOut size={20} />
-                 Sair da Conta
+                 {!collapsed && <span className="animate-in fade-in duration-300">Sair da Conta</span>}
              </button>
          </div>
       </aside>
