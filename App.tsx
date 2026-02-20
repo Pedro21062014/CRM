@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig, Coupon } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
+import { createPaymentLink } from './src/services/asaas';
 
 // --- AI CONFIGURATION ---
 const apiKey = process.env.API_KEY;
@@ -2408,7 +2409,26 @@ const PublicStore = () => {
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [paying, setPaying] = useState<string | null>(null);
   
+  const handleSubscribe = async (plan: any) => {
+      if (plan.price === "R$ 0") {
+          navigate('/register');
+          return;
+      }
+      
+      setPaying(plan.name);
+      try {
+          // Em um cenário real, pediríamos o email antes ou usaríamos o do usuário logado
+          const checkoutUrl = await createPaymentLink(plan.name, parseFloat(plan.price.replace('R$ ', '')), 'cliente@exemplo.com');
+          window.location.href = checkoutUrl;
+      } catch (error: any) {
+          alert("Erro ao iniciar pagamento: " + error.message);
+      } finally {
+          setPaying(null);
+      }
+  };
+
   const plans = [
     {
       name: "Gratuito",
@@ -2430,11 +2450,11 @@ const LandingPage = () => {
     },
     {
       name: "Enterprise",
-      price: "Personalizado",
-      period: "",
+      price: "R$ 199",
+      period: "/mês",
       desc: "Soluções sob medida para grandes empresas.",
       features: ["Acesso via API", "Gerente de Conta", "Integrações Customizadas", "Treinamento de Equipe"],
-      button: "Falar com Vendas",
+      button: "Assinar Enterprise",
       highlight: false
     }
   ];
@@ -2577,10 +2597,11 @@ const LandingPage = () => {
                             </div>
                             
                             <button 
-                                onClick={() => navigate('/register')}
-                                className={`w-full py-4 rounded-xl font-bold transition-all ${plan.highlight ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                                onClick={() => handleSubscribe(plan)}
+                                disabled={paying === plan.name}
+                                className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${plan.highlight ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'} disabled:opacity-70`}
                             >
-                                {plan.button}
+                                {paying === plan.name ? <Loader2 className="animate-spin" size={20}/> : plan.button}
                             </button>
                         </div>
                     ))}
