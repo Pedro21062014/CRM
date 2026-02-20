@@ -1,4 +1,4 @@
-
+"use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation, Navigate, Outlet } from 'react-router-dom';
@@ -2408,6 +2408,37 @@ const PublicStore = () => {
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  
+  const plans = [
+    {
+      name: "Gratuito",
+      price: "R$ 0",
+      period: "/mês",
+      desc: "Ideal para quem está começando agora.",
+      features: ["Até 10 produtos", "CRM Básico", "Link de WhatsApp", "Marketplace Público"],
+      button: "Começar Agora",
+      highlight: false
+    },
+    {
+      name: "Pro",
+      price: "R$ 49",
+      period: "/mês",
+      desc: "Para negócios que querem escalar vendas.",
+      features: ["Produtos Ilimitados", "CRM Completo (B2B)", "Organizador IA", "Cupons de Desconto", "Suporte Prioritário"],
+      button: "Assinar Pro",
+      highlight: true
+    },
+    {
+      name: "Enterprise",
+      price: "Personalizado",
+      period: "",
+      desc: "Soluções sob medida para grandes empresas.",
+      features: ["Acesso via API", "Gerente de Conta", "Integrações Customizadas", "Treinamento de Equipe"],
+      button: "Falar com Vendas",
+      highlight: false
+    }
+  ];
+
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
         <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
@@ -2505,7 +2536,59 @@ const LandingPage = () => {
             </div>
         </section>
 
-        <footer className="py-12 bg-white border-t border-slate-100 text-center">
+        {/* Pricing Section */}
+        <section className="py-24 bg-white">
+            <div className="max-w-7xl mx-auto px-6">
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl font-bold text-slate-900 mb-4">Planos que crescem com você</h2>
+                    <p className="text-slate-500 max-w-xl mx-auto">Escolha o plano ideal para o seu momento. Sem taxas escondidas.</p>
+                </div>
+                
+                <div className="grid md:grid-cols-3 gap-8">
+                    {plans.map((plan, i) => (
+                        <div 
+                            key={i} 
+                            className={`relative p-8 rounded-3xl border transition-all duration-300 flex flex-col ${plan.highlight ? 'border-indigo-600 shadow-xl shadow-indigo-100 scale-105 z-10 bg-white' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
+                        >
+                            {plan.highlight && (
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
+                                    Mais Popular
+                                </div>
+                            )}
+                            
+                            <div className="mb-8">
+                                <h3 className="font-bold text-xl text-slate-900 mb-2">{plan.name}</h3>
+                                <div className="flex items-baseline gap-1 mb-2">
+                                    <span className="text-4xl font-extrabold text-slate-900">{plan.price}</span>
+                                    <span className="text-slate-500 font-medium">{plan.period}</span>
+                                </div>
+                                <p className="text-sm text-slate-500">{plan.desc}</p>
+                            </div>
+                            
+                            <div className="space-y-4 mb-10 flex-1">
+                                {plan.features.map((feature, idx) => (
+                                    <div key={idx} className="flex items-center gap-3 text-sm text-slate-600">
+                                        <div className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${plan.highlight ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}>
+                                            <Check size={12} strokeWidth={3} />
+                                        </div>
+                                        {feature}
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <button 
+                                onClick={() => navigate('/register')}
+                                className={`w-full py-4 rounded-xl font-bold transition-all ${plan.highlight ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                            >
+                                {plan.button}
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+
+        <footer className="py-12 bg-slate-50 border-t border-slate-100 text-center">
             <div className="flex justify-center mb-4 opacity-50 grayscale hover:grayscale-0 transition-all">
                 <AppLogo />
             </div>
@@ -2778,4 +2861,3 @@ const App = () => {
 };
 
 export default App;
-
