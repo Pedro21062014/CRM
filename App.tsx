@@ -27,6 +27,7 @@ import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientT
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
 
 // --- AI CONFIGURATION ---
+console.log("Gemini API Key:", process.env.API_KEY);
 const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
 // --- Shared Components ---
