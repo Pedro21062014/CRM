@@ -27,8 +27,8 @@ import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientT
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
 
 // --- AI CONFIGURATION ---
-console.log("Gemini API Key:", process.env.API_KEY);
-const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+const apiKey = process.env.API_KEY;
+const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // --- Shared Components ---
 
@@ -1102,7 +1102,7 @@ const OrdersManager = ({ user }: { user: User }) => {
   );
 };
 
-const StoreEditor = ({ user }: { user: User }) => {
+const StoreEditor = ({ user, genAI }: { user: User, genAI: GoogleGenAI | null }) => {
   const [config, setConfig] = useState<StoreConfig>({
     storeName: 'Minha Loja',
     themeColor: '#4f46e5', // Changed from red to Indigo for general purpose
@@ -1264,6 +1264,11 @@ const StoreEditor = ({ user }: { user: User }) => {
   };
 
   const handleSmartOrganize = async () => {
+    if (!genAI) {
+      alert("A chave da API Gemini não está configurada. Por favor, adicione a chave no arquivo .env para usar o organizador inteligente.");
+      return;
+    }
+
     if (products.length === 0) {
       alert("Você precisa cadastrar produtos primeiro para o Bot organizar sua loja!");
       return;
@@ -2060,7 +2065,7 @@ const DashboardHome = ({ user }: { user: User }) => {
   );
 };
 
-const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
+const Dashboard = ({ user, logout, genAI }: { user: User, logout: () => void, genAI: GoogleGenAI | null }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -2150,7 +2155,7 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
                     <Route path="/products" element={<ProductsManager user={user} />} />
                     <Route path="/clients" element={<ClientsManager user={user} />} />
                     <Route path="/coupons" element={<CouponsManager user={user} />} />
-                    <Route path="/store" element={<StoreEditor user={user} />} />
+                    <Route path="/store" element={<StoreEditor user={user} genAI={genAI} />} />
                     <Route path="/whatsapp" element={<WhatsAppBot user={user} />} />
                     <Route path="*" element={<Navigate to="/dashboard" />} />
                 </Routes>
@@ -2765,7 +2770,7 @@ const App = () => {
         <Route path="/store/:id" element={<PublicStore />} />
         
         <Route path="/dashboard/*" element={
-            user ? <Dashboard user={user} logout={logout} /> : <Navigate to="/login" />
+            user ? <Dashboard user={user} logout={logout} genAI={genAI} /> : <Navigate to="/login" />
         } />
       </Routes>
     </HashRouter>
