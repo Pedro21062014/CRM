@@ -1,7 +1,7 @@
-"use client";
+
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { HashRouter, Routes, Route, Link, useNavigate, useParams, useLocation, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useLocation, Navigate, Outlet } from 'react-router-dom';
 import { auth, googleProvider, db } from './firebase';
 import { 
   signInWithPopup, 
@@ -21,15 +21,13 @@ import {
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2, TicketPercent, Tag, Utensils, Navigation, Home, Shirt, Monitor
+  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2, TicketPercent, Tag, Utensils, Navigation, Home, Shirt, Monitor, CreditCard
 } from 'lucide-react';
-import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig, Coupon } from './types';
+import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig, Coupon, PaymentPlan, MerchantSubscription } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
-import { createPaymentLink } from './src/services/asaas';
 
 // --- AI CONFIGURATION ---
-const apiKey = process.env.API_KEY;
-const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null;
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || '' });
 
 // --- Shared Components ---
 
@@ -515,7 +513,7 @@ const ProductsManager = ({ user }: { user: User }) => {
       e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: React.DragEvent, _index?: number) => {
       e.preventDefault(); // Necessary to allow dropping
       e.dataTransfer.dropEffect = "move";
   };
@@ -1103,7 +1101,7 @@ const OrdersManager = ({ user }: { user: User }) => {
   );
 };
 
-const StoreEditor = ({ user, genAI }: { user: User, genAI: GoogleGenAI | null }) => {
+const StoreEditor = ({ user }: { user: User }) => {
   const [config, setConfig] = useState<StoreConfig>({
     storeName: 'Minha Loja',
     themeColor: '#4f46e5', // Changed from red to Indigo for general purpose
@@ -1265,11 +1263,6 @@ const StoreEditor = ({ user, genAI }: { user: User, genAI: GoogleGenAI | null })
   };
 
   const handleSmartOrganize = async () => {
-    if (!genAI) {
-      alert("A chave da API Gemini não está configurada. Por favor, adicione a chave no arquivo .env para usar o organizador inteligente.");
-      return;
-    }
-
     if (products.length === 0) {
       alert("Você precisa cadastrar produtos primeiro para o Bot organizar sua loja!");
       return;
@@ -1384,7 +1377,7 @@ const StoreEditor = ({ user, genAI }: { user: User, genAI: GoogleGenAI | null })
       e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: React.DragEvent, _index?: number) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
   };
@@ -1797,7 +1790,7 @@ const Marketplace = () => {
             } else {
                 // Fallback to searching in name/desc if category field is missing
                 matchesCategory = store.config.storeName.toLowerCase().includes(selectedCategory.toLowerCase()) || 
-                                  (store.config.description && store.config.description.toLowerCase().includes(selectedCategory.toLowerCase()));
+                                  !!(store.config.description && store.config.description.toLowerCase().includes(selectedCategory.toLowerCase()));
             }
         }
 
@@ -1986,8 +1979,160 @@ const Marketplace = () => {
     );
 };
 
+const PlansManager = ({ user }: { user: User }) => {
+  const [subscription, setSubscription] = useState<MerchantSubscription | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const plans: PaymentPlan[] = [
+    {
+      id: 'free',
+      name: 'Gratuito',
+      price: 0,
+      features: ['Até 10 Produtos', 'Catálogo Online', 'Pedidos via WhatsApp', 'Suporte Básico']
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      price: 49.90,
+      features: ['Produtos Ilimitados', 'Gestão de Clientes (CRM)', 'Cupons de Desconto', 'WhatsApp Bot Básico', 'Relatórios de Vendas'],
+      isPopular: true
+    },
+    {
+      id: 'enterprise',
+      name: 'Enterprise',
+      price: 99.90,
+      features: ['Tudo do Pro', 'WhatsApp Bot Avançado (IA)', 'Suporte Prioritário', 'Domínio Personalizado', 'API de Integração']
+    }
+  ];
+
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      try {
+        const docRef = doc(db, 'merchants', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setSubscription(docSnap.data().subscription || { planId: 'free', status: 'active' });
+        } else {
+          setSubscription({ planId: 'free', status: 'active', currentPeriodEnd: null });
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSubscription();
+  }, [user.uid]);
+
+  const handleSelectPlan = async (planId: string) => {
+    if (planId === subscription?.planId) return;
+    
+    try {
+      await updateDoc(doc(db, 'merchants', user.uid), {
+        subscription: {
+          planId,
+          status: 'active',
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        }
+      });
+      setSubscription({
+        planId,
+        status: 'active',
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      });
+      alert(`Plano ${planId.toUpperCase()} selecionado com sucesso!`);
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao atualizar plano.");
+    }
+  };
+
+  if (loading) return <LoadingSpinner />;
+
+  return (
+    <div className="space-y-8 animate-in fade-in">
+      <div className="text-center max-w-2xl mx-auto">
+        <h2 className="text-3xl font-bold text-slate-900 mb-4">Escolha o plano ideal para o seu negócio</h2>
+        <p className="text-slate-500">Aumente suas vendas e profissionalize sua gestão com as ferramentas certas.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {plans.map((plan) => (
+          <div 
+            key={plan.id} 
+            className={`relative bg-white rounded-3xl p-8 shadow-sm border-2 transition-all duration-300 hover:shadow-xl ${plan.isPopular ? 'border-indigo-500 scale-105 z-10' : 'border-slate-100'}`}
+          >
+            {plan.isPopular && (
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-widest py-1.5 px-4 rounded-full shadow-lg">
+                Mais Popular
+              </div>
+            )}
+            
+            <div className="mb-8">
+              <h3 className="text-xl font-bold text-slate-900 mb-2">{plan.name}</h3>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-slate-900">R$ {plan.price.toFixed(2).replace('.', ',')}</span>
+                <span className="text-slate-400 text-sm">/mês</span>
+              </div>
+            </div>
+
+            <ul className="space-y-4 mb-8">
+              {plan.features.map((feature: string, idx: number) => (
+                <li key={idx} className="flex items-start gap-3 text-sm text-slate-600">
+                  <div className="mt-0.5 p-0.5 bg-indigo-50 text-indigo-600 rounded-full shrink-0">
+                    <Check size={12} strokeWidth={3} />
+                  </div>
+                  {feature}
+                </li>
+              ))}
+            </ul>
+
+            <button
+              onClick={() => handleSelectPlan(plan.id)}
+              disabled={plan.id === subscription?.planId}
+              className={`w-full py-3 px-6 rounded-xl font-bold transition-all duration-200 ${
+                plan.id === subscription?.planId 
+                  ? 'bg-slate-100 text-slate-400 cursor-default' 
+                  : plan.isPopular 
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200' 
+                    : 'bg-slate-900 text-white hover:bg-slate-800'
+              }`}
+            >
+              {plan.id === subscription?.planId ? 'Plano Atual' : 'Selecionar Plano'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-indigo-50 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="p-4 bg-white text-indigo-600 rounded-2xl shadow-sm">
+            <ShieldCheck size={32} />
+          </div>
+          <div>
+            <h4 className="font-bold text-slate-900">Pagamento Seguro</h4>
+            <p className="text-sm text-slate-500">Sua assinatura é processada com segurança e pode ser cancelada a qualquer momento.</p>
+          </div>
+        </div>
+        <div className="flex -space-x-2">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 overflow-hidden">
+              <img src={`https://picsum.photos/seed/${i+10}/40/40`} alt="User" referrerPolicy="no-referrer" />
+            </div>
+          ))}
+          <div className="w-10 h-10 rounded-full border-2 border-white bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white">
+            +500
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DashboardHome = ({ user }: { user: User }) => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ orders: 0, revenue: 0, clients: 0 });
+  const [chartData, setChartData] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1998,16 +2143,34 @@ const DashboardHome = ({ user }: { user: User }) => {
          const clientsSnap = await getDocs(collection(db, `merchants/${user.uid}/clients`));
          
          let totalRevenue = 0;
+         const revenueByDay: {[key: string]: number} = {};
+         
          ordersSnap.forEach(doc => {
              const data = doc.data();
              totalRevenue += data.total || 0;
+             
+             if (data.createdAt) {
+                const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+                const day = date.toISOString().split('T')[0];
+                revenueByDay[day] = (revenueByDay[day] || 0) + (data.total || 0);
+             }
          });
+
+         // Fill last 7 days for chart
+         const last7Days = [];
+         for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dayStr = d.toISOString().split('T')[0];
+            last7Days.push(Math.round(revenueByDay[dayStr] || 0));
+         }
 
          setStats({
              orders: ordersSnap.size,
              revenue: totalRevenue,
              clients: clientsSnap.size
          });
+         setChartData(last7Days);
        } catch (e) {
            console.error(e);
        } finally {
@@ -2057,16 +2220,54 @@ const DashboardHome = ({ user }: { user: User }) => {
             </div>
         </div>
         
-        {/* Placeholder for charts or recent activity */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 text-center py-20">
-            <BarChart3 size={48} className="mx-auto text-slate-200 mb-4"/>
-            <p className="text-slate-400 font-medium">Gráficos detalhados em breve.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h4 className="font-bold text-slate-800">Desempenho de Vendas</h4>
+                        <p className="text-xs text-slate-400">Receita nos últimos 7 dias</p>
+                    </div>
+                    <TrendingUp size={20} className="text-emerald-500" />
+                </div>
+                <div className="h-48 flex items-end">
+                    <SimpleBarChart data={chartData} color="indigo" height={150} />
+                </div>
+                <div className="mt-4 flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <span>6 dias atrás</span>
+                    <span>Hoje</span>
+                </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-6">
+                    <h4 className="font-bold text-slate-800">Ações Rápidas</h4>
+                    <Zap size={20} className="text-amber-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={() => navigate('/dashboard/products')} className="p-4 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all text-left group">
+                        <Plus size={20} className="mb-2 text-slate-400 group-hover:text-indigo-500" />
+                        <span className="text-sm font-bold block">Novo Produto</span>
+                    </button>
+                    <button onClick={() => navigate('/dashboard/clients')} className="p-4 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all text-left group">
+                        <Users size={20} className="mb-2 text-slate-400 group-hover:text-indigo-500" />
+                        <span className="text-sm font-bold block">Novo Cliente</span>
+                    </button>
+                    <button onClick={() => navigate('/dashboard/store')} className="p-4 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all text-left group">
+                        <Store size={20} className="mb-2 text-slate-400 group-hover:text-indigo-500" />
+                        <span className="text-sm font-bold block">Editar Loja</span>
+                    </button>
+                    <button onClick={() => navigate('/dashboard/coupons')} className="p-4 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all text-left group">
+                        <TicketPercent size={20} className="mb-2 text-slate-400 group-hover:text-indigo-500" />
+                        <span className="text-sm font-bold block">Criar Cupom</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
   );
 };
 
-const Dashboard = ({ user, logout, genAI }: { user: User, logout: () => void, genAI: GoogleGenAI | null }) => {
+const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -2080,6 +2281,7 @@ const Dashboard = ({ user, logout, genAI }: { user: User, logout: () => void, ge
     { icon: TicketPercent, label: 'Cupons', path: '/dashboard/coupons' },
     { icon: Store, label: 'Minha Loja', path: '/dashboard/store' },
     { icon: MessageCircle, label: 'WhatsApp Bot', path: '/dashboard/whatsapp' },
+    { icon: CreditCard, label: 'Planos', path: '/dashboard/plans' },
   ];
 
   return (
@@ -2156,8 +2358,9 @@ const Dashboard = ({ user, logout, genAI }: { user: User, logout: () => void, ge
                     <Route path="/products" element={<ProductsManager user={user} />} />
                     <Route path="/clients" element={<ClientsManager user={user} />} />
                     <Route path="/coupons" element={<CouponsManager user={user} />} />
-                    <Route path="/store" element={<StoreEditor user={user} genAI={genAI} />} />
+                    <Route path="/store" element={<StoreEditor user={user} />} />
                     <Route path="/whatsapp" element={<WhatsAppBot user={user} />} />
+                    <Route path="/plans" element={<PlansManager user={user} />} />
                     <Route path="*" element={<Navigate to="/dashboard" />} />
                 </Routes>
              </div>
@@ -2332,6 +2535,45 @@ const PublicStore = () => {
                  </button>
             </nav>
 
+            <div className="bg-white pb-8 relative mb-6">
+                <div className="h-40 md:h-64 w-full bg-slate-100 relative overflow-hidden group">
+                    {config.bannerUrl ? (
+                        <img src={config.bannerUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Capa da Loja" />
+                    ) : (
+                        <div className="w-full h-full" style={{ backgroundColor: config.themeColor || '#4f46e5' }}>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                        </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-90"></div>
+                </div>
+                
+                <div className="px-4 -mt-16 flex flex-col items-center gap-4 relative z-10 text-center">
+                    <div className="w-28 h-28 rounded-full border-4 border-white bg-white shadow-xl overflow-hidden flex items-center justify-center shrink-0">
+                        {config.logoUrl ? (
+                            <img src={config.logoUrl} className="w-full h-full object-cover" alt="Logo" />
+                        ) : (
+                            <Store size={40} className="text-slate-300"/>
+                        )}
+                    </div>
+                    
+                    <div className="animate-in slide-in-from-bottom-2 fade-in duration-500">
+                        <h1 className="font-extrabold text-3xl md:text-4xl text-slate-900 leading-tight mb-2 tracking-tight">{config.storeName}</h1>
+                        {config.description && <p className="text-slate-500 text-base max-w-xl mx-auto leading-relaxed">{config.description}</p>}
+                        
+                        <div className="flex flex-wrap gap-2 justify-center mt-4">
+                             {config.category && (
+                                <span className="px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full uppercase tracking-wider border border-slate-200">
+                                    {config.category}
+                                </span>
+                             )}
+                             <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full flex items-center gap-1 border border-emerald-100">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Aberto Agora
+                             </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Sections */}
             <div>
                 {config.sections.map((section, idx) => {
@@ -2409,56 +2651,6 @@ const PublicStore = () => {
 
 const LandingPage = () => {
   const navigate = useNavigate();
-  const [paying, setPaying] = useState<string | null>(null);
-  
-  const handleSubscribe = async (plan: any) => {
-      if (plan.price === "R$ 0") {
-          navigate('/register');
-          return;
-      }
-      
-      setPaying(plan.name);
-      try {
-          // Em um cenário real, pediríamos o email antes ou usaríamos o do usuário logado
-          const checkoutUrl = await createPaymentLink(plan.name, parseFloat(plan.price.replace('R$ ', '')), 'cliente@exemplo.com');
-          window.location.href = checkoutUrl;
-      } catch (error: any) {
-          alert("Erro ao iniciar pagamento: " + error.message);
-      } finally {
-          setPaying(null);
-      }
-  };
-
-  const plans = [
-    {
-      name: "Gratuito",
-      price: "R$ 0",
-      period: "/mês",
-      desc: "Ideal para quem está começando agora.",
-      features: ["Até 10 produtos", "CRM Básico", "Link de WhatsApp", "Marketplace Público"],
-      button: "Começar Agora",
-      highlight: false
-    },
-    {
-      name: "Pro",
-      price: "R$ 49",
-      period: "/mês",
-      desc: "Para negócios que querem escalar vendas.",
-      features: ["Produtos Ilimitados", "CRM Completo (B2B)", "Organizador IA", "Cupons de Desconto", "Suporte Prioritário"],
-      button: "Assinar Pro",
-      highlight: true
-    },
-    {
-      name: "Enterprise",
-      price: "R$ 199",
-      period: "/mês",
-      desc: "Soluções sob medida para grandes empresas.",
-      features: ["Acesso via API", "Gerente de Conta", "Integrações Customizadas", "Treinamento de Equipe"],
-      button: "Assinar Enterprise",
-      highlight: false
-    }
-  ];
-
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
         <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
@@ -2556,60 +2748,7 @@ const LandingPage = () => {
             </div>
         </section>
 
-        {/* Pricing Section */}
-        <section className="py-24 bg-white">
-            <div className="max-w-7xl mx-auto px-6">
-                <div className="text-center mb-16">
-                    <h2 className="text-3xl font-bold text-slate-900 mb-4">Planos que crescem com você</h2>
-                    <p className="text-slate-500 max-w-xl mx-auto">Escolha o plano ideal para o seu momento. Sem taxas escondidas.</p>
-                </div>
-                
-                <div className="grid md:grid-cols-3 gap-8">
-                    {plans.map((plan, i) => (
-                        <div 
-                            key={i} 
-                            className={`relative p-8 rounded-3xl border transition-all duration-300 flex flex-col ${plan.highlight ? 'border-indigo-600 shadow-xl shadow-indigo-100 scale-105 z-10 bg-white' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}
-                        >
-                            {plan.highlight && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full">
-                                    Mais Popular
-                                </div>
-                            )}
-                            
-                            <div className="mb-8">
-                                <h3 className="font-bold text-xl text-slate-900 mb-2">{plan.name}</h3>
-                                <div className="flex items-baseline gap-1 mb-2">
-                                    <span className="text-4xl font-extrabold text-slate-900">{plan.price}</span>
-                                    <span className="text-slate-500 font-medium">{plan.period}</span>
-                                </div>
-                                <p className="text-sm text-slate-500">{plan.desc}</p>
-                            </div>
-                            
-                            <div className="space-y-4 mb-10 flex-1">
-                                {plan.features.map((feature, idx) => (
-                                    <div key={idx} className="flex items-center gap-3 text-sm text-slate-600">
-                                        <div className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${plan.highlight ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}>
-                                            <Check size={12} strokeWidth={3} />
-                                        </div>
-                                        {feature}
-                                    </div>
-                                ))}
-                            </div>
-                            
-                            <button 
-                                onClick={() => handleSubscribe(plan)}
-                                disabled={paying === plan.name}
-                                className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${plan.highlight ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'} disabled:opacity-70`}
-                            >
-                                {paying === plan.name ? <Loader2 className="animate-spin" size={20}/> : plan.button}
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </section>
-
-        <footer className="py-12 bg-slate-50 border-t border-slate-100 text-center">
+        <footer className="py-12 bg-white border-t border-slate-100 text-center">
             <div className="flex justify-center mb-4 opacity-50 grayscale hover:grayscale-0 transition-all">
                 <AppLogo />
             </div>
@@ -2862,22 +3001,16 @@ const App = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><LoadingSpinner /></div>;
 
   return (
-    <HashRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={!user ? <AuthPage /> : <Navigate to="/dashboard" />} />
-        <Route path="/register" element={!user ? <AuthPage /> : <Navigate to="/dashboard" />} />
-        
-        {/* New Marketplace Route */}
-        <Route path="/marketplace" element={<Marketplace />} />
-        
-        <Route path="/store/:id" element={<PublicStore />} />
-        
-        <Route path="/dashboard/*" element={
-            user ? <Dashboard user={user} logout={logout} genAI={genAI} /> : <Navigate to="/login" />
-        } />
-      </Routes>
-    </HashRouter>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={user ? <Navigate to="/dashboard" /> : <LandingPage />} />
+          <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <AuthPage />} />
+          <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <AuthPage />} />
+          <Route path="/dashboard/*" element={user ? <Dashboard user={user} logout={logout} /> : <Navigate to="/login" />} />
+          <Route path="/store/:id/*" element={<PublicStore />} />
+          <Route path="/marketplace" element={<Marketplace />} />
+        </Routes>
+      </BrowserRouter>
   );
 };
 

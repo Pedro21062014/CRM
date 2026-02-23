@@ -135,3 +135,17 @@ export interface Coupon {
   active: boolean;
   createdAt: any;
 }
+
+export interface PaymentPlan {
+  id: string;
+  name: string;
+  price: number;
+  features: string[];
+  isPopular?: boolean;
+}
+
+export interface MerchantSubscription {
+  planId: string;
+  status: 'active' | 'past_due' | 'canceled';
+  currentPeriodEnd: any;
+}
