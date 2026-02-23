@@ -1701,16 +1701,11 @@ const Marketplace = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
     const [loadingLocation, setLoadingLocation] = useState(false);
-    
-    // NEW STATE for selected category
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchStores = async () => {
             try {
-                // Fetch all merchants
-                // Note: In a real production app, we would query only active/verified stores
-                // For this MVP, we fetch the merchants collection
                 const querySnapshot = await getDocs(collection(db, "merchants"));
                 const items: {id: string, config: StoreConfig}[] = [];
                 
@@ -1749,7 +1744,6 @@ const Marketplace = () => {
                 const userLng = position.coords.longitude;
                 setUserLocation({ latitude: userLat, longitude: userLng });
 
-                // Calculate distances and sort
                 setStores(prevStores => {
                     const storesWithDist = prevStores.map(store => {
                         let dist = undefined;
@@ -1759,8 +1753,6 @@ const Marketplace = () => {
                         return { ...store, distance: dist };
                     });
 
-                    // Sort: stores with distance come first, sorted by distance
-                    // Stores without distance go to the bottom
                     return storesWithDist.sort((a, b) => {
                         if (a.distance !== undefined && b.distance !== undefined) {
                             return a.distance - b.distance;
@@ -1781,14 +1773,11 @@ const Marketplace = () => {
     };
 
     const filteredStores = stores.filter(store => {
-        // Prioritize store.config.category if it exists for filtering
         let matchesCategory = true;
         if (selectedCategory) {
             if (store.config.category) {
-                // Exact or partial match on category field
                 matchesCategory = store.config.category.toLowerCase() === selectedCategory.toLowerCase();
             } else {
-                // Fallback to searching in name/desc if category field is missing
                 matchesCategory = store.config.storeName.toLowerCase().includes(selectedCategory.toLowerCase()) || 
                                   !!(store.config.description && store.config.description.toLowerCase().includes(selectedCategory.toLowerCase()));
             }
@@ -1801,12 +1790,13 @@ const Marketplace = () => {
     });
 
     const categories = [
-        { name: "Eletrônicos", icon: Smartphone, color: "bg-blue-100 text-blue-600" },
-        { name: "Moda", icon: Shirt, color: "bg-pink-100 text-pink-600" },
-        { name: "Casa", icon: Home, color: "bg-amber-100 text-amber-600" }, 
-        { name: "Beleza", icon: Sparkles, color: "bg-purple-100 text-purple-600" },
-        { name: "Serviços", icon: Briefcase, color: "bg-emerald-100 text-emerald-600" },
-        { name: "Alimentação", icon: Utensils, color: "bg-red-100 text-red-600" }
+        { name: "Mercado", image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=150&h=150&fit=crop" },
+        { name: "Lanches", image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=150&h=150&fit=crop" },
+        { name: "Farmácia", image: "https://images.unsplash.com/photo-1585435557343-3b092031a831?w=150&h=150&fit=crop" },
+        { name: "Bebidas", image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=150&h=150&fit=crop" },
+        { name: "Pet", image: "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=150&h=150&fit=crop" },
+        { name: "Eletrônicos", image: "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=150&h=150&fit=crop" },
+        { name: "Moda", image: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=150&h=150&fit=crop" },
     ];
     
     const toggleCategory = (catName: string) => {
@@ -1818,154 +1808,166 @@ const Marketplace = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 font-sans pb-20">
-            {/* Header / Search Area */}
-            <div className="bg-white sticky top-0 z-30 shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="min-h-screen bg-white font-sans pb-20">
+            {/* Header */}
+            <div className="bg-white sticky top-0 z-30 shadow-sm pt-4 pb-2 px-4">
+                <div className="max-w-3xl mx-auto">
+                    {/* Top Row: Location & Profile */}
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-                             <div className="bg-indigo-600 text-white p-1.5 rounded-lg">
+                             <div className="bg-red-500 text-white p-1.5 rounded-lg">
                                 <Rocket size={20} fill="currentColor"/>
                              </div>
-                             <span className="font-bold text-xl tracking-tight text-slate-900">Nova<span className="text-indigo-600">Store</span></span>
+                             <span className="font-bold text-xl tracking-tight text-slate-900">Nova<span className="text-red-500">Store</span></span>
                         </div>
                         
-                        <div className="flex gap-2">
-                             <button onClick={() => navigate('/login')} className="text-sm font-bold text-slate-600 hover:text-indigo-600 px-3 py-1.5 rounded-full hover:bg-slate-100 transition-colors">
-                                 Sou Lojista
-                             </button>
-                        </div>
-                    </div>
-
-                    <div className="relative max-w-2xl mx-auto mb-2 flex gap-2">
-                        <div className="relative flex-1">
-                            <input 
-                                type="text" 
-                                placeholder="Buscar loja ou produto..." 
-                                className="w-full pl-12 pr-4 py-3.5 bg-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-indigo-200 transition-all text-slate-700 font-medium placeholder:text-slate-400"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500" size={20} />
-                        </div>
                         <button 
                             onClick={handleNearMe}
                             disabled={loadingLocation}
-                            className={`px-4 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-sm whitespace-nowrap ${userLocation ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                            className="flex items-center gap-1 text-slate-700 hover:bg-slate-100 px-3 py-1.5 rounded-full transition-colors"
                         >
-                            {loadingLocation ? <Loader2 className="animate-spin" size={18}/> : <Navigation size={18} fill={userLocation ? "currentColor" : "none"}/>}
-                            {userLocation ? 'Perto de mim' : 'Perto de mim'}
+                            <div className="flex flex-col items-end text-right">
+                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Entregar em</span>
+                                <span className="text-sm font-bold flex items-center gap-1">
+                                    {loadingLocation ? 'Buscando...' : userLocation ? 'Sua localização' : 'Definir endereço'}
+                                    <ChevronDown size={14} className="text-red-500"/>
+                                </span>
+                            </div>
                         </button>
+                    </div>
+
+                    {/* Search Bar */}
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            placeholder="Buscar lojas, itens ou categorias" 
+                            className="w-full pl-12 pr-4 py-3.5 bg-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-red-200 transition-all text-slate-700 font-medium placeholder:text-slate-500"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-red-500" size={20} />
                     </div>
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
-                {/* Categories */}
-                <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+            <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
+                {/* Categories Carousel */}
+                <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar -mx-4 px-4">
                     {categories.map((cat, i) => (
                         <div 
                             key={i} 
                             onClick={() => toggleCategory(cat.name)}
-                            className={`flex flex-col items-center gap-2 min-w-[80px] cursor-pointer hover:scale-105 transition-all ${selectedCategory === cat.name ? 'opacity-100 scale-105' : 'opacity-70 hover:opacity-100'}`}
+                            className={`flex flex-col items-center gap-2 min-w-[72px] cursor-pointer transition-all ${selectedCategory === cat.name ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}
                         >
-                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-sm transition-all ${selectedCategory === cat.name ? 'bg-indigo-600 text-white ring-2 ring-indigo-300' : cat.color}`}>
-                                <cat.icon size={24} />
+                            <div className={`w-16 h-16 rounded-2xl overflow-hidden shadow-sm transition-all ${selectedCategory === cat.name ? 'ring-4 ring-red-500 ring-offset-2' : ''}`}>
+                                <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
                             </div>
-                            <span className={`text-xs font-bold ${selectedCategory === cat.name ? 'text-indigo-600' : 'text-slate-600'}`}>{cat.name}</span>
+                            <span className={`text-xs font-medium text-center ${selectedCategory === cat.name ? 'text-red-600 font-bold' : 'text-slate-700'}`}>{cat.name}</span>
                         </div>
                     ))}
                 </div>
 
-                {/* Banner Promo */}
-                <div className="w-full h-40 md:h-56 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl relative overflow-hidden shadow-lg flex items-center px-8 text-white">
-                    <div className="absolute right-0 top-0 h-full w-1/2 bg-white/10 skew-x-12 transform translate-x-20"></div>
-                    <div className="relative z-10 max-w-lg">
-                        <span className="bg-white/20 text-white px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-2 inline-block">Novidades</span>
-                        <h2 className="text-2xl md:text-4xl font-extrabold mb-2">O que você precisa?</h2>
-                        <p className="text-white/90 text-sm md:text-base mb-4">Descubra as melhores lojas e produtos da sua região em um só lugar.</p>
+                {/* Banners Carousel */}
+                <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar -mx-4 px-4 snap-x">
+                    <div className="min-w-[280px] md:min-w-[400px] h-40 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-6 text-white shadow-md snap-center relative overflow-hidden flex flex-col justify-center">
+                        <div className="absolute right-0 top-0 h-full w-1/2 bg-white/10 skew-x-12 transform translate-x-10"></div>
+                        <span className="bg-white text-red-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider mb-2 w-max">Cupom R$15</span>
+                        <h3 className="text-2xl font-extrabold leading-tight mb-1">Primeira<br/>Compra</h3>
+                        <p className="text-sm text-white/90">Aproveite descontos exclusivos</p>
+                    </div>
+                    <div className="min-w-[280px] md:min-w-[400px] h-40 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-2xl p-6 text-white shadow-md snap-center relative overflow-hidden flex flex-col justify-center">
+                        <div className="absolute right-0 top-0 h-full w-1/2 bg-white/10 skew-x-12 transform translate-x-10"></div>
+                        <span className="bg-white text-blue-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider mb-2 w-max">Mercado</span>
+                        <h3 className="text-2xl font-extrabold leading-tight mb-1">Compras<br/>do Mês</h3>
+                        <p className="text-sm text-white/90">Receba em casa hoje mesmo</p>
                     </div>
                 </div>
 
                 {/* Store List */}
                 <div>
-                    <h3 className="font-bold text-xl text-slate-800 mb-6 flex items-center gap-2">
-                        <Store size={20} className="text-slate-400"/> Lojas Disponíveis
+                    <h3 className="font-bold text-lg text-slate-800 mb-4 px-1">
+                        {selectedCategory ? `Lojas de ${selectedCategory}` : 'Lojas na sua região'}
                     </h3>
                     
                     {loading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {[1,2,3,4,5,6].map(i => (
-                                <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-100 h-48 animate-pulse"></div>
+                        <div className="space-y-4">
+                            {[1,2,3,4].map(i => (
+                                <div key={i} className="flex gap-4 p-4 bg-white rounded-xl border border-slate-100 animate-pulse">
+                                    <div className="w-16 h-16 bg-slate-200 rounded-full"></div>
+                                    <div className="flex-1 space-y-2 py-1">
+                                        <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                                        <div className="h-3 bg-slate-200 rounded w-1/3"></div>
+                                        <div className="h-3 bg-slate-200 rounded w-1/4"></div>
+                                    </div>
+                                </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="space-y-3">
                             {filteredStores.length > 0 ? filteredStores.map((store) => (
                                 <div 
                                     key={store.id} 
                                     onClick={() => navigate(`/store/${store.id}`)}
-                                    className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer group"
+                                    className="flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer group"
                                 >
-                                    {/* Store Banner */}
-                                    <div className="h-24 w-full bg-slate-200 relative">
-                                        {store.config.bannerUrl ? (
-                                            <img src={store.config.bannerUrl} className="w-full h-full object-cover" alt="Capa" />
+                                    {/* Store Logo */}
+                                    <div className="w-16 h-16 rounded-full border border-slate-100 shadow-sm overflow-hidden flex-shrink-0 flex items-center justify-center bg-slate-50">
+                                        {store.config.logoUrl ? (
+                                            <img src={store.config.logoUrl} className="w-full h-full object-cover" alt={store.config.storeName} />
                                         ) : (
-                                            <div className="w-full h-full" style={{backgroundColor: store.config.themeColor || '#4f46e5'}}></div>
-                                        )}
-                                        {store.distance !== undefined && (
-                                            <div className="absolute top-2 right-2 bg-white/90 backdrop-blur text-slate-800 px-2 py-1 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1">
-                                                <MapPin size={12} className="text-indigo-500"/>
-                                                {store.distance < 1 
-                                                    ? `${(store.distance * 1000).toFixed(0)}m` 
-                                                    : `${store.distance.toFixed(1)}km`}
-                                            </div>
+                                            <Store size={24} className="text-slate-300"/>
                                         )}
                                     </div>
                                     
-                                    <div className="px-5 pb-5 relative">
-                                        {/* Store Logo Overlapping Banner */}
-                                        <div className="w-16 h-16 bg-white rounded-full border-4 border-white shadow-md -mt-8 mb-3 overflow-hidden flex items-center justify-center">
-                                            {store.config.logoUrl ? (
-                                                <img src={store.config.logoUrl} className="w-full h-full object-cover" alt="Logo" />
-                                            ) : (
-                                                <Store size={24} className="text-slate-300"/>
-                                            )}
-                                        </div>
-                                        
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <h4 className="font-bold text-lg text-slate-800 leading-tight mb-1">{store.config.storeName}</h4>
-                                                <p className="text-xs text-slate-500 line-clamp-1">{store.config.description || 'Loja de Variedades'}</p>
-                                                {store.config.category && <span className="inline-block mt-1 px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded uppercase tracking-wider">{store.config.category}</span>}
-                                            </div>
-                                            <div className="flex items-center gap-1 bg-yellow-50 px-1.5 py-0.5 rounded text-xs font-bold text-yellow-700">
+                                    {/* Store Details */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <h4 className="font-bold text-slate-800 truncate pr-2 group-hover:text-red-600 transition-colors">{store.config.storeName}</h4>
+                                            <div className="flex items-center gap-1 text-amber-500 font-bold text-xs bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">
                                                 <Star size={10} fill="currentColor" />
                                                 <span>4.8</span>
                                             </div>
                                         </div>
-
-                                        <div className="mt-4 flex items-center gap-4 text-xs text-slate-400 font-medium">
-                                             <span className="flex items-center gap-1"><Package size={12}/> Variedades</span>
-                                             <span>•</span>
-                                             <span className="text-green-600">Aberto Agora</span>
+                                        
+                                        <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5 truncate">
+                                            <span>{store.config.category || 'Variedades'}</span>
+                                            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                                            {store.distance !== undefined ? (
+                                                <span>
+                                                    {store.distance < 1 
+                                                        ? `${(store.distance * 1000).toFixed(0)}m` 
+                                                        : `${store.distance.toFixed(1)}km`}
+                                                </span>
+                                            ) : (
+                                                <span>Novo</span>
+                                            )}
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-3 text-xs text-slate-500">
+                                            <div className="flex items-center gap-1">
+                                                <Clock size={12} className="text-slate-400"/>
+                                                <span>30-45 min</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 text-green-600 font-medium">
+                                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                                                <span className="ml-2">Frete Grátis</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             )) : (
-                                <div className="col-span-full py-20 text-center">
-                                    <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-                                        <Search size={32}/>
+                                <div className="py-16 text-center">
+                                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                                        <Search size={24}/>
                                     </div>
-                                    <p className="text-slate-500 font-medium">
+                                    <p className="text-slate-600 font-bold mb-1">
                                         {selectedCategory 
-                                            ? `Nenhuma loja encontrada na categoria "${selectedCategory}".` 
-                                            : "Nenhuma loja encontrada."}
+                                            ? `Nenhuma loja de ${selectedCategory}` 
+                                            : "Nenhuma loja encontrada"}
                                     </p>
-                                    <p className="text-sm text-slate-400">Tente buscar por outro nome ou limpe os filtros.</p>
+                                    <p className="text-sm text-slate-500">Tente buscar por outro termo ou limpe os filtros.</p>
                                     {selectedCategory && (
-                                        <button onClick={() => setSelectedCategory(null)} className="mt-4 text-indigo-600 font-bold hover:underline">
+                                        <button onClick={() => setSelectedCategory(null)} className="mt-4 px-4 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors">
                                             Limpar Filtros
                                         </button>
                                     )}
