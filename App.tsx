@@ -1585,6 +1585,24 @@ const StoreEditor = ({ user }: { user: User }) => {
                              <div className="flex-1 flex items-center text-xs text-slate-500">Cor principal da sua loja</div>
                         </div>
                     </div>
+
+                    <div className="border-t pt-4 mt-2">
+                        <label className="flex items-center justify-between cursor-pointer">
+                            <div>
+                                <span className="text-sm font-bold text-slate-700 block">Pagamento Nativo (PIX)</span>
+                                <span className="text-xs text-slate-500">Permitir que clientes paguem via PIX direto na loja</span>
+                            </div>
+                            <div className={`w-12 h-6 rounded-full p-1 transition-colors ${config.enableNativePayment ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                                <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.enableNativePayment ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                            </div>
+                            <input 
+                                type="checkbox" 
+                                className="hidden" 
+                                checked={config.enableNativePayment || false} 
+                                onChange={(e) => setConfig({...config, enableNativePayment: e.target.checked})}
+                            />
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -2670,6 +2688,9 @@ const PublicStore = () => {
     const [cart, setCart] = useState<{product: Product, quantity: number}[]>([]);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [sendingOrder, setSendingOrder] = useState(false);
+    const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [pixData, setPixData] = useState<{qrCodeUrl: string, payload: string} | null>(null);
+    const [customerCpf, setCustomerCpf] = useState('');
 
     // Cart details
     const [customerName, setCustomerName] = useState('');
@@ -2729,6 +2750,65 @@ const PublicStore = () => {
 
     const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
 
+    const generatePixPayment = async () => {
+        if (!customerName || !customerPhone || !customerAddress || !customerCpf) {
+            alert("Por favor, preencha todos os campos, incluindo o CPF.");
+            return;
+        }
+
+        setSendingOrder(true);
+        try {
+            const response = await fetch('/api/store-checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    customerName,
+                    customerEmail: `${customerPhone.replace(/\D/g, '')}@novacrm.com.br`, // Fake email for Asaas if not provided
+                    customerCpfCnpj: customerCpf.replace(/\D/g, ''),
+                    value: total,
+                    description: `Pedido na loja ${config?.storeName}`
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.qrCodeUrl) {
+                setPixData({ qrCodeUrl: data.qrCodeUrl, payload: data.payload });
+                setPaymentModalOpen(true);
+                
+                // Create order in Firestore with status 'pending_payment'
+                const orderData = {
+                    customerName,
+                    customerPhone,
+                    deliveryAddress: { street: customerAddress, number: 'S/N', neighborhood: '', city: '', zip: '' },
+                    items: cart.map(i => ({
+                        productId: i.product.id,
+                        productName: i.product.name,
+                        quantity: i.quantity,
+                        price: i.product.price,
+                        imageUrl: i.product.imageUrl
+                    })),
+                    total: total,
+                    status: 'pending_payment',
+                    paymentMethod: 'PIX',
+                    paymentId: data.paymentId,
+                    createdAt: serverTimestamp()
+                };
+                await addDoc(collection(db, `merchants/${id}/orders`), orderData);
+                
+                setCart([]);
+                setIsCartOpen(false);
+            } else {
+                alert(`Erro ao gerar PIX: ${data.error || 'Falha desconhecida'}`);
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erro de conexão ao gerar pagamento.");
+        } finally {
+            setSendingOrder(false);
+        }
+    };
+
     const handleCheckout = async () => {
         if (!customerName || !customerPhone || !customerAddress) {
             alert("Por favor, preencha todos os campos de contato e endereço.");
@@ -2736,6 +2816,16 @@ const PublicStore = () => {
         }
 
         if (cart.length === 0) return;
+
+        if (config?.enableNativePayment) {
+            // If native payment is enabled, we need CPF to generate PIX
+            if (!customerCpf) {
+                alert("Para pagamento via PIX, o CPF é obrigatório.");
+                return;
+            }
+            await generatePixPayment();
+            return;
+        }
 
         setSendingOrder(true);
         try {
@@ -2782,6 +2872,7 @@ const PublicStore = () => {
             setCustomerName('');
             setCustomerAddress('');
             setCustomerPhone('');
+            setCustomerCpf('');
 
         } catch (error) {
             console.error(error);
@@ -2900,6 +2991,9 @@ const PublicStore = () => {
                                     <input placeholder="Seu Nome" className="w-full p-3 border rounded-xl text-sm" value={customerName} onChange={e => setCustomerName(e.target.value)} />
                                     <input placeholder="Seu WhatsApp (com DDD)" className="w-full p-3 border rounded-xl text-sm" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
                                     <input placeholder="Endereço de Entrega" className="w-full p-3 border rounded-xl text-sm" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
+                                    {config.enableNativePayment && (
+                                        <input placeholder="Seu CPF (para gerar o PIX)" className="w-full p-3 border rounded-xl text-sm" value={customerCpf} onChange={e => setCustomerCpf(e.target.value)} />
+                                    )}
                                 </div>
                                 <div className="flex justify-between items-center text-lg font-bold text-slate-800 mb-2">
                                     <span>Total</span>
@@ -2910,11 +3004,61 @@ const PublicStore = () => {
                                     disabled={sendingOrder}
                                     className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
                                 >
-                                    {sendingOrder ? <Loader2 className="animate-spin" /> : <MessageCircle size={20}/>}
-                                    Finalizar Pedido
+                                    {sendingOrder ? <Loader2 className="animate-spin" /> : config.enableNativePayment ? <QrCode size={20}/> : <MessageCircle size={20}/>}
+                                    {config.enableNativePayment ? 'Pagar com PIX' : 'Finalizar Pedido'}
                                 </button>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* PIX Payment Modal */}
+            {paymentModalOpen && pixData && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPaymentModalOpen(false)}></div>
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col items-center animate-in zoom-in-95 duration-300">
+                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
+                            <QrCode size={24} />
+                        </div>
+                        <h2 className="text-2xl font-bold text-slate-800 mb-2">Pagamento via PIX</h2>
+                        <p className="text-slate-500 text-center text-sm mb-6">Escaneie o QR Code abaixo ou copie o código PIX Copia e Cola para finalizar seu pedido.</p>
+                        
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+                            <img src={pixData.qrCodeUrl} alt="QR Code PIX" className="w-48 h-48 mx-auto" />
+                        </div>
+
+                        <div className="w-full space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">PIX Copia e Cola</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    readOnly 
+                                    value={pixData.payload} 
+                                    className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 font-mono"
+                                />
+                                <button 
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(pixData.payload);
+                                        alert("Código PIX copiado!");
+                                    }}
+                                    className="px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-sm"
+                                >
+                                    Copiar
+                                </button>
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={() => {
+                                setPaymentModalOpen(false);
+                                setPixData(null);
+                                alert("Pedido registrado! Assim que o pagamento for confirmado, a loja iniciará o preparo.");
+                            }}
+                            className="w-full mt-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-colors"
+                        >
+                            Fechar
+                        </button>
                     </div>
                 </div>
             )}

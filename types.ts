@@ -124,6 +124,7 @@ export interface StoreConfig {
   longitude?: number;
   fullAddress?: string; // Endereço formatado do OpenStreetMap
   isPublished?: boolean; // Se a loja está visível no marketplace
+  enableNativePayment?: boolean; // Se a loja aceita pagamento nativo via PIX
 }
 
 export interface Coupon {
