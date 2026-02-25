@@ -14,7 +14,17 @@ export async function onRequestPost(context: any) {
         "access_token": ASAAS_API_KEY
       }
     });
-    const customersData = await customersResponse.json();
+    
+    const customersText = await customersResponse.text();
+    let customersData;
+    try {
+        customersData = JSON.parse(customersText);
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Erro na API Asaas (Busca Cliente): ${customersText}` }), { 
+            status: 400, 
+            headers: { "Content-Type": "application/json" } 
+        });
+    }
 
     if (customersData.data && customersData.data.length > 0) {
       customerId = customersData.data[0].id;
@@ -31,7 +41,18 @@ export async function onRequestPost(context: any) {
           cpfCnpj: customerCpfCnpj
         })
       });
-      const newCustomerData = await createCustomerResponse.json();
+      
+      const newCustomerText = await createCustomerResponse.text();
+      let newCustomerData;
+      try {
+          newCustomerData = JSON.parse(newCustomerText);
+      } catch (e) {
+          return new Response(JSON.stringify({ error: `Erro na API Asaas (Criação Cliente): ${newCustomerText}` }), { 
+              status: 400, 
+              headers: { "Content-Type": "application/json" } 
+          });
+      }
+      
       if (newCustomerData.errors) {
           return new Response(JSON.stringify({ error: newCustomerData.errors[0].description }), { 
             status: 400, 
@@ -58,7 +79,16 @@ export async function onRequestPost(context: any) {
       })
     });
 
-    const subscriptionData = await subscriptionResponse.json();
+    const subscriptionText = await subscriptionResponse.text();
+    let subscriptionData;
+    try {
+        subscriptionData = JSON.parse(subscriptionText);
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Erro na API Asaas (Assinatura): ${subscriptionText}` }), { 
+            status: 400, 
+            headers: { "Content-Type": "application/json" } 
+        });
+    }
     
     if (subscriptionData.errors) {
         return new Response(JSON.stringify({ error: subscriptionData.errors[0].description }), { 
@@ -72,7 +102,17 @@ export async function onRequestPost(context: any) {
             "access_token": ASAAS_API_KEY
         }
     });
-    const paymentsData = await paymentsResponse.json();
+    
+    const paymentsText = await paymentsResponse.text();
+    let paymentsData;
+    try {
+        paymentsData = JSON.parse(paymentsText);
+    } catch (e) {
+        return new Response(JSON.stringify({ error: `Erro na API Asaas (Pagamentos): ${paymentsText}` }), { 
+            status: 400, 
+            headers: { "Content-Type": "application/json" } 
+        });
+    }
     
     if (paymentsData.data && paymentsData.data.length > 0) {
         return new Response(JSON.stringify({ checkoutUrl: paymentsData.data[0].invoiceUrl }), { 
