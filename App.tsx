@@ -1857,7 +1857,7 @@ const Marketplace = () => {
 
     const categories = [
         { name: "Mercado", image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=150&h=150&fit=crop" },
-        { name: "Lanches", image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=150&h=150&fit=crop" },
+        { name: "Alimentação", image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=150&h=150&fit=crop" },
         { name: "Farmácia", image: "https://images.unsplash.com/photo-1585435557343-3b092031a831?w=150&h=150&fit=crop" },
         { name: "Bebidas", image: "https://images.unsplash.com/photo-1569529465841-dfecdab7503b?w=150&h=150&fit=crop" },
         { name: "Pet", image: "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=150&h=150&fit=crop" },
@@ -1888,13 +1888,13 @@ const Marketplace = () => {
                         </div>
                         
                         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-                            <a href="#" className="text-red-600 font-bold">Início</a>
-                            <a href="#" className="hover:text-red-600 transition-colors">Restaurantes</a>
-                            <a href="#" className="hover:text-red-600 transition-colors">Mercados</a>
-                            <a href="#" className="hover:text-red-600 transition-colors">Bebidas</a>
-                            <a href="#" className="hover:text-red-600 transition-colors">Farmácias</a>
-                            <a href="#" className="hover:text-red-600 transition-colors">Pets</a>
-                            <a href="#" className="hover:text-red-600 transition-colors">Shopping</a>
+                            <button onClick={() => setSelectedCategory(null)} className={`${!selectedCategory ? 'text-red-600 font-bold' : 'hover:text-red-600 transition-colors'}`}>Início</button>
+                            <button onClick={() => setSelectedCategory('Alimentação')} className={`${selectedCategory === 'Alimentação' ? 'text-red-600 font-bold' : 'hover:text-red-600 transition-colors'}`}>Restaurantes</button>
+                            <button onClick={() => setSelectedCategory('Mercado')} className={`${selectedCategory === 'Mercado' ? 'text-red-600 font-bold' : 'hover:text-red-600 transition-colors'}`}>Mercados</button>
+                            <button onClick={() => setSelectedCategory('Bebidas')} className={`${selectedCategory === 'Bebidas' ? 'text-red-600 font-bold' : 'hover:text-red-600 transition-colors'}`}>Bebidas</button>
+                            <button onClick={() => setSelectedCategory('Farmácia')} className={`${selectedCategory === 'Farmácia' ? 'text-red-600 font-bold' : 'hover:text-red-600 transition-colors'}`}>Farmácias</button>
+                            <button onClick={() => setSelectedCategory('Pet')} className={`${selectedCategory === 'Pet' ? 'text-red-600 font-bold' : 'hover:text-red-600 transition-colors'}`}>Pets</button>
+                            <button onClick={() => setSelectedCategory('Eletrônicos')} className={`${selectedCategory === 'Eletrônicos' ? 'text-red-600 font-bold' : 'hover:text-red-600 transition-colors'}`}>Shopping</button>
                         </nav>
                     </div>
 
