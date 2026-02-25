@@ -1874,118 +1874,203 @@ const Marketplace = () => {
     };
 
     return (
-        <div className="min-h-screen bg-white font-sans pb-20">
+        <div className="min-h-screen bg-slate-50 font-sans pb-20">
             {/* Header */}
-            <div className="bg-white sticky top-0 z-30 shadow-sm pt-4 pb-2 px-4">
-                <div className="max-w-3xl mx-auto">
-                    {/* Top Row: Location & Profile */}
-                    <div className="flex justify-between items-center mb-4">
+            <header className="bg-white sticky top-0 z-30 shadow-sm">
+                <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-6">
+                    {/* Logo & Nav Links (Desktop) */}
+                    <div className="flex items-center gap-8">
                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-                             <div className="bg-red-500 text-white p-1.5 rounded-lg">
-                                <Rocket size={20} fill="currentColor"/>
+                             <div className="bg-red-600 text-white p-1.5 rounded-lg">
+                                <Rocket size={24} fill="currentColor"/>
                              </div>
-                             <span className="font-bold text-xl tracking-tight text-slate-900">Nova<span className="text-red-500">Store</span></span>
+                             <span className="font-extrabold text-2xl tracking-tight text-red-600">Nova</span>
                         </div>
                         
-                        <button 
-                            onClick={handleNearMe}
-                            disabled={loadingLocation}
-                            className="flex items-center gap-1 text-slate-700 hover:bg-slate-100 px-3 py-1.5 rounded-full transition-colors"
-                        >
-                            <div className="flex flex-col items-end text-right">
-                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Entregar em</span>
-                                <span className="text-sm font-bold flex items-center gap-1">
-                                    {loadingLocation ? 'Buscando...' : userLocation ? 'Sua localização' : 'Definir endereço'}
-                                    <ChevronDown size={14} className="text-red-500"/>
-                                </span>
-                            </div>
-                        </button>
+                        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+                            <a href="#" className="text-red-600 font-bold">Início</a>
+                            <a href="#" className="hover:text-red-600 transition-colors">Restaurantes</a>
+                            <a href="#" className="hover:text-red-600 transition-colors">Mercados</a>
+                            <a href="#" className="hover:text-red-600 transition-colors">Bebidas</a>
+                            <a href="#" className="hover:text-red-600 transition-colors">Farmácias</a>
+                            <a href="#" className="hover:text-red-600 transition-colors">Pets</a>
+                            <a href="#" className="hover:text-red-600 transition-colors">Shopping</a>
+                        </nav>
                     </div>
 
                     {/* Search Bar */}
-                    <div className="relative">
+                    <div className="flex-1 max-w-2xl hidden md:block relative">
                         <input 
                             type="text" 
-                            placeholder="Buscar lojas, itens ou categorias" 
-                            className="w-full pl-12 pr-4 py-3.5 bg-slate-100 rounded-xl outline-none focus:ring-2 focus:ring-red-200 transition-all text-slate-700 font-medium placeholder:text-slate-500"
+                            placeholder="Busque por item ou loja" 
+                            className="w-full pl-12 pr-4 py-3 bg-slate-100 rounded-lg outline-none focus:ring-2 focus:ring-red-200 transition-all text-slate-700 font-medium placeholder:text-slate-500"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-red-500" size={20} />
                     </div>
-                </div>
-            </div>
 
-            <div className="max-w-3xl mx-auto px-4 py-6 space-y-8">
-                {/* Categories Carousel */}
-                <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar -mx-4 px-4">
-                    {categories.map((cat, i) => (
-                        <div 
-                            key={i} 
-                            onClick={() => toggleCategory(cat.name)}
-                            className={`flex flex-col items-center gap-2 min-w-[72px] cursor-pointer transition-all ${selectedCategory === cat.name ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}
+                    {/* Right Actions */}
+                    <div className="flex items-center gap-4 md:gap-6">
+                        <button 
+                            onClick={handleNearMe}
+                            disabled={loadingLocation}
+                            className="hidden md:flex items-center gap-2 text-slate-700 hover:bg-slate-100 px-3 py-2 rounded-lg transition-colors"
                         >
-                            <div className={`w-16 h-16 rounded-2xl overflow-hidden shadow-sm transition-all ${selectedCategory === cat.name ? 'ring-4 ring-red-500 ring-offset-2' : ''}`}>
-                                <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
-                            </div>
-                            <span className={`text-xs font-medium text-center ${selectedCategory === cat.name ? 'text-red-600 font-bold' : 'text-slate-700'}`}>{cat.name}</span>
+                            <span className="text-sm font-medium truncate max-w-[200px]">
+                                {loadingLocation ? 'Buscando...' : userLocation ? 'Sua localização atual' : 'Definir endereço'}
+                            </span>
+                            <ChevronDown size={16} className="text-red-500"/>
+                        </button>
+                        
+                        <div className="flex items-center gap-4">
+                            <button className="text-slate-600 hover:text-red-600 transition-colors">
+                                <UserIcon size={24} />
+                            </button>
+                            <button className="text-slate-600 hover:text-red-600 transition-colors flex items-center gap-2">
+                                <ShoppingBag size={24} />
+                                <div className="hidden md:flex flex-col text-left">
+                                    <span className="text-xs font-bold text-slate-800 leading-none">R$ 0,00</span>
+                                    <span className="text-[10px] text-slate-500 leading-none mt-0.5">0 itens</span>
+                                </div>
+                            </button>
                         </div>
-                    ))}
-                </div>
-
-                {/* Banners Carousel */}
-                <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar -mx-4 px-4 snap-x">
-                    <div className="min-w-[280px] md:min-w-[400px] h-40 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl p-6 text-white shadow-md snap-center relative overflow-hidden flex flex-col justify-center">
-                        <div className="absolute right-0 top-0 h-full w-1/2 bg-white/10 skew-x-12 transform translate-x-10"></div>
-                        <span className="bg-white text-red-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider mb-2 w-max">Cupom R$15</span>
-                        <h3 className="text-2xl font-extrabold leading-tight mb-1">Primeira<br/>Compra</h3>
-                        <p className="text-sm text-white/90">Aproveite descontos exclusivos</p>
-                    </div>
-                    <div className="min-w-[280px] md:min-w-[400px] h-40 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-2xl p-6 text-white shadow-md snap-center relative overflow-hidden flex flex-col justify-center">
-                        <div className="absolute right-0 top-0 h-full w-1/2 bg-white/10 skew-x-12 transform translate-x-10"></div>
-                        <span className="bg-white text-blue-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider mb-2 w-max">Mercado</span>
-                        <h3 className="text-2xl font-extrabold leading-tight mb-1">Compras<br/>do Mês</h3>
-                        <p className="text-sm text-white/90">Receba em casa hoje mesmo</p>
                     </div>
                 </div>
+                
+                {/* Mobile Search & Address (Visible only on small screens) */}
+                <div className="md:hidden px-4 pb-3 space-y-3">
+                    <button 
+                        onClick={handleNearMe}
+                        disabled={loadingLocation}
+                        className="flex items-center justify-between w-full text-slate-700 bg-slate-100 px-3 py-2 rounded-lg"
+                    >
+                        <span className="text-sm font-medium truncate">
+                            {loadingLocation ? 'Buscando...' : userLocation ? 'Sua localização atual' : 'Definir endereço de entrega'}
+                        </span>
+                        <ChevronDown size={16} className="text-red-500"/>
+                    </button>
+                    <div className="relative">
+                        <input 
+                            type="text" 
+                            placeholder="Busque por item ou loja" 
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-100 rounded-lg outline-none focus:ring-2 focus:ring-red-200 text-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-red-500" size={18} />
+                    </div>
+                </div>
+            </header>
 
-                {/* Store List */}
-                <div>
-                    <h3 className="font-bold text-lg text-slate-800 mb-4 px-1">
+            <main className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+                
+                {/* Últimas lojas (Recent Stores) */}
+                <section>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-slate-800">Últimas lojas</h2>
+                        <button className="text-red-600 font-medium text-sm hover:underline">Ver mais</button>
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+                        {stores.slice(0, 4).map(store => (
+                            <div key={`recent-${store.id}`} onClick={() => navigate(`/store/${store.id}`)} className="min-w-[280px] bg-white border border-slate-100 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow">
+                                <div className="w-14 h-14 rounded-full border border-slate-100 overflow-hidden flex-shrink-0 bg-slate-50 flex items-center justify-center">
+                                    {store.config.logoUrl ? (
+                                        <img src={store.config.logoUrl} alt={store.config.storeName} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Store size={20} className="text-slate-300"/>
+                                    )}
+                                </div>
+                                <span className="font-bold text-slate-800 text-sm leading-tight">{store.config.storeName}</span>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Famosos na NovaStore (Popular Stores) */}
+                <section>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-slate-800">Famosos na NovaStore</h2>
+                        <button className="text-red-600 font-medium text-sm hover:underline">Ver mais</button>
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar relative">
+                        {stores.slice(0, 6).map(store => (
+                            <div key={`famous-${store.id}`} onClick={() => navigate(`/store/${store.id}`)} className="min-w-[280px] md:min-w-[320px] bg-white border border-slate-100 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:shadow-md transition-shadow">
+                                <div className="w-20 h-20 rounded-xl border border-slate-100 overflow-hidden flex-shrink-0 bg-slate-50 flex items-center justify-center">
+                                    {store.config.logoUrl ? (
+                                        <img src={store.config.logoUrl} alt={store.config.storeName} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Store size={28} className="text-slate-300"/>
+                                    )}
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-base leading-tight mb-1">{store.config.storeName}</h3>
+                                    <div className="flex items-center gap-1 text-amber-500 font-bold text-xs">
+                                        <Star size={12} fill="currentColor" />
+                                        <span>4.8</span>
+                                        <span className="text-slate-400 font-normal ml-1">• {store.config.category || 'Variedades'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Categories Carousel */}
+                <section>
+                    <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar">
+                        {categories.map((cat, i) => (
+                            <div 
+                                key={i} 
+                                onClick={() => toggleCategory(cat.name)}
+                                className={`flex flex-col items-center gap-3 min-w-[100px] cursor-pointer transition-all group`}
+                            >
+                                <div className={`w-24 h-20 rounded-xl overflow-hidden shadow-sm transition-all relative ${selectedCategory === cat.name ? 'ring-2 ring-red-500 ring-offset-2' : 'group-hover:-translate-y-1'}`}>
+                                    <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" />
+                                    {/* Optional: Add a subtle gradient overlay if needed */}
+                                </div>
+                                <span className={`text-sm font-medium text-center ${selectedCategory === cat.name ? 'text-red-600 font-bold' : 'text-slate-700'}`}>{cat.name}</span>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Store List (All Stores) */}
+                <section>
+                    <h2 className="text-xl font-bold text-slate-800 mb-6">
                         {selectedCategory ? `Lojas de ${selectedCategory}` : 'Lojas na sua região'}
-                    </h3>
+                    </h2>
                     
                     {loading ? (
-                        <div className="space-y-4">
-                            {[1,2,3,4].map(i => (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[1,2,3,4,5,6].map(i => (
                                 <div key={i} className="flex gap-4 p-4 bg-white rounded-xl border border-slate-100 animate-pulse">
-                                    <div className="w-16 h-16 bg-slate-200 rounded-full"></div>
-                                    <div className="flex-1 space-y-2 py-1">
-                                        <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                                    <div className="w-20 h-20 bg-slate-200 rounded-full"></div>
+                                    <div className="flex-1 space-y-3 py-2">
+                                        <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                                        <div className="h-3 bg-slate-200 rounded w-1/2"></div>
                                         <div className="h-3 bg-slate-200 rounded w-1/3"></div>
-                                        <div className="h-3 bg-slate-200 rounded w-1/4"></div>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {filteredStores.length > 0 ? filteredStores.map((store) => (
                                 <div 
                                     key={store.id} 
                                     onClick={() => navigate(`/store/${store.id}`)}
-                                    className="flex flex-col bg-white rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer group overflow-hidden"
+                                    className="flex items-center gap-4 bg-white rounded-xl border border-slate-100 p-4 hover:border-slate-200 hover:shadow-md transition-all cursor-pointer group"
                                 >
-                                    {/* Store Banner */}
-                                    <div className="h-24 w-full bg-slate-200 relative">
-                                        {store.config.bannerUrl ? (
-                                            <img src={store.config.bannerUrl} className="w-full h-full object-cover" alt="Capa" />
+                                    {/* Store Logo */}
+                                    <div className="w-20 h-20 rounded-full border border-slate-100 shadow-sm overflow-hidden flex-shrink-0 flex items-center justify-center bg-slate-50 relative">
+                                        {store.config.logoUrl ? (
+                                            <img src={store.config.logoUrl} className="w-full h-full object-cover" alt={store.config.storeName} />
                                         ) : (
-                                            <div className="w-full h-full" style={{backgroundColor: store.config.themeColor || '#4f46e5'}}></div>
+                                            <Store size={28} className="text-slate-300"/>
                                         )}
                                         {store.distance !== undefined && (
-                                            <div className="absolute top-2 right-2 bg-white/90 backdrop-blur text-slate-800 px-2 py-1 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1">
-                                                <MapPin size={12} className="text-red-500"/>
+                                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] font-bold text-center py-0.5">
                                                 {store.distance < 1 
                                                     ? `${(store.distance * 1000).toFixed(0)}m` 
                                                     : `${store.distance.toFixed(1)}km`}
@@ -1993,49 +2078,38 @@ const Marketplace = () => {
                                         )}
                                     </div>
                                     
-                                    <div className="flex items-center gap-4 px-4 pb-4 -mt-6 relative z-10">
-                                        {/* Store Logo */}
-                                        <div className="w-16 h-16 rounded-full border-4 border-white shadow-sm overflow-hidden flex-shrink-0 flex items-center justify-center bg-slate-50">
-                                            {store.config.logoUrl ? (
-                                                <img src={store.config.logoUrl} className="w-full h-full object-cover" alt={store.config.storeName} />
-                                            ) : (
-                                                <Store size={24} className="text-slate-300"/>
-                                            )}
+                                    {/* Store Details */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <h4 className="font-bold text-slate-800 text-lg truncate pr-2 group-hover:text-red-600 transition-colors">{store.config.storeName}</h4>
                                         </div>
                                         
-                                        {/* Store Details */}
-                                        <div className="flex-1 min-w-0 pt-6">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <h4 className="font-bold text-slate-800 truncate pr-2 group-hover:text-red-600 transition-colors">{store.config.storeName}</h4>
-                                                <div className="flex items-center gap-1 text-amber-500 font-bold text-xs bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">
-                                                    <Star size={10} fill="currentColor" />
-                                                    <span>4.8</span>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5 truncate">
-                                                <span>{store.config.category || 'Variedades'}</span>
-                                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                <span>30-45 min</span>
-                                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                <span className="text-green-600 font-medium">Frete Grátis</span>
-                                            </div>
+                                        <div className="flex items-center gap-1 text-amber-500 font-bold text-xs mb-1">
+                                            <Star size={12} fill="currentColor" />
+                                            <span>4.8</span>
+                                            <span className="text-slate-400 font-normal ml-1">• {store.config.category || 'Variedades'}</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 text-xs text-slate-500 truncate">
+                                            <span>30-45 min</span>
+                                            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                                            <span className="text-green-600 font-medium">Frete Grátis</span>
                                         </div>
                                     </div>
                                 </div>
                             )) : (
-                                <div className="py-16 text-center">
-                                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                                <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-100">
+                                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
                                         <Search size={24}/>
                                     </div>
-                                    <p className="text-slate-600 font-bold mb-1">
+                                    <p className="text-slate-800 font-bold text-lg mb-1">
                                         {selectedCategory 
                                             ? `Nenhuma loja de ${selectedCategory}` 
                                             : "Nenhuma loja encontrada"}
                                     </p>
                                     <p className="text-sm text-slate-500">Tente buscar por outro termo ou limpe os filtros.</p>
                                     {selectedCategory && (
-                                        <button onClick={() => setSelectedCategory(null)} className="mt-4 px-4 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors">
+                                        <button onClick={() => setSelectedCategory(null)} className="mt-6 px-6 py-2.5 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors">
                                             Limpar Filtros
                                         </button>
                                     )}
@@ -2043,8 +2117,8 @@ const Marketplace = () => {
                             )}
                         </div>
                     )}
-                </div>
-            </div>
+                </section>
+            </main>
         </div>
     );
 };

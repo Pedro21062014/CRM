@@ -11,7 +11,8 @@ export async function onRequestPost(context: any) {
     let customerId = "";
     const customersResponse = await fetch(`${ASAAS_URL}/customers?cpfCnpj=${customerCpfCnpj}`, {
       headers: {
-        "access_token": ASAAS_API_KEY
+        "access_token": ASAAS_API_KEY,
+        "User-Agent": "NovaStore/1.0"
       }
     });
     
@@ -33,7 +34,8 @@ export async function onRequestPost(context: any) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "access_token": ASAAS_API_KEY
+          "access_token": ASAAS_API_KEY,
+          "User-Agent": "NovaStore/1.0"
         },
         body: JSON.stringify({
           name: customerName,
@@ -67,7 +69,8 @@ export async function onRequestPost(context: any) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "access_token": ASAAS_API_KEY
+        "access_token": ASAAS_API_KEY,
+        "User-Agent": "NovaStore/1.0"
       },
       body: JSON.stringify({
         customer: customerId,
@@ -99,7 +102,8 @@ export async function onRequestPost(context: any) {
 
     const paymentsResponse = await fetch(`${ASAAS_URL}/payments?subscription=${subscriptionData.id}`, {
         headers: {
-            "access_token": ASAAS_API_KEY
+            "access_token": ASAAS_API_KEY,
+            "User-Agent": "NovaStore/1.0"
         }
     });
     
