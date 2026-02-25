@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useParams, useLocation, Navigate, Outlet } from 'react-router-dom';
-import { auth, googleProvider, db } from './firebase';
+import { motion } from 'motion/react';
+import { auth, googleProvider, db, storage } from './firebase';
 import { 
   signInWithPopup, 
   signInWithEmailAndPassword, 
@@ -14,8 +15,10 @@ import {
 } from 'firebase/auth';
 
 import { collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, limit, runTransaction, writeBatch } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import XLSX from 'xlsx-js-style';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, Store, Settings, 
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
@@ -185,25 +188,6 @@ function deg2rad(deg: number) {
 }
 
 // --- CHARTS ---
-const SimpleBarChart = ({ data, color = "indigo", height = 60 }: { data: number[], color?: string, height?: number }) => {
-  const max = Math.max(...data, 1);
-  return (
-    <div className="flex items-end gap-1 h-full w-full" style={{ height: `${height}px` }}>
-      {data.map((val, i) => (
-        <div key={i} className="flex-1 flex flex-col justify-end group relative">
-           <div 
-             className={`w-full rounded-t-sm transition-all duration-500 bg-${color}-500 opacity-80 group-hover:opacity-100`}
-             style={{ height: `${(val / max) * 100}%` }}
-           ></div>
-           <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-             {val}
-           </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
 // ... [CouponsManager, ProductsManager, WhatsAppBot, ClientsManager, OrdersManager remain unchanged] ...
 const CouponsManager = ({ user }: { user: User }) => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -1120,6 +1104,8 @@ const StoreEditor = ({ user }: { user: User }) => {
   const [searchingAddress, setSearchingAddress] = useState(false);
   // NEW STATE for GPS Button Loading
   const [loadingLocation, setLoadingLocation] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -1160,6 +1146,46 @@ const StoreEditor = ({ user }: { user: User }) => {
     }
     setSaving(false);
     alert('Loja atualizada com sucesso!');
+  };
+
+  const togglePublish = async () => {
+    const newStatus = !config.isPublished;
+    const newConfig = { ...config, isPublished: newStatus };
+    setConfig(newConfig);
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'merchants', user.uid), { storeConfig: newConfig });
+    } catch (e) {
+      await setDoc(doc(db, 'merchants', user.uid), { storeConfig: newConfig }, { merge: true });
+    }
+    setSaving(false);
+    alert(newStatus ? 'Loja publicada com sucesso!' : 'Loja despublicada com sucesso!');
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'banner') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (type === 'logo') setUploadingLogo(true);
+    else setUploadingBanner(true);
+
+    try {
+      const fileRef = ref(storage, `merchants/${user.uid}/store/${type}_${Date.now()}`);
+      const uploadTask = await uploadBytesResumable(fileRef, file);
+      const url = await getDownloadURL(uploadTask.ref);
+      
+      if (type === 'logo') {
+        setConfig(prev => ({ ...prev, logoUrl: url }));
+      } else {
+        setConfig(prev => ({ ...prev, bannerUrl: url }));
+      }
+    } catch (error) {
+      console.error(`Error uploading ${type}:`, error);
+      alert(`Erro ao fazer upload da imagem.`);
+    } finally {
+      if (type === 'logo') setUploadingLogo(false);
+      else setUploadingBanner(false);
+    }
   };
 
   const getMyLocation = () => {
@@ -1414,6 +1440,9 @@ const StoreEditor = ({ user }: { user: User }) => {
           <a href={publicLink} target="_blank" rel="noopener noreferrer" className="flex-1 md:flex-none justify-center px-4 py-2 border border-slate-200 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition-all flex items-center gap-2 text-sm">
             <ExternalLink size={14} /> Ver Loja
           </a>
+          <button onClick={togglePublish} disabled={saving} className={`flex-1 md:flex-none px-4 py-2 text-white font-medium rounded-lg shadow-md transition-all text-sm ${config.isPublished ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-600 hover:bg-slate-700'}`}>
+            {saving ? 'Aguarde...' : config.isPublished ? 'Loja Publicada (Ocultar)' : 'Publicar Loja'}
+          </button>
           <button onClick={saveConfig} disabled={saving} className="flex-1 md:flex-none px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 shadow-md transition-all text-sm">
             {saving ? 'Salvando...' : 'Salvar Alterações'}
           </button>
@@ -1430,6 +1459,44 @@ const StoreEditor = ({ user }: { user: User }) => {
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nome da Loja</label>
                         <input className="w-full p-2 border rounded-lg mt-1 text-sm" value={config.storeName} onChange={e => setConfig({...config, storeName: e.target.value})} />
                     </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Logo da Loja</label>
+                            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors relative overflow-hidden">
+                                {config.logoUrl ? (
+                                    <img src={config.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center text-slate-400">
+                                        {uploadingLogo ? <Loader2 className="animate-spin" size={20} /> : <ImageIcon size={20} />}
+                                        <span className="text-[10px] mt-1 font-medium">{uploadingLogo ? 'Enviando...' : 'Upload Logo'}</span>
+                                    </div>
+                                )}
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, 'logo')} disabled={uploadingLogo} />
+                            </label>
+                            {config.logoUrl && (
+                                <button onClick={() => setConfig({...config, logoUrl: undefined})} className="text-[10px] text-red-500 font-bold mt-1 hover:underline w-full text-center">Remover Logo</button>
+                            )}
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Capa (Banner)</label>
+                            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors relative overflow-hidden">
+                                {config.bannerUrl ? (
+                                    <img src={config.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center text-slate-400">
+                                        {uploadingBanner ? <Loader2 className="animate-spin" size={20} /> : <ImageIcon size={20} />}
+                                        <span className="text-[10px] mt-1 font-medium">{uploadingBanner ? 'Enviando...' : 'Upload Capa'}</span>
+                                    </div>
+                                )}
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, 'banner')} disabled={uploadingBanner} />
+                            </label>
+                            {config.bannerUrl && (
+                                <button onClick={() => setConfig({...config, bannerUrl: undefined})} className="text-[10px] text-red-500 font-bold mt-1 hover:underline w-full text-center">Remover Capa</button>
+                            )}
+                        </div>
+                    </div>
+
                     <div>
                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria Principal</label>
                         <select 
@@ -1512,12 +1579,11 @@ const StoreEditor = ({ user }: { user: User }) => {
                     </div>
 
                     <div className="border-t pt-4 mt-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Cor e Logo</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Cor do Tema</label>
                         <div className="flex gap-2 mt-1">
                              <input type="color" className="w-10 h-10 border rounded cursor-pointer" value={config.themeColor} onChange={e => setConfig({...config, themeColor: e.target.value})} />
-                             <input className="flex-1 p-2 border rounded-lg text-xs" placeholder="URL do Logo" value={config.logoUrl || ''} onChange={e => setConfig({...config, logoUrl: e.target.value})} />
+                             <div className="flex-1 flex items-center text-xs text-slate-500">Cor principal da sua loja</div>
                         </div>
-                        <input className="w-full mt-2 p-2 border rounded-lg text-xs" placeholder="URL do Banner (Capa)" value={config.bannerUrl || ''} onChange={e => setConfig({...config, bannerUrl: e.target.value})} />
                     </div>
                 </div>
             </div>
@@ -1908,49 +1974,51 @@ const Marketplace = () => {
                                 <div 
                                     key={store.id} 
                                     onClick={() => navigate(`/store/${store.id}`)}
-                                    className="flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer group"
+                                    className="flex flex-col bg-white rounded-xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer group overflow-hidden"
                                 >
-                                    {/* Store Logo */}
-                                    <div className="w-16 h-16 rounded-full border border-slate-100 shadow-sm overflow-hidden flex-shrink-0 flex items-center justify-center bg-slate-50">
-                                        {store.config.logoUrl ? (
-                                            <img src={store.config.logoUrl} className="w-full h-full object-cover" alt={store.config.storeName} />
+                                    {/* Store Banner */}
+                                    <div className="h-24 w-full bg-slate-200 relative">
+                                        {store.config.bannerUrl ? (
+                                            <img src={store.config.bannerUrl} className="w-full h-full object-cover" alt="Capa" />
                                         ) : (
-                                            <Store size={24} className="text-slate-300"/>
+                                            <div className="w-full h-full" style={{backgroundColor: store.config.themeColor || '#4f46e5'}}></div>
+                                        )}
+                                        {store.distance !== undefined && (
+                                            <div className="absolute top-2 right-2 bg-white/90 backdrop-blur text-slate-800 px-2 py-1 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1">
+                                                <MapPin size={12} className="text-red-500"/>
+                                                {store.distance < 1 
+                                                    ? `${(store.distance * 1000).toFixed(0)}m` 
+                                                    : `${store.distance.toFixed(1)}km`}
+                                            </div>
                                         )}
                                     </div>
                                     
-                                    {/* Store Details */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <h4 className="font-bold text-slate-800 truncate pr-2 group-hover:text-red-600 transition-colors">{store.config.storeName}</h4>
-                                            <div className="flex items-center gap-1 text-amber-500 font-bold text-xs bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">
-                                                <Star size={10} fill="currentColor" />
-                                                <span>4.8</span>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5 truncate">
-                                            <span>{store.config.category || 'Variedades'}</span>
-                                            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                            {store.distance !== undefined ? (
-                                                <span>
-                                                    {store.distance < 1 
-                                                        ? `${(store.distance * 1000).toFixed(0)}m` 
-                                                        : `${store.distance.toFixed(1)}km`}
-                                                </span>
+                                    <div className="flex items-center gap-4 px-4 pb-4 -mt-6 relative z-10">
+                                        {/* Store Logo */}
+                                        <div className="w-16 h-16 rounded-full border-4 border-white shadow-sm overflow-hidden flex-shrink-0 flex items-center justify-center bg-slate-50">
+                                            {store.config.logoUrl ? (
+                                                <img src={store.config.logoUrl} className="w-full h-full object-cover" alt={store.config.storeName} />
                                             ) : (
-                                                <span>Novo</span>
+                                                <Store size={24} className="text-slate-300"/>
                                             )}
                                         </div>
                                         
-                                        <div className="flex items-center gap-3 text-xs text-slate-500">
-                                            <div className="flex items-center gap-1">
-                                                <Clock size={12} className="text-slate-400"/>
-                                                <span>30-45 min</span>
+                                        {/* Store Details */}
+                                        <div className="flex-1 min-w-0 pt-6">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <h4 className="font-bold text-slate-800 truncate pr-2 group-hover:text-red-600 transition-colors">{store.config.storeName}</h4>
+                                                <div className="flex items-center gap-1 text-amber-500 font-bold text-xs bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">
+                                                    <Star size={10} fill="currentColor" />
+                                                    <span>4.8</span>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-1 text-green-600 font-medium">
+                                            
+                                            <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5 truncate">
+                                                <span>{store.config.category || 'Variedades'}</span>
                                                 <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                <span className="ml-2">Frete Grátis</span>
+                                                <span>30-45 min</span>
+                                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                                                <span className="text-green-600 font-medium">Frete Grátis</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1984,6 +2052,10 @@ const Marketplace = () => {
 const PlansManager = ({ user }: { user: User }) => {
   const [subscription, setSubscription] = useState<MerchantSubscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<PaymentPlan | null>(null);
+  const [customerData, setCustomerData] = useState({ name: user.displayName || '', cpfCnpj: '' });
+  const [processingPayment, setProcessingPayment] = useState(false);
 
   const plans: PaymentPlan[] = [
     {
@@ -2026,26 +2098,76 @@ const PlansManager = ({ user }: { user: User }) => {
     fetchSubscription();
   }, [user.uid]);
 
-  const handleSelectPlan = async (planId: string) => {
-    if (planId === subscription?.planId) return;
+  const handleSelectPlan = async (plan: PaymentPlan) => {
+    if (plan.id === subscription?.planId) return;
     
-    try {
-      await updateDoc(doc(db, 'merchants', user.uid), {
-        subscription: {
-          planId,
+    if (plan.price === 0) {
+      try {
+        await updateDoc(doc(db, 'merchants', user.uid), {
+          subscription: {
+            planId: plan.id,
+            status: 'active',
+            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          }
+        });
+        setSubscription({
+          planId: plan.id,
           status: 'active',
           currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        }
+        });
+        alert(`Plano ${plan.name} selecionado com sucesso!`);
+      } catch (e) {
+        console.error(e);
+        alert("Erro ao atualizar plano.");
+      }
+    } else {
+      setSelectedPlan(plan);
+      setCheckoutModalOpen(true);
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (!customerData.name || !customerData.cpfCnpj) {
+      alert("Preencha todos os campos.");
+      return;
+    }
+
+    setProcessingPayment(true);
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: customerData.name,
+          customerEmail: user.email,
+          customerCpfCnpj: customerData.cpfCnpj.replace(/\D/g, ''),
+          planId: selectedPlan?.id,
+          value: selectedPlan?.price,
+          cycle: 'MONTHLY'
+        })
       });
-      setSubscription({
-        planId,
-        status: 'active',
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      });
-      alert(`Plano ${planId.toUpperCase()} selecionado com sucesso!`);
-    } catch (e) {
-      console.error(e);
-      alert("Erro ao atualizar plano.");
+
+      const data = await response.json();
+
+      if (response.ok && data.checkoutUrl) {
+        // Save pending subscription status
+        await updateDoc(doc(db, 'merchants', user.uid), {
+          subscription: {
+            planId: selectedPlan?.id,
+            status: 'pending',
+            currentPeriodEnd: null
+          }
+        });
+        // Redirect to Asaas checkout
+        window.location.href = data.checkoutUrl;
+      } else {
+        alert(`Erro: ${data.error || 'Falha ao processar pagamento'}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Erro de conexão ao processar pagamento.");
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -2053,6 +2175,58 @@ const PlansManager = ({ user }: { user: User }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in">
+      {checkoutModalOpen && selectedPlan && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-slate-800">Finalizar Assinatura</h3>
+              <button onClick={() => setCheckoutModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+            </div>
+            
+            <div className="bg-indigo-50 p-4 rounded-xl mb-6">
+              <p className="text-sm text-indigo-800 font-medium">Plano Selecionado</p>
+              <div className="flex justify-between items-end mt-1">
+                <p className="text-lg font-bold text-indigo-900">{selectedPlan.name}</p>
+                <p className="text-lg font-bold text-indigo-900">R$ {selectedPlan.price.toFixed(2).replace('.', ',')}<span className="text-sm font-normal">/mês</span></p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">Nome Completo</label>
+                <input 
+                  type="text" 
+                  className="w-full p-3 border rounded-xl mt-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  value={customerData.name} 
+                  onChange={e => setCustomerData({...customerData, name: e.target.value})}
+                  placeholder="Seu nome completo"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase">CPF ou CNPJ</label>
+                <input 
+                  type="text" 
+                  className="w-full p-3 border rounded-xl mt-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  value={customerData.cpfCnpj} 
+                  onChange={e => setCustomerData({...customerData, cpfCnpj: e.target.value})}
+                  placeholder="Apenas números"
+                />
+              </div>
+              
+              <button 
+                onClick={handleCheckout}
+                disabled={processingPayment}
+                className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mt-4"
+              >
+                {processingPayment ? <Loader2 className="animate-spin" size={20}/> : <CreditCard size={20}/>}
+                {processingPayment ? 'Processando...' : 'Ir para Pagamento'}
+              </button>
+              <p className="text-center text-[10px] text-slate-400 mt-2">Você será redirecionado para o ambiente seguro do Asaas.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="text-center max-w-2xl mx-auto">
         <h2 className="text-3xl font-bold text-slate-900 mb-4">Escolha o plano ideal para o seu negócio</h2>
         <p className="text-slate-500">Aumente suas vendas e profissionalize sua gestão com as ferramentas certas.</p>
@@ -2090,7 +2264,7 @@ const PlansManager = ({ user }: { user: User }) => {
             </ul>
 
             <button
-              onClick={() => handleSelectPlan(plan.id)}
+              onClick={() => handleSelectPlan(plan)}
               disabled={plan.id === subscription?.planId}
               className={`w-full py-3 px-6 rounded-xl font-bold transition-all duration-200 ${
                 plan.id === subscription?.planId 
@@ -2134,7 +2308,7 @@ const PlansManager = ({ user }: { user: User }) => {
 const DashboardHome = ({ user }: { user: User }) => {
   const navigate = useNavigate();
   const [stats, setStats] = useState({ orders: 0, revenue: 0, clients: 0 });
-  const [chartData, setChartData] = useState<number[]>([]);
+  const [chartData, setChartData] = useState<{name: string, value: number}[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -2164,7 +2338,11 @@ const DashboardHome = ({ user }: { user: User }) => {
             const d = new Date();
             d.setDate(d.getDate() - i);
             const dayStr = d.toISOString().split('T')[0];
-            last7Days.push(Math.round(revenueByDay[dayStr] || 0));
+            const formattedDate = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+            last7Days.push({
+              name: formattedDate,
+              value: Math.round(revenueByDay[dayStr] || 0)
+            });
          }
 
          setStats({
@@ -2231,12 +2409,31 @@ const DashboardHome = ({ user }: { user: User }) => {
                     </div>
                     <TrendingUp size={20} className="text-emerald-500" />
                 </div>
-                <div className="h-48 flex items-end">
-                    <SimpleBarChart data={chartData} color="indigo" height={150} />
-                </div>
-                <div className="mt-4 flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    <span>6 dias atrás</span>
-                    <span>Hoje</span>
+                <div className="h-64 mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis 
+                                dataKey="name" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 12, fill: '#94a3b8' }} 
+                                dy={10}
+                            />
+                            <YAxis 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fontSize: 12, fill: '#94a3b8' }}
+                                tickFormatter={(value) => `R$ ${value}`}
+                            />
+                            <Tooltip 
+                                cursor={{ fill: '#f8fafc' }}
+                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                formatter={(value: number | undefined) => [`R$ ${(value || 0).toFixed(2)}`, 'Receita']}
+                            />
+                            <Bar dataKey="value" fill="#4f46e5" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
 
@@ -2546,7 +2743,7 @@ const PublicStore = () => {
                             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                         </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-90"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-white/80 via-transparent to-transparent"></div>
                 </div>
                 
                 <div className="px-4 -mt-16 flex flex-col items-center gap-4 relative z-10 text-center">
@@ -2826,9 +3023,25 @@ const AuthPage = () => {
   return (
     <div className="min-h-screen w-full flex bg-white overflow-hidden">
       {/* Left Side - Form Section */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12 xl:p-24 bg-white relative z-10">
-        <div className="w-full max-w-sm space-y-8 animate-in slide-in-from-left duration-700">
-            <div className="text-center lg:text-left">
+      <motion.div 
+        initial="hidden"
+        animate="visible"
+        variants={{
+          hidden: { opacity: 0, x: -50 },
+          visible: { 
+            opacity: 1, 
+            x: 0,
+            transition: { 
+              duration: 0.5, 
+              ease: "easeOut",
+              staggerChildren: 0.1
+            }
+          }
+        }}
+        className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12 xl:p-24 bg-white relative z-10"
+      >
+        <div className="w-full max-w-sm space-y-8">
+            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="text-center lg:text-left">
                <div className="flex justify-center lg:justify-start mb-6"><AppLogo /></div>
                <h2 className="text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
                  {isReset ? 'Recuperar Acesso' : isRegister ? 'Crie sua conta' : 'Bem-vindo de volta'}
@@ -2841,11 +3054,11 @@ const AuthPage = () => {
                         : 'Entre com seus dados para acessar o painel.'
                  }
                </p>
-            </div>
+            </motion.div>
 
             {isReset ? (
                 // --- RESET PASSWORD FORM ---
-                <form onSubmit={handleResetPassword} className="space-y-5">
+                <motion.form variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} onSubmit={handleResetPassword} className="space-y-5">
                    <div>
                      <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Email Corporativo</label>
                      <div className="relative">
@@ -2873,10 +3086,10 @@ const AuthPage = () => {
                    >
                      <ArrowRight className="inline mr-1 rotate-180" size={16}/> Voltar para Login
                    </button>
-                </form>
+                </motion.form>
             ) : (
                 // --- LOGIN / REGISTER FORM ---
-                <>
+                <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
                     <form onSubmit={handleAuth} className="space-y-5">
                        <div>
                          <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Email</label>
@@ -2934,13 +3147,18 @@ const AuthPage = () => {
                           {isRegister ? 'Fazer Login' : 'Criar conta agora'}
                        </span>
                     </p>
-                </>
+                </motion.div>
             )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Right Side - Visuals (Desktop Only) */}
-      <div className="hidden lg:flex w-1/2 bg-slate-900 relative items-center justify-center overflow-hidden">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8, delay: 0.2 }}
+        className="hidden lg:flex w-1/2 bg-slate-900 relative items-center justify-center overflow-hidden"
+      >
          {/* Background Gradients/Blobs with movement */}
          <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 z-0"></div>
          
@@ -2949,7 +3167,12 @@ const AuthPage = () => {
          <div className="absolute top-[40%] left-[30%] w-[300px] h-[300px] bg-orange-500/20 rounded-full blur-[80px] animate-pulse" style={{animationDuration: '7s'}}></div>
 
          {/* Glassmorphism Card */}
-         <div className="relative z-10 p-12 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl max-w-lg shadow-2xl mx-12 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-200">
+         <motion.div 
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
+            className="relative z-10 p-12 bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl max-w-lg shadow-2xl mx-12"
+         >
             <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mb-8 shadow-lg shadow-indigo-500/30">
                 <BarChart3 className="text-white" size={32} />
             </div>
@@ -2972,8 +3195,8 @@ const AuthPage = () => {
                     <span className="text-white font-bold">+2.000</span> lojistas ativos
                 </div>
             </div>
-         </div>
-      </div>
+         </motion.div>
+      </motion.div>
     </div>
   );
 };

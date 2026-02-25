@@ -120,10 +120,10 @@ export const ProductGridSection: React.FC<SectionProps> = ({ section, products =
               {isEditable && <p className="text-xs text-indigo-500">Dica: Verifique se o nome da categoria nos produtos corresponde ao filtro da seção.</p>}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
+          <div className="flex flex-col gap-4">
             {displayProducts.map(product => (
-              <div key={product.id} className="bg-white rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden group flex flex-col h-full border border-slate-100">
-                <div className="h-48 sm:h-52 bg-gray-100 relative overflow-hidden shrink-0">
+              <div key={product.id} className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden group flex border border-slate-100 p-4 gap-4 items-center">
+                <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gray-100 rounded-xl relative overflow-hidden shrink-0">
                   <img 
                     src={product.imageUrl || `https://picsum.photos/400/300?random=${product.id}`} 
                     alt={product.name}
@@ -134,17 +134,19 @@ export const ProductGridSection: React.FC<SectionProps> = ({ section, products =
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                   )}
                 </div>
-                <div className="p-5 flex flex-col flex-1">
-                  <h3 className="font-bold text-lg text-slate-800 mb-1 leading-snug break-words">{product.name}</h3>
-                  <p className="text-sm text-slate-500 mb-4 line-clamp-2 flex-1">{product.description}</p>
-                  <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-50">
-                    <span className="text-xl font-extrabold text-slate-900">R$ {product.price.toFixed(2)}</span>
+                <div className="flex flex-col justify-between flex-1 py-1">
+                  <div>
+                    <h3 className="font-bold text-lg text-slate-800 mb-1 leading-snug break-words">{product.name}</h3>
+                    <p className="text-sm text-slate-500 line-clamp-2">{product.description}</p>
+                  </div>
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="text-lg font-extrabold text-slate-900">R$ {product.price.toFixed(2)}</span>
                     <button 
                       onClick={() => onAddToCart && onAddToCart(product)}
-                      className={`p-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 transition-colors active:scale-95 shadow-lg shadow-slate-200 ${isEditable ? 'pointer-events-none opacity-50' : ''}`}
+                      className={`p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors active:scale-95 shadow-sm ${isEditable ? 'pointer-events-none opacity-50' : ''}`}
                       aria-label="Adicionar ao carrinho"
                     >
-                      <ShoppingBag size={20} strokeWidth={2.5} />
+                      <Plus size={20} strokeWidth={2.5} />
                     </button>
                   </div>
                 </div>

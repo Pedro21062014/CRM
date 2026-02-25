@@ -123,6 +123,7 @@ export interface StoreConfig {
   latitude?: number;
   longitude?: number;
   fullAddress?: string; // Endereço formatado do OpenStreetMap
+  isPublished?: boolean; // Se a loja está visível no marketplace
 }
 
 export interface Coupon {
