@@ -208,6 +208,34 @@ async function startServer() {
     }
   });
 
+  app.get("/api/balance", async (req, res) => {
+    try {
+      if (!ASAAS_API_KEY) {
+        return res.status(500).json({ error: "Chave da API do Asaas não configurada no servidor (.env)." });
+      }
+
+      const response = await fetch(`${ASAAS_URL}/finance/balance`, {
+        headers: {
+          "access_token": ASAAS_API_KEY,
+          "User-Agent": "NovaStore/1.0"
+        }
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        return res.status(400).json({ error: `Erro Asaas: ${text}` });
+      }
+
+      res.json(data);
+    } catch (error: any) {
+      console.error("Asaas error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

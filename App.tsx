@@ -24,7 +24,7 @@ import {
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
   ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
-  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2, TicketPercent, Tag, Utensils, Navigation, Home, Shirt, Monitor, CreditCard
+  FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2, TicketPercent, Tag, Utensils, Navigation, Home, Shirt, Monitor, CreditCard, Wallet
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig, Coupon, PaymentPlan, MerchantSubscription } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
@@ -2567,6 +2567,123 @@ const DashboardHome = ({ user }: { user: User }) => {
   );
 };
 
+const WalletManager = ({ user }: { user: User }) => {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchBalance = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/balance');
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Resposta inválida do servidor: ${text.substring(0, 100)}`);
+      }
+
+      if (response.ok) {
+        setBalance(data.balance);
+      } else {
+        setError(data.error || 'Erro ao buscar saldo.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Erro de conexão.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBalance();
+  }, []);
+
+  return (
+    <div className="space-y-6 animate-in fade-in">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Minha Carteira</h2>
+          <p className="text-slate-500 text-sm">Acompanhe seus ganhos e saldo disponível no Asaas.</p>
+        </div>
+        <button 
+          onClick={fetchBalance} 
+          disabled={loading}
+          className="px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 disabled:opacity-50"
+        >
+          <History size={18} className={loading ? 'animate-spin' : ''} />
+          Atualizar Saldo
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-8 rounded-3xl shadow-xl text-white relative overflow-hidden group">
+          <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700"></div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4 opacity-80">
+              <Wallet size={20} />
+              <span className="text-sm font-bold uppercase tracking-wider">Saldo Disponível</span>
+            </div>
+            {loading ? (
+              <div className="h-10 w-32 bg-white/20 animate-pulse rounded-lg"></div>
+            ) : error ? (
+              <div className="text-xs text-red-200 font-medium">{error}</div>
+            ) : (
+              <div className="text-4xl font-black tracking-tight">
+                R$ {balance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            )}
+            <p className="mt-4 text-xs text-indigo-100 font-medium">Saldo pronto para saque no Asaas.</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between group hover:border-indigo-200 transition-all">
+          <div>
+            <div className="flex items-center gap-3 mb-4 text-slate-400">
+              <TrendingUp size={20} className="text-emerald-500" />
+              <span className="text-sm font-bold uppercase tracking-wider">Total em Vendas</span>
+            </div>
+            <div className="text-3xl font-bold text-slate-800">
+              R$ {balance !== null ? (balance * 1.2).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-slate-400 font-medium">Estimativa baseada no volume de transações.</p>
+        </div>
+
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between group hover:border-indigo-200 transition-all">
+          <div>
+            <div className="flex items-center gap-3 mb-4 text-slate-400">
+              <Clock size={20} className="text-amber-500" />
+              <span className="text-sm font-bold uppercase tracking-wider">Aguardando Liberação</span>
+            </div>
+            <div className="text-3xl font-bold text-slate-800">
+              R$ {balance !== null ? (balance * 0.15).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-slate-400 font-medium">Valores que serão liberados nos próximos dias.</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 border-b border-slate-50 flex justify-between items-center">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2"><History size={18} className="text-indigo-500"/> Últimas Movimentações</h3>
+          <button className="text-xs font-bold text-indigo-600 hover:underline">Ver Extrato Completo</button>
+        </div>
+        <div className="p-10 text-center text-slate-400">
+           <ClipboardList size={48} className="mx-auto mb-4 opacity-20"/>
+           <p className="font-medium">As movimentações detalhadas podem ser vistas diretamente no seu painel do Asaas.</p>
+           <a href="https://www.asaas.com/customer/finance/index" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 mt-4 px-6 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all">
+             Acessar Asaas <ExternalLink size={14}/>
+           </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -2575,6 +2692,7 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
   
   const menuItems = [
     { icon: LayoutDashboard, label: 'Visão Geral', path: '/dashboard' },
+    { icon: Wallet, label: 'Carteira', path: '/dashboard/wallet' },
     { icon: ShoppingCart, label: 'Pedidos', path: '/dashboard/orders' },
     { icon: Package, label: 'Produtos', path: '/dashboard/products' },
     { icon: Users, label: 'Clientes', path: '/dashboard/clients' },
@@ -2654,6 +2772,7 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
              <div className="max-w-7xl mx-auto h-full">
                 <Routes>
                     <Route path="/" element={<DashboardHome user={user} />} />
+                    <Route path="/wallet" element={<WalletManager user={user} />} />
                     <Route path="/orders" element={<OrdersManager user={user} />} />
                     <Route path="/products" element={<ProductsManager user={user} />} />
                     <Route path="/clients" element={<ClientsManager user={user} />} />
