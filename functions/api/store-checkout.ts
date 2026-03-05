@@ -5,10 +5,10 @@ export async function onRequestPost(context: any) {
     const { customerName, customerEmail, customerCpfCnpj, value, description } = body;
 
     const ASAAS_API_KEY = env.ASAAS_API_KEY;
-    const ASAAS_URL = "https://sandbox.asaas.com/api/v3"; // Use sandbox or production based on your key
+    const ASAAS_URL = "https://api.asaas.com/v3";
 
     if (!ASAAS_API_KEY) {
-      return new Response(JSON.stringify({ error: "Chave da API do Asaas não configurada no servidor." }), { 
+      return new Response(JSON.stringify({ error: "Chave da API do Asaas não configurada no servidor. Configure a variável ASAAS_API_KEY no Cloudflare Pages." }), { 
         status: 500, 
         headers: { "Content-Type": "application/json" } 
       });

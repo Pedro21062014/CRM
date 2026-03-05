@@ -4,8 +4,15 @@ export async function onRequestPost(context: any) {
     const body = await request.json();
     const { customerName, customerEmail, customerCpfCnpj, planId, value, cycle } = body;
 
-    const ASAAS_API_KEY = env.ASAAS_API_KEY || "$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OjI3NjhiOWRiLTdmODEtNGQ2Ny05MGE0LWIyMTA4NTZhMzJhNTo6JGFhY2hfZTkzMDYzYzQtZTRlNC00M2U5LTgzNGEtNjZmZWUwNzE5NDZm";
+    const ASAAS_API_KEY = env.ASAAS_API_KEY;
     const ASAAS_URL = "https://api.asaas.com/v3";
+
+    if (!ASAAS_API_KEY) {
+      return new Response(JSON.stringify({ error: "Chave da API do Asaas não configurada no servidor. Configure a variável ASAAS_API_KEY no Cloudflare Pages." }), { 
+        status: 500, 
+        headers: { "Content-Type": "application/json" } 
+      });
+    }
 
     // 1. Create or find customer
     let customerId = "";

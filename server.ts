@@ -13,7 +13,7 @@ async function startServer() {
   app.use(express.json());
 
   // Asaas API Key
-  const ASAAS_API_KEY = process.env.ASAAS_API_KEY || "$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OjI3NjhiOWRiLTdmODEtNGQ2Ny05MGE0LWIyMTA4NTZhMzJhNTo6JGFhY2hfZTkzMDYzYzQtZTRlNC00M2U5LTgzNGEtNjZmZWUwNzE5NDZm";
+  const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
   const ASAAS_URL = "https://api.asaas.com/v3";
 
   // API routes
@@ -23,16 +23,22 @@ async function startServer() {
 
   app.post("/api/checkout", async (req, res) => {
     try {
+      if (!ASAAS_API_KEY) {
+        return res.status(500).json({ error: "Chave da API do Asaas não configurada no servidor (.env)." });
+      }
       const { customerName, customerEmail, customerCpfCnpj, planId, value, cycle } = req.body;
 
       // 1. Create or find customer in Asaas
       let customerId = "";
       const customersResponse = await fetch(`${ASAAS_URL}/customers?cpfCnpj=${customerCpfCnpj}`, {
         headers: {
-          "access_token": ASAAS_API_KEY
+          "access_token": ASAAS_API_KEY,
+          "User-Agent": "NovaStore/1.0"
         }
       });
-      const customersData = await customersResponse.json();
+      const customersText = await customersResponse.text();
+      let customersData;
+      try { customersData = JSON.parse(customersText); } catch(e) { return res.status(400).json({ error: `Erro Asaas (Busca Cliente): ${customersText}` }); }
 
       if (customersData.data && customersData.data.length > 0) {
         customerId = customersData.data[0].id;
@@ -41,7 +47,8 @@ async function startServer() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "access_token": ASAAS_API_KEY
+            "access_token": ASAAS_API_KEY,
+            "User-Agent": "NovaStore/1.0"
           },
           body: JSON.stringify({
             name: customerName,
@@ -49,7 +56,10 @@ async function startServer() {
             cpfCnpj: customerCpfCnpj
           })
         });
-        const newCustomerData = await createCustomerResponse.json();
+        const newCustomerText = await createCustomerResponse.text();
+        let newCustomerData;
+        try { newCustomerData = JSON.parse(newCustomerText); } catch(e) { return res.status(400).json({ error: `Erro Asaas (Criação Cliente): ${newCustomerText}` }); }
+        
         if (newCustomerData.errors) {
             return res.status(400).json({ error: newCustomerData.errors[0].description });
         }
@@ -61,7 +71,8 @@ async function startServer() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "access_token": ASAAS_API_KEY
+          "access_token": ASAAS_API_KEY,
+          "User-Agent": "NovaStore/1.0"
         },
         body: JSON.stringify({
           customer: customerId,
@@ -73,32 +84,123 @@ async function startServer() {
         })
       });
 
-      const subscriptionData = await subscriptionResponse.json();
+      const subscriptionText = await subscriptionResponse.text();
+      let subscriptionData;
+      try { subscriptionData = JSON.parse(subscriptionText); } catch(e) { return res.status(400).json({ error: `Erro Asaas (Assinatura): ${subscriptionText}` }); }
       
       if (subscriptionData.errors) {
           return res.status(400).json({ error: subscriptionData.errors[0].description });
       }
 
-      // Return the invoice URL to redirect the user
-      // Since billingType is UNDEFINED, Asaas generates a payment link
-      // Wait, Asaas subscriptions don't return an invoiceUrl directly on creation, we need to get the first payment
-      // Let's create a payment link instead, or fetch the first installment
-      
-      // Actually, creating a payment link is easier for subscriptions if we want a hosted checkout
-      // Or we can just create a payment (charge) if it's a one-time, but it's a subscription.
-      // Let's get the first payment of the subscription
       const paymentsResponse = await fetch(`${ASAAS_URL}/payments?subscription=${subscriptionData.id}`, {
           headers: {
-              "access_token": ASAAS_API_KEY
+              "access_token": ASAAS_API_KEY,
+              "User-Agent": "NovaStore/1.0"
           }
       });
-      const paymentsData = await paymentsResponse.json();
+      const paymentsText = await paymentsResponse.text();
+      let paymentsData;
+      try { paymentsData = JSON.parse(paymentsText); } catch(e) { return res.status(400).json({ error: `Erro Asaas (Pagamentos): ${paymentsText}` }); }
       
       if (paymentsData.data && paymentsData.data.length > 0) {
           res.json({ checkoutUrl: paymentsData.data[0].invoiceUrl });
       } else {
           res.status(500).json({ error: "Não foi possível gerar o link de pagamento." });
       }
+
+    } catch (error: any) {
+      console.error("Asaas error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/store-checkout", async (req, res) => {
+    try {
+      if (!ASAAS_API_KEY) {
+        return res.status(500).json({ error: "Chave da API do Asaas não configurada no servidor (.env)." });
+      }
+      const { customerName, customerEmail, customerCpfCnpj, value, description } = req.body;
+
+      // 1. Create or find customer in Asaas
+      let customerId = "";
+      const customersResponse = await fetch(`${ASAAS_URL}/customers?cpfCnpj=${customerCpfCnpj}`, {
+        headers: {
+          "access_token": ASAAS_API_KEY,
+          "User-Agent": "NovaStore/1.0"
+        }
+      });
+      const customersText = await customersResponse.text();
+      let customersData;
+      try { customersData = JSON.parse(customersText); } catch(e) { return res.status(400).json({ error: `Erro Asaas (Busca Cliente): ${customersText}` }); }
+
+      if (customersData.data && customersData.data.length > 0) {
+        customerId = customersData.data[0].id;
+      } else {
+        const createCustomerResponse = await fetch(`${ASAAS_URL}/customers`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "access_token": ASAAS_API_KEY,
+            "User-Agent": "NovaStore/1.0"
+          },
+          body: JSON.stringify({
+            name: customerName,
+            email: customerEmail,
+            cpfCnpj: customerCpfCnpj
+          })
+        });
+        const newCustomerText = await createCustomerResponse.text();
+        let newCustomerData;
+        try { newCustomerData = JSON.parse(newCustomerText); } catch(e) { return res.status(400).json({ error: `Erro Asaas (Criação Cliente): ${newCustomerText}` }); }
+        
+        if (newCustomerData.errors) {
+            return res.status(400).json({ error: newCustomerData.errors[0].description });
+        }
+        customerId = newCustomerData.id;
+      }
+
+      // 2. Create PIX Charge
+      const paymentResponse = await fetch(`${ASAAS_URL}/payments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "access_token": ASAAS_API_KEY,
+          "User-Agent": "NovaStore/1.0"
+        },
+        body: JSON.stringify({
+          customer: customerId,
+          billingType: "PIX",
+          value: value,
+          dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Due tomorrow
+          description: description
+        })
+      });
+
+      const paymentText = await paymentResponse.text();
+      let paymentData;
+      try { paymentData = JSON.parse(paymentText); } catch(e) { return res.status(400).json({ error: `Erro Asaas (Cobrança): ${paymentText}` }); }
+      
+      if (paymentData.errors) {
+          return res.status(400).json({ error: paymentData.errors[0].description });
+      }
+
+      // 3. Get PIX QR Code
+      const qrCodeResponse = await fetch(`${ASAAS_URL}/payments/${paymentData.id}/pixQrCode`, {
+          headers: {
+              "access_token": ASAAS_API_KEY,
+              "User-Agent": "NovaStore/1.0"
+          }
+      });
+
+      const qrCodeText = await qrCodeResponse.text();
+      let qrCodeData;
+      try { qrCodeData = JSON.parse(qrCodeText); } catch(e) { return res.status(400).json({ error: `Erro Asaas (QR Code): ${qrCodeText}` }); }
+
+      res.json({ 
+          paymentId: paymentData.id,
+          qrCodeUrl: qrCodeData.encodedImage,
+          payload: qrCodeData.payload
+      });
 
     } catch (error: any) {
       console.error("Asaas error:", error);

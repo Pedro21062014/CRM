@@ -2239,7 +2239,16 @@ const PlansManager = ({ user }: { user: User }) => {
         })
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+          data = JSON.parse(responseText);
+      } catch (e) {
+          console.error("Non-JSON response:", responseText);
+          alert(`Erro no servidor: A resposta não é um JSON válido. Status: ${response.status}. Resposta: ${responseText.substring(0, 100)}`);
+          setProcessingPayment(false);
+          return;
+      }
 
       if (response.ok && data.checkoutUrl) {
         // Save pending subscription status
@@ -2770,7 +2779,15 @@ const PublicStore = () => {
                 })
             });
 
-            const data = await response.json();
+            const responseText = await response.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (e) {
+                console.error("Non-JSON response:", responseText);
+                alert(`Erro no servidor: A resposta não é um JSON válido. Status: ${response.status}. Resposta: ${responseText.substring(0, 100)}`);
+                return;
+            }
 
             if (response.ok && data.qrCodeUrl) {
                 setPixData({ qrCodeUrl: data.qrCodeUrl, payload: data.payload });
