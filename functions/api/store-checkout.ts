@@ -127,7 +127,7 @@ export async function onRequestPost(context: any) {
 
     return new Response(JSON.stringify({ 
         paymentId: paymentData.id,
-        qrCodeUrl: qrCodeData.encodedImage,
+        qrCodeUrl: `data:image/png;base64,${qrCodeData.encodedImage}`,
         payload: qrCodeData.payload
     }), {
       headers: { "Content-Type": "application/json" },

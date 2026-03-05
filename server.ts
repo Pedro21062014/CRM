@@ -198,7 +198,7 @@ async function startServer() {
 
       res.json({ 
           paymentId: paymentData.id,
-          qrCodeUrl: qrCodeData.encodedImage,
+          qrCodeUrl: `data:image/png;base64,${qrCodeData.encodedImage}`,
           payload: qrCodeData.payload
       });
 
