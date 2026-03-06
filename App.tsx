@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig, Coupon, PaymentPlan, MerchantSubscription, Customer } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
+import { CheckoutFlow } from './components/CheckoutFlow';
 
 // --- AI CONFIGURATION ---
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || '' });
@@ -3106,45 +3107,75 @@ const PublicStore = ({ customer }: { customer: Customer | null }) => {
 
     const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
 
-    const generatePixPayment = async () => {
-        if (!customerName || !customerPhone || !customerAddress || !customerCpf) {
-            alert("Por favor, preencha todos os campos, incluindo o CPF.");
-            return;
-        }
+    const handleConfirmOrder = async (data: { name: string; phone: string; cpf: string; address: string; coordinates: { lat: number, lng: number } | null }) => {
+        if (cart.length === 0) return;
 
-        setSendingOrder(true);
-        try {
-            const response = await fetch('/api/store-checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    customerName,
-                    customerEmail: `${customerPhone.replace(/\D/g, '')}@novacrm.com.br`, // Fake email for Asaas if not provided
-                    customerCpfCnpj: customerCpf.replace(/\D/g, ''),
-                    value: total,
-                    description: `Pedido na loja ${config?.storeName}`
-                })
-            });
-
-            const responseText = await response.text();
-            let data;
+        if (config?.enableNativePayment) {
+            // Generate PIX
             try {
-                data = JSON.parse(responseText);
-            } catch (e) {
-                console.error("Non-JSON response:", responseText);
-                alert(`Erro no servidor: A resposta não é um JSON válido. Status: ${response.status}. Resposta: ${responseText.substring(0, 100)}`);
-                return;
-            }
+                const response = await fetch('/api/store-checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        customerName: data.name,
+                        customerEmail: `${data.phone.replace(/\D/g, '')}@novacrm.com.br`,
+                        customerCpfCnpj: data.cpf.replace(/\D/g, ''),
+                        value: total,
+                        description: `Pedido na loja ${config?.storeName}`
+                    })
+                });
 
-            if (response.ok && data.qrCodeUrl) {
-                setPixData({ qrCodeUrl: data.qrCodeUrl, payload: data.payload });
-                setPaymentModalOpen(true);
-                
-                // Create order in Firestore with status 'pending_payment'
+                const responseText = await response.text();
+                let resData;
+                try {
+                    resData = JSON.parse(responseText);
+                } catch (e) {
+                    console.error("Non-JSON response:", responseText);
+                    alert(`Erro no servidor: A resposta não é um JSON válido. Status: ${response.status}. Resposta: ${responseText.substring(0, 100)}`);
+                    throw new Error("Invalid response");
+                }
+
+                if (response.ok && resData.qrCodeUrl) {
+                    setPixData({ qrCodeUrl: resData.qrCodeUrl, payload: resData.payload });
+                    setPaymentModalOpen(true);
+                    
+                    const orderData = {
+                        customerName: data.name,
+                        customerPhone: data.phone,
+                        deliveryAddress: { street: data.address, number: 'S/N', neighborhood: '', city: '', zip: '', coordinates: data.coordinates },
+                        items: cart.map(i => ({
+                            productId: i.product.id,
+                            productName: i.product.name,
+                            quantity: i.quantity,
+                            price: i.product.price,
+                            imageUrl: i.product.imageUrl
+                        })),
+                        total: total,
+                        status: 'pending_payment',
+                        paymentMethod: 'PIX',
+                        paymentId: resData.paymentId,
+                        createdAt: serverTimestamp()
+                    };
+                    await addDoc(collection(db, `merchants/${id}/orders`), orderData);
+                    
+                    setCart([]);
+                    setIsCartOpen(false); // Close the checkout flow so the PIX modal is clearly visible
+                } else {
+                    alert(`Erro ao gerar PIX: ${resData.error || 'Falha desconhecida'}`);
+                    throw new Error(resData.error);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Erro de conexão ao gerar pagamento.");
+                throw error;
+            }
+        } else {
+            // Standard order
+            try {
                 const orderData = {
-                    customerName,
-                    customerPhone,
-                    deliveryAddress: { street: customerAddress, number: 'S/N', neighborhood: '', city: '', zip: '' },
+                    customerName: data.name,
+                    customerPhone: data.phone,
+                    deliveryAddress: { street: data.address, number: 'S/N', neighborhood: '', city: '', zip: '', coordinates: data.coordinates },
                     items: cart.map(i => ({
                         productId: i.product.id,
                         productName: i.product.name,
@@ -3153,96 +3184,30 @@ const PublicStore = ({ customer }: { customer: Customer | null }) => {
                         imageUrl: i.product.imageUrl
                     })),
                     total: total,
-                    status: 'pending_payment',
-                    paymentMethod: 'PIX',
-                    paymentId: data.paymentId,
+                    status: 'new',
                     createdAt: serverTimestamp()
                 };
+
                 await addDoc(collection(db, `merchants/${id}/orders`), orderData);
+
+                const message = `*Novo Pedido - ${config?.storeName}*\n\n` +
+                    `*Cliente:* ${data.name}\n` +
+                    `*Endereço:* ${data.address}\n\n` +
+                    `*Itens:*\n` +
+                    cart.map(i => `${i.quantity}x ${i.product.name} (R$ ${i.product.price.toFixed(2)})`).join('\n') +
+                    `\n\n*Total:* R$ ${total.toFixed(2)}`;
+
+                let phone = config?.whatsapp || '';
                 
+                if (phone) {
+                    openWhatsApp(phone, message);
+                }
                 setCart([]);
-                setIsCartOpen(false);
-            } else {
-                alert(`Erro ao gerar PIX: ${data.error || 'Falha desconhecida'}`);
+            } catch (error) {
+                console.error(error);
+                alert("Erro ao enviar pedido. Tente novamente.");
+                throw error;
             }
-        } catch (error) {
-            console.error(error);
-            alert("Erro de conexão ao gerar pagamento.");
-        } finally {
-            setSendingOrder(false);
-        }
-    };
-
-    const handleCheckout = async () => {
-        if (!customerName || !customerPhone || !customerAddress) {
-            alert("Por favor, preencha todos os campos de contato e endereço.");
-            return;
-        }
-
-        if (cart.length === 0) return;
-
-        if (config?.enableNativePayment) {
-            // If native payment is enabled, we need CPF to generate PIX
-            if (!customerCpf) {
-                alert("Para pagamento via PIX, o CPF é obrigatório.");
-                return;
-            }
-            await generatePixPayment();
-            return;
-        }
-
-        setSendingOrder(true);
-        try {
-            // 1. Create Order in Firestore
-            const orderData = {
-                customerName,
-                customerPhone,
-                deliveryAddress: { street: customerAddress, number: 'S/N', neighborhood: '', city: '', zip: '' }, // Simplified for MVP
-                items: cart.map(i => ({
-                    productId: i.product.id,
-                    productName: i.product.name,
-                    quantity: i.quantity,
-                    price: i.product.price,
-                    imageUrl: i.product.imageUrl
-                })),
-                total: total,
-                status: 'new',
-                createdAt: serverTimestamp()
-            };
-
-            await addDoc(collection(db, `merchants/${id}/orders`), orderData);
-
-            // 2. Send via WhatsApp
-            const message = `*Novo Pedido - ${config?.storeName}*\n\n` +
-                `*Cliente:* ${customerName}\n` +
-                `*Endereço:* ${customerAddress}\n\n` +
-                `*Itens:*\n` +
-                cart.map(i => `${i.quantity}x ${i.product.name} (R$ ${i.product.price.toFixed(2)})`).join('\n') +
-                `\n\n*Total:* R$ ${total.toFixed(2)}`;
-
-            let phone = config?.whatsapp || '';
-            if (!phone && id) {
-                 // Fallback if not configured (should ideally fetch user profile phone but config is source of truth)
-            }
-            
-            if (phone) {
-                openWhatsApp(phone, message);
-            } else {
-                alert("Pedido realizado com sucesso! Aguarde o contato da loja.");
-            }
-
-            setCart([]);
-            setIsCartOpen(false);
-            setCustomerName('');
-            setCustomerAddress('');
-            setCustomerPhone('');
-            setCustomerCpf('');
-
-        } catch (error) {
-            console.error(error);
-            alert("Erro ao enviar pedido. Tente novamente.");
-        } finally {
-            setSendingOrder(false);
         }
     };
 
@@ -3326,67 +3291,16 @@ const PublicStore = ({ customer }: { customer: Customer | null }) => {
 
             {/* Cart Modal / Sidebar */}
             {isCartOpen && (
-                <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-sm">
-                    <div className="absolute inset-0" onClick={() => setIsCartOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white/80 backdrop-blur-xl h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 border-l border-white/20">
-                        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <h3 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20}/> Seu Carrinho</h3>
-                            <button onClick={() => setIsCartOpen(false)}><X size={24} className="text-slate-400 hover:text-slate-600"/></button>
-                        </div>
-                        
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                            {cart.length === 0 ? (
-                                <div className="text-center py-10 opacity-50">
-                                    <ShoppingBag size={48} className="mx-auto mb-2"/>
-                                    <p>Seu carrinho está vazio.</p>
-                                </div>
-                            ) : (
-                                cart.map((item, i) => (
-                                    <div key={i} className="flex gap-4 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-                                        <div className="w-16 h-16 bg-slate-100 rounded-lg overflow-hidden shrink-0">
-                                            {item.product.imageUrl && <img src={item.product.imageUrl} className="w-full h-full object-cover" />}
-                                        </div>
-                                        <div className="flex-1">
-                                            <h4 className="font-bold text-sm text-slate-800 line-clamp-1">{item.product.name}</h4>
-                                            <p className="text-indigo-600 font-bold text-sm">R$ {item.product.price.toFixed(2)}</p>
-                                            <div className="flex items-center gap-3 mt-2">
-                                                <button onClick={() => updateQuantity(item.product.id, -1)} className="w-6 h-6 flex items-center justify-center bg-slate-100 rounded hover:bg-slate-200 font-bold">-</button>
-                                                <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
-                                                <button onClick={() => updateQuantity(item.product.id, 1)} className="w-6 h-6 flex items-center justify-center bg-slate-100 rounded hover:bg-slate-200 font-bold">+</button>
-                                                <button onClick={() => removeFromCart(item.product.id)} className="ml-auto text-red-400 hover:text-red-500"><Trash2 size={16}/></button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                        
-                        {cart.length > 0 && (
-                            <div className="p-4 bg-slate-50 border-t border-slate-100 space-y-3">
-                                <div className="space-y-2 mb-4">
-                                    <input placeholder="Seu Nome" className="w-full p-3 border rounded-xl text-sm" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                                    <input placeholder="Seu WhatsApp (com DDD)" className="w-full p-3 border rounded-xl text-sm" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
-                                    <input placeholder="Endereço de Entrega" className="w-full p-3 border rounded-xl text-sm" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} />
-                                    {config.enableNativePayment && (
-                                        <input placeholder="Seu CPF (para gerar o PIX)" className="w-full p-3 border rounded-xl text-sm" value={customerCpf} onChange={e => setCustomerCpf(e.target.value)} />
-                                    )}
-                                </div>
-                                <div className="flex justify-between items-center text-lg font-bold text-slate-800 mb-2">
-                                    <span>Total</span>
-                                    <span>R$ {total.toFixed(2)}</span>
-                                </div>
-                                <button 
-                                    onClick={handleCheckout} 
-                                    disabled={sendingOrder}
-                                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
-                                >
-                                    {sendingOrder ? <Loader2 className="animate-spin" /> : config.enableNativePayment ? <QrCode size={20}/> : <MessageCircle size={20}/>}
-                                    {config.enableNativePayment ? 'Pagar com PIX' : 'Finalizar Pedido'}
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <CheckoutFlow 
+                    cart={cart}
+                    total={total}
+                    config={config}
+                    onClose={() => setIsCartOpen(false)}
+                    onConfirm={handleConfirmOrder}
+                    updateQuantity={updateQuantity}
+                    removeFromCart={removeFromCart}
+                    initialData={{ name: customerName, phone: customerPhone, cpf: customerCpf, address: customerAddress }}
+                />
             )}
 
             {/* PIX Payment Modal */}
