@@ -155,3 +155,13 @@ export interface MerchantSubscription {
   status: 'active' | 'past_due' | 'canceled';
   currentPeriodEnd: any;
 }
+
+export interface Customer {
+  uid: string;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  cpf?: string;
+  createdAt: any;
+}

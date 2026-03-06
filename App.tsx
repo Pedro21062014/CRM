@@ -26,13 +26,21 @@ import {
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
   FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2, TicketPercent, Tag, Utensils, Navigation, Home, Shirt, Monitor, CreditCard, Wallet
 } from 'lucide-react';
-import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig, Coupon, PaymentPlan, MerchantSubscription } from './types';
+import { Product, Client, Order, StoreConfig, StoreSection, OrderStatus, ClientType, ClientStatus, WhatsAppConfig, Coupon, PaymentPlan, MerchantSubscription, Customer } from './types';
 import { HeroSection, TextSection, ProductGridSection } from './components/StoreComponents';
 
 // --- AI CONFIGURATION ---
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.API_KEY || '' });
 
 // --- Shared Components ---
+
+const statusColors: any = {
+    [OrderStatus.PENDING_PAYMENT]: 'bg-slate-100 text-slate-700 border-slate-200',
+    [OrderStatus.NEW]: 'bg-blue-100 text-blue-700 border-blue-200',
+    [OrderStatus.PROCESSING]: 'bg-amber-100 text-amber-700 border-amber-200',
+    [OrderStatus.COMPLETED]: 'bg-green-100 text-green-700 border-green-200',
+    [OrderStatus.CANCELLED]: 'bg-red-100 text-red-700 border-red-200'
+};
 
 const LoadingSpinner = () => (
   <div className="flex h-64 w-full items-center justify-center text-slate-400">
@@ -1032,14 +1040,6 @@ const OrdersManager = ({ user }: { user: User }) => {
       }
   };
 
-  const statusColors: any = {
-      [OrderStatus.PENDING_PAYMENT]: 'bg-slate-100 text-slate-700 border-slate-200',
-      [OrderStatus.NEW]: 'bg-blue-100 text-blue-700 border-blue-200',
-      [OrderStatus.PROCESSING]: 'bg-amber-100 text-amber-700 border-amber-200',
-      [OrderStatus.COMPLETED]: 'bg-green-100 text-green-700 border-green-200',
-      [OrderStatus.CANCELLED]: 'bg-red-100 text-red-700 border-red-200'
-  };
-
   return (
       <div className="space-y-6 animate-in fade-in">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100"><h2 className="text-2xl font-bold">Pedidos</h2></div>
@@ -1834,7 +1834,7 @@ const StoreEditor = ({ user }: { user: User }) => {
   );
 };
 
-const Marketplace = () => {
+const Marketplace = ({ customer, logout }: { customer: Customer | null, logout: () => void }) => {
     const navigate = useNavigate();
     const [stores, setStores] = useState<{id: string, config: StoreConfig, distance?: number}[]>([]);
     const [loading, setLoading] = useState(true);
@@ -1842,6 +1842,7 @@ const Marketplace = () => {
     const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
     const [loadingLocation, setLoadingLocation] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchStores = async () => {
@@ -1949,6 +1950,7 @@ const Marketplace = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans pb-20">
+            <CustomerAuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onAuthSuccess={() => window.location.reload()} />
             {/* Header */}
             <header className="bg-white sticky top-0 z-30 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-6">
@@ -1998,16 +2000,33 @@ const Marketplace = () => {
                         </button>
                         
                         <div className="flex items-center gap-4">
-                            <button className="text-slate-600 hover:text-red-600 transition-colors">
-                                <UserIcon size={24} />
-                            </button>
-                            <button className="text-slate-600 hover:text-red-600 transition-colors flex items-center gap-2">
-                                <ShoppingBag size={24} />
-                                <div className="hidden md:flex flex-col text-left">
-                                    <span className="text-xs font-bold text-slate-800 leading-none">R$ 0,00</span>
-                                    <span className="text-[10px] text-slate-500 leading-none mt-0.5">0 itens</span>
+                            {customer ? (
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => navigate('/my-orders')} className="hidden md:flex items-center gap-2 text-slate-600 font-bold text-sm hover:text-red-600 transition-colors">
+                                        <ShoppingBag size={18}/> Meus Pedidos
+                                    </button>
+                                    <div className="group relative">
+                                        <div className="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm cursor-pointer">
+                                            {customer.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="absolute right-0 top-full mt-2 w-48 bg-white/80 backdrop-blur-xl rounded-xl shadow-xl border border-white/20 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                                            <button onClick={() => navigate('/my-orders')} className="w-full px-4 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+                                                <ShoppingBag size={16}/> Meus Pedidos
+                                            </button>
+                                            <button onClick={logout} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                                                <LogOut size={16}/> Sair
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </button>
+                            ) : (
+                                <button 
+                                    onClick={() => setIsAuthModalOpen(true)}
+                                    className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-red-700 transition-all shadow-lg shadow-red-200"
+                                >
+                                    <UserIcon size={18}/> Entrar
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -3006,8 +3025,9 @@ const Dashboard = ({ user, logout }: { user: User, logout: () => void }) => {
   );
 };
 
-const PublicStore = () => {
+const PublicStore = ({ customer }: { customer: Customer | null }) => {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [config, setConfig] = useState<StoreConfig | null>(null);
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
@@ -3016,12 +3036,22 @@ const PublicStore = () => {
     const [sendingOrder, setSendingOrder] = useState(false);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [pixData, setPixData] = useState<{qrCodeUrl: string, payload: string} | null>(null);
-    const [customerCpf, setCustomerCpf] = useState('');
+    const [customerCpf, setCustomerCpf] = useState(customer?.cpf || '');
 
     // Cart details
-    const [customerName, setCustomerName] = useState('');
-    const [customerPhone, setCustomerPhone] = useState('');
-    const [customerAddress, setCustomerAddress] = useState('');
+    const [customerName, setCustomerName] = useState(customer?.name || '');
+    const [customerPhone, setCustomerPhone] = useState(customer?.phone || '');
+    const [customerAddress, setCustomerAddress] = useState(customer?.address || '');
+    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+    useEffect(() => {
+        if (customer) {
+            setCustomerName(customer.name || '');
+            setCustomerPhone(customer.phone || '');
+            setCustomerAddress(customer.address || '');
+            setCustomerCpf(customer.cpf || '');
+        }
+    }, [customer]);
 
     useEffect(() => {
         const fetchStore = async () => {
@@ -3223,14 +3253,26 @@ const PublicStore = () => {
         <div className="min-h-screen bg-white font-sans text-slate-900 pb-24">
             {/* Header / Nav */}
             <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 px-4 py-3 flex justify-between items-center shadow-sm">
-                 <div className="flex items-center gap-3">
+                 <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/marketplace')}>
+                     <ChevronLeft size={20} className="text-slate-400" />
                      {config.logoUrl && <img src={config.logoUrl} className="w-8 h-8 rounded-full object-cover border border-slate-200" />}
                      <span className="font-bold text-lg truncate max-w-[200px]">{config.storeName}</span>
                  </div>
-                 <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-indigo-600 bg-indigo-50 rounded-full hover:bg-indigo-100 transition-colors">
-                     <ShoppingBag size={24} />
-                     {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">{cart.reduce((a,c) => a + c.quantity, 0)}</span>}
-                 </button>
+                 <div className="flex items-center gap-2">
+                    {customer ? (
+                        <button onClick={() => navigate('/my-orders')} className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-xs border border-white shadow-sm">
+                            {customer.name.charAt(0).toUpperCase()}
+                        </button>
+                    ) : (
+                        <button onClick={() => setIsAuthModalOpen(true)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
+                            <UserIcon size={20} />
+                        </button>
+                    )}
+                    <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-indigo-600 bg-indigo-50 rounded-full hover:bg-indigo-100 transition-colors">
+                        <ShoppingBag size={24} />
+                        {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">{cart.reduce((a,c) => a + c.quantity, 0)}</span>}
+                    </button>
+                 </div>
             </nav>
 
             <div className="bg-white pb-8 relative mb-6">
@@ -3396,6 +3438,7 @@ const PublicStore = () => {
                     </div>
                 </div>
             )}
+            <CustomerAuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onAuthSuccess={() => window.location.reload()} />
         </div>
     );
 };
@@ -3753,14 +3796,288 @@ const AuthPage = () => {
   );
 };
 
+const CustomerAuthModal = ({ isOpen, onClose, onAuthSuccess }: { isOpen: boolean, onClose: () => void, onAuthSuccess: (user: User) => void }) => {
+  const [isRegister, setIsRegister] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      let userCredential;
+      if (isRegister) {
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // Create customer profile
+        await setDoc(doc(db, 'customers', userCredential.user.uid), {
+          uid: userCredential.user.uid,
+          name: name || email.split('@')[0],
+          email: email,
+          createdAt: serverTimestamp()
+        });
+      } else {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      }
+      onAuthSuccess(userCredential.user);
+      onClose();
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      // Check if profile exists, if not create
+      const docRef = doc(db, 'customers', result.user.uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        await setDoc(docRef, {
+          uid: result.user.uid,
+          name: result.user.displayName || result.user.email?.split('@')[0],
+          email: result.user.email,
+          createdAt: serverTimestamp()
+        });
+      }
+      onAuthSuccess(result.user);
+      onClose();
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in">
+      <div className="bg-white/90 backdrop-blur-xl w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-white/20 animate-in zoom-in-95">
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <UserIcon className="text-indigo-600" /> {isRegister ? 'Criar Conta' : 'Entrar'}
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+        
+        <div className="p-8">
+          <form onSubmit={handleAuth} className="space-y-4">
+            {isRegister && (
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo</label>
+                <input 
+                  type="text"
+                  required
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
+              <input 
+                type="email"
+                required
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Senha</label>
+              <input 
+                type="password"
+                required
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+              />
+            </div>
+            <button 
+              disabled={loading}
+              className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+            >
+              {loading && <Loader2 className="animate-spin" size={18}/>}
+              {isRegister ? 'Cadastrar' : 'Entrar'}
+            </button>
+          </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
+            <div className="relative flex justify-center text-xs"><span className="px-2 bg-white text-slate-400 uppercase font-bold">Ou</span></div>
+          </div>
+
+          <button onClick={handleGoogle} className="w-full py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all flex items-center justify-center gap-3">
+            <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Entrar com Google
+          </button>
+
+          <p className="text-center mt-6 text-sm text-slate-500">
+            {isRegister ? 'Já tem conta?' : 'Não tem conta?'}
+            <button onClick={() => setIsRegister(!isRegister)} className="ml-1 text-indigo-600 font-bold hover:underline">
+              {isRegister ? 'Fazer Login' : 'Criar Agora'}
+            </button>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CustomerOrders = ({ customer, logout }: { customer: Customer, logout: () => void }) => {
+    const navigate = useNavigate();
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchOrders = async () => {
+            try {
+                // We need to fetch orders from all merchants where customerEmail matches
+                // This is a bit tricky with the current structure.
+                // Ideally we'd have a top-level orders collection or a customer-specific orders collection.
+                // For now, let's try to query all orders from all merchants.
+                // Note: This might require an index or a different data structure for scale.
+                
+                const merchantsSnap = await getDocs(collection(db, 'merchants'));
+                const allOrders: Order[] = [];
+                
+                for (const merchantDoc of merchantsSnap.docs) {
+                    const ordersSnap = await getDocs(query(
+                        collection(db, `merchants/${merchantDoc.id}/orders`),
+                        where('customerEmail', '==', customer.email)
+                    ));
+                    ordersSnap.forEach(doc => {
+                        allOrders.push({ id: doc.id, ...doc.data() } as Order);
+                    });
+                }
+                
+                setOrders(allOrders.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+            } catch (error) {
+                console.error("Error fetching orders:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchOrders();
+    }, [customer.email]);
+
+    return (
+        <div className="min-h-screen bg-slate-50 font-sans pb-20">
+            {/* Header */}
+            <header className="bg-white sticky top-0 z-30 shadow-sm">
+                <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => navigate('/marketplace')} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+                            <ChevronLeft size={24} />
+                        </button>
+                        <h1 className="text-xl font-bold text-slate-800">Meus Pedidos</h1>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold border-2 border-white shadow-sm">
+                            {customer.name.charAt(0).toUpperCase()}
+                        </div>
+                        <button onClick={logout} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                            <LogOut size={20} />
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main className="max-w-3xl mx-auto px-4 py-8">
+                {loading ? (
+                    <div className="flex justify-center py-20"><LoadingSpinner /></div>
+                ) : orders.length === 0 ? (
+                    <div className="text-center py-20">
+                        <div className="w-20 h-20 bg-slate-100 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <ShoppingBag size={40} />
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-800 mb-2">Nenhum pedido encontrado</h2>
+                        <p className="text-slate-500 mb-6">Você ainda não realizou nenhuma compra.</p>
+                        <button onClick={() => navigate('/marketplace')} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
+                            Explorar Marketplace
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {orders.map((order) => (
+                            <div key={order.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow">
+                                <div className="p-6">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pedido #{order.id.slice(-6)}</span>
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColors[order.status]}`}>
+                                                    {order.status === OrderStatus.NEW ? 'Novo' : 
+                                                     order.status === OrderStatus.PROCESSING ? 'Em Preparo' :
+                                                     order.status === OrderStatus.COMPLETED ? 'Concluído' :
+                                                     order.status === OrderStatus.CANCELLED ? 'Cancelado' : 'Aguardando Pagamento'}
+                                                </span>
+                                            </div>
+                                            <h3 className="font-bold text-slate-800">{order.items.length} {order.items.length === 1 ? 'item' : 'itens'}</h3>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-lg font-bold text-slate-900">R$ {order.total.toFixed(2)}</p>
+                                            <p className="text-xs text-slate-400">{order.createdAt.toDate().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2 border-t border-slate-50 pt-4">
+                                        {order.items.map((item, idx) => (
+                                            <div key={idx} className="flex justify-between text-sm">
+                                                <span className="text-slate-600">{item.quantity}x {item.productName}</span>
+                                                <span className="text-slate-400">R$ {(item.price * item.quantity).toFixed(2)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {order.status === 'pending_payment' && (
+                                        <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-100 flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3 text-amber-700">
+                                                <AlertCircle size={20} />
+                                                <span className="text-sm font-medium">Aguardando pagamento via PIX</span>
+                                            </div>
+                                            <button className="px-4 py-2 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors">
+                                                Ver QR Code
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+};
+
 const App = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      if (u) {
+        // Try to fetch customer profile
+        const docRef = doc(db, 'customers', u.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setCustomer({ uid: u.uid, ...docSnap.data() } as Customer);
+        } else {
+          setCustomer(null);
+        }
+      } else {
+        setCustomer(null);
+      }
       setLoading(false);
     });
     return unsubscribe;
@@ -3780,12 +4097,13 @@ const App = () => {
   return (
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={user ? <Navigate to="/dashboard" /> : <LandingPage />} />
-          <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <AuthPage />} />
-          <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <AuthPage />} />
-          <Route path="/dashboard/*" element={user ? <Dashboard user={user} logout={logout} /> : <Navigate to="/login" />} />
-          <Route path="/store/:id/*" element={<PublicStore />} />
-          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/" element={user && !customer ? <Navigate to="/dashboard" /> : <LandingPage />} />
+          <Route path="/login" element={user && !customer ? <Navigate to="/dashboard" /> : <AuthPage />} />
+          <Route path="/register" element={user && !customer ? <Navigate to="/dashboard" /> : <AuthPage />} />
+          <Route path="/dashboard/*" element={user && !customer ? <Dashboard user={user} logout={logout} /> : <Navigate to="/login" />} />
+          <Route path="/store/:id/*" element={<PublicStore customer={customer} />} />
+          <Route path="/marketplace" element={<Marketplace customer={customer} logout={logout} />} />
+          <Route path="/my-orders" element={customer ? <CustomerOrders customer={customer} logout={logout} /> : <Navigate to="/marketplace" />} />
         </Routes>
       </BrowserRouter>
   );
