@@ -22,7 +22,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { 
   LayoutDashboard, Package, Users, ShoppingCart, Store, Settings, 
   LogOut, Plus, Trash2, Edit2, ChevronUp, ChevronDown, Check, X,
-  ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
+  ExternalLink, Bell, Image as ImageIcon, Type as TypeIcon, LayoutGrid, ChevronLeft, ChevronRight, Loader2, Rocket, Search, ArrowRight, ArrowUpRight, ShoppingBag, MapPin, Clock, Star, History, Menu, Phone,
   Zap, Globe, ShieldCheck, BarChart3, Smartphone, CheckCircle2, TrendingUp, TrendingDown, DollarSign, PieChart, Sparkles, MessageSquare, Send, Minus, Briefcase, User as UserIcon, Calendar, ClipboardList,
   FileSpreadsheet, Download, Upload, Filter, Target, List, MessageCircle, Bot, QrCode, Play, StopCircle, MoreVertical, Paperclip, Smile, Key, AlertTriangle, GripVertical, AlertCircle, Trophy, Save, Cpu, Timer, Lock, Mail, Wand2, TicketPercent, Tag, Utensils, Navigation, Home, Shirt, Monitor, CreditCard, Wallet
 } from 'lucide-react';
@@ -272,8 +272,8 @@ const CouponsManager = ({ user }: { user: User }) => {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
+          <div className="bg-white/80 backdrop-blur-xl p-6 rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 border border-white/20">
              <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-lg">{editing.id ? 'Editar Cupom' : 'Novo Cupom'}</h3>
                 <button onClick={() => setEditing(null)}><X size={24} className="text-slate-400"/></button>
@@ -552,8 +552,8 @@ const ProductsManager = ({ user }: { user: User }) => {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-           <div className="bg-white p-6 rounded-2xl shadow-2xl border border-slate-100 w-full max-w-lg animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
+           <div className="bg-white/80 backdrop-blur-xl p-6 rounded-2xl shadow-2xl border border-white/20 w-full max-w-lg animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                  <h3 className="font-bold text-lg">{editing.id ? 'Editar Produto' : 'Novo Produto'}</h3>
                  <button onClick={() => setEditing(null)}><X size={24} className="text-slate-400"/></button>
@@ -792,8 +792,8 @@ const ClientsManager = ({ user }: { user: User }) => {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
+          <div className="bg-white/80 backdrop-blur-xl p-6 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-white/20">
              <div className="flex justify-between mb-6">
                  <h3 className="font-bold text-lg text-slate-800">{editing.id ? 'Editar Cliente' : 'Novo Cliente'}</h3>
                  <button onClick={()=>setEditing(null)}><X className="text-slate-400 hover:text-slate-600"/></button>
@@ -1002,6 +1002,26 @@ const OrdersManager = ({ user }: { user: User }) => {
       }
   };
 
+  const checkPayment = async (order: Order) => {
+    if (!order.paymentId) return;
+    try {
+      const response = await fetch(`/api/check-payment/${order.paymentId}`);
+      const data = await response.json();
+      
+      if (data.status === 'RECEIVED' || data.status === 'CONFIRMED') {
+        await updateDoc(doc(db, `merchants/${user.uid}/orders`, order.id), { 
+          status: 'completed',
+          paymentStatus: 'paid'
+        });
+        alert("Pagamento confirmado! O pedido foi marcado como concluído.");
+      } else {
+        alert(`Status do pagamento: ${data.status}. Ainda não recebido.`);
+      }
+    } catch (e) {
+      alert("Erro ao verificar pagamento.");
+    }
+  };
+
   const handleDeleteOrder = async (orderId: string) => {
       if (confirm("Tem certeza que deseja excluir este pedido?")) {
           try {
@@ -1013,10 +1033,11 @@ const OrdersManager = ({ user }: { user: User }) => {
   };
 
   const statusColors: any = {
-      'new': 'bg-blue-100 text-blue-700 border-blue-200',
-      'processing': 'bg-amber-100 text-amber-700 border-amber-200',
-      'completed': 'bg-green-100 text-green-700 border-green-200',
-      'cancelled': 'bg-red-100 text-red-700 border-red-200'
+      [OrderStatus.PENDING_PAYMENT]: 'bg-slate-100 text-slate-700 border-slate-200',
+      [OrderStatus.NEW]: 'bg-blue-100 text-blue-700 border-blue-200',
+      [OrderStatus.PROCESSING]: 'bg-amber-100 text-amber-700 border-amber-200',
+      [OrderStatus.COMPLETED]: 'bg-green-100 text-green-700 border-green-200',
+      [OrderStatus.CANCELLED]: 'bg-red-100 text-red-700 border-red-200'
   };
 
   return (
@@ -1064,11 +1085,21 @@ const OrdersManager = ({ user }: { user: User }) => {
                                 onChange={(e) => updateStatus(order.id, e.target.value)}
                                 className={`p-2 rounded-lg text-sm font-bold border outline-none cursor-pointer w-full transition-colors ${statusColors[order.status] || 'bg-slate-100'}`}
                             >
-                                <option value="new">Novo Pedido</option>
-                                <option value="processing">Em Preparo</option>
-                                <option value="completed">Concluído / Entregue</option>
-                                <option value="cancelled">Cancelado</option>
+                                <option value={OrderStatus.PENDING_PAYMENT}>Aguardando Pagamento</option>
+                                <option value={OrderStatus.NEW}>Novo Pedido</option>
+                                <option value={OrderStatus.PROCESSING}>Em Preparo</option>
+                                <option value={OrderStatus.COMPLETED}>Concluído / Entregue</option>
+                                <option value={OrderStatus.CANCELLED}>Cancelado</option>
                             </select>
+                            
+                            {order.status === OrderStatus.PENDING_PAYMENT && order.paymentId && (
+                                <button 
+                                    onClick={() => checkPayment(order)}
+                                    className="w-full py-2 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Check size={14} /> Verificar PIX
+                                </button>
+                            )}
                             {order.deliveryAddress && (
                                 <div className="text-right text-xs text-slate-500 mt-2 max-w-[200px]">
                                     <p className="truncate">{order.deliveryAddress.street}, {order.deliveryAddress.number}</p>
@@ -1138,6 +1169,10 @@ const StoreEditor = ({ user }: { user: User }) => {
   }, [user.uid]);
 
   const saveConfig = async () => {
+    if (config.enableNativePayment && !config.pixKey) {
+      alert("Você habilitou o Pagamento Nativo (PIX), mas não configurou sua Chave PIX. Por favor, preencha a chave PIX antes de salvar.");
+      return;
+    }
     setSaving(true);
     try {
       await updateDoc(doc(db, 'merchants', user.uid), { storeConfig: config });
@@ -1149,6 +1184,10 @@ const StoreEditor = ({ user }: { user: User }) => {
   };
 
   const togglePublish = async () => {
+    if (!config.isPublished && config.enableNativePayment && !config.pixKey) {
+      alert("Você habilitou o Pagamento Nativo (PIX), mas não configurou sua Chave PIX. Por favor, preencha a chave PIX antes de publicar a loja.");
+      return;
+    }
     const newStatus = !config.isPublished;
     const newConfig = { ...config, isPublished: newStatus };
     setConfig(newConfig);
@@ -1587,6 +1626,17 @@ const StoreEditor = ({ user }: { user: User }) => {
                     </div>
 
                     <div className="border-t pt-4 mt-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase">Sua Chave PIX (Para Recebimentos)</label>
+                        <input 
+                            className="w-full p-2 border rounded-lg mt-1 text-sm" 
+                            placeholder="CPF, CNPJ, E-mail, Telefone ou Aleatória" 
+                            value={config.pixKey || ''} 
+                            onChange={e => setConfig({...config, pixKey: e.target.value})} 
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">Obrigatório para habilitar o pagamento nativo via PIX.</p>
+                    </div>
+
+                    <div className="border-t pt-4 mt-2">
                         <label className="flex items-center justify-between cursor-pointer">
                             <div>
                                 <span className="text-sm font-bold text-slate-700 block">Pagamento Nativo (PIX)</span>
@@ -1599,7 +1649,13 @@ const StoreEditor = ({ user }: { user: User }) => {
                                 type="checkbox" 
                                 className="hidden" 
                                 checked={config.enableNativePayment || false} 
-                                onChange={(e) => setConfig({...config, enableNativePayment: e.target.checked})}
+                                onChange={(e) => {
+                                    if (e.target.checked && !config.pixKey) {
+                                        alert("Você precisa configurar sua Chave PIX antes de habilitar o pagamento nativo.");
+                                        return;
+                                    }
+                                    setConfig({...config, enableNativePayment: e.target.checked});
+                                }}
                             />
                         </label>
                     </div>
@@ -2277,8 +2333,8 @@ const PlansManager = ({ user }: { user: User }) => {
   return (
     <div className="space-y-8 animate-in fade-in">
       {checkoutModalOpen && selectedPlan && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 w-full max-w-md shadow-2xl border border-white/20">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-slate-800">Finalizar Assinatura</h3>
               <button onClick={() => setCheckoutModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
@@ -2568,55 +2624,123 @@ const DashboardHome = ({ user }: { user: User }) => {
 };
 
 const WalletManager = ({ user }: { user: User }) => {
-  const [balance, setBalance] = useState<number | null>(null);
+  const [balance, setBalance] = useState<number>(0);
+  const [pendingBalance, setPendingBalance] = useState<number>(0);
+  const [totalSales, setTotalSales] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
 
   const fetchBalance = async () => {
     setLoading(true);
-    setError(null);
     try {
-      const response = await fetch('/api/balance');
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        throw new Error(`Resposta inválida do servidor: ${text.substring(0, 100)}`);
-      }
+      // Fetch Orders
+      const qOrders = query(collection(db, `merchants/${user.uid}/orders`));
+      const snapshotOrders = await getDocs(qOrders);
+      
+      let available = 0;
+      let pending = 0;
+      let total = 0;
 
-      if (response.ok) {
-        setBalance(data.balance);
-      } else {
-        setError(data.error || 'Erro ao buscar saldo.');
-      }
+      snapshotOrders.forEach(doc => {
+        const order = doc.data() as Order;
+        if (order.status !== OrderStatus.CANCELLED) {
+          total += order.total;
+          // Consider available only if status is completed OR if it has a paymentStatus 'paid'
+          if (order.status === OrderStatus.COMPLETED || (order as any).paymentStatus === 'paid') {
+            available += order.total;
+          } else {
+            pending += order.total;
+          }
+        }
+      });
+
+      // Fetch Withdrawals to subtract from available balance
+      const qWithdrawals = query(collection(db, `merchants/${user.uid}/withdrawals`), orderBy('createdAt', 'desc'));
+      const snapshotWithdrawals = await getDocs(qWithdrawals);
+      const withdrawalList: any[] = [];
+      
+      snapshotWithdrawals.forEach(doc => {
+        const w = { id: doc.id, ...doc.data() };
+        withdrawalList.push(w);
+        // Subtract requested or completed withdrawals from available balance
+        if ((w as any).status !== 'rejected') {
+          available -= (w as any).amount;
+        }
+      });
+
+      setBalance(Math.max(0, available));
+      setPendingBalance(pending);
+      setTotalSales(total);
+      setWithdrawals(withdrawalList);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Erro de conexão.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleWithdraw = async () => {
+    const amount = parseFloat(withdrawAmount.replace(',', '.'));
+    if (isNaN(amount) || amount <= 0) {
+      alert("Por favor, insira um valor válido.");
+      return;
+    }
+    if (amount > balance) {
+      alert("Saldo insuficiente para este saque.");
+      return;
+    }
+
+    setWithdrawing(true);
+    try {
+      await addDoc(collection(db, `merchants/${user.uid}/withdrawals`), {
+        amount,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        type: 'PIX'
+      });
+      alert("Solicitação de saque enviada com sucesso! O valor será processado em breve.");
+      setIsWithdrawModalOpen(false);
+      setWithdrawAmount('');
+      fetchBalance();
+    } catch (e) {
+      alert("Erro ao solicitar saque.");
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   useEffect(() => {
     fetchBalance();
-  }, []);
+  }, [user.uid]);
 
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Minha Carteira</h2>
-          <p className="text-slate-500 text-sm">Acompanhe seus ganhos e saldo disponível no Asaas.</p>
+          <p className="text-slate-500 text-sm">Acompanhe seus ganhos e solicite seus saques.</p>
         </div>
-        <button 
-          onClick={fetchBalance} 
-          disabled={loading}
-          className="px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 disabled:opacity-50"
-        >
-          <History size={18} className={loading ? 'animate-spin' : ''} />
-          Atualizar Saldo
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={fetchBalance} 
+            disabled={loading}
+            className="px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <History size={18} className={loading ? 'animate-spin' : ''} />
+            Atualizar
+          </button>
+          <button 
+            onClick={() => setIsWithdrawModalOpen(true)}
+            disabled={balance <= 0 || loading}
+            className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 disabled:opacity-50 disabled:shadow-none"
+          >
+            <ArrowUpRight size={18} />
+            Solicitar Saque
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -2629,14 +2753,12 @@ const WalletManager = ({ user }: { user: User }) => {
             </div>
             {loading ? (
               <div className="h-10 w-32 bg-white/20 animate-pulse rounded-lg"></div>
-            ) : error ? (
-              <div className="text-xs text-red-200 font-medium">{error}</div>
             ) : (
               <div className="text-4xl font-black tracking-tight">
-                R$ {balance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             )}
-            <p className="mt-4 text-xs text-indigo-100 font-medium">Saldo pronto para saque no Asaas.</p>
+            <p className="mt-4 text-xs text-indigo-100 font-medium">Saldo pronto para saque.</p>
           </div>
         </div>
 
@@ -2647,10 +2769,10 @@ const WalletManager = ({ user }: { user: User }) => {
               <span className="text-sm font-bold uppercase tracking-wider">Total em Vendas</span>
             </div>
             <div className="text-3xl font-bold text-slate-800">
-              R$ {balance !== null ? (balance * 1.2).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+              R$ {totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
           </div>
-          <p className="mt-4 text-xs text-slate-400 font-medium">Estimativa baseada no volume de transações.</p>
+          <p className="mt-4 text-xs text-slate-400 font-medium">Volume total de transações.</p>
         </div>
 
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between group hover:border-indigo-200 transition-all">
@@ -2660,26 +2782,102 @@ const WalletManager = ({ user }: { user: User }) => {
               <span className="text-sm font-bold uppercase tracking-wider">Aguardando Liberação</span>
             </div>
             <div className="text-3xl font-bold text-slate-800">
-              R$ {balance !== null ? (balance * 0.15).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00'}
+              R$ {pendingBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
           </div>
-          <p className="mt-4 text-xs text-slate-400 font-medium">Valores que serão liberados nos próximos dias.</p>
+          <p className="mt-4 text-xs text-slate-400 font-medium">Valores de pedidos em andamento.</p>
         </div>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="p-6 border-b border-slate-50 flex justify-between items-center">
           <h3 className="font-bold text-slate-800 flex items-center gap-2"><History size={18} className="text-indigo-500"/> Últimas Movimentações</h3>
-          <button className="text-xs font-bold text-indigo-600 hover:underline">Ver Extrato Completo</button>
         </div>
-        <div className="p-10 text-center text-slate-400">
-           <ClipboardList size={48} className="mx-auto mb-4 opacity-20"/>
-           <p className="font-medium">As movimentações detalhadas podem ser vistas diretamente no seu painel do Asaas.</p>
-           <a href="https://www.asaas.com/customer/finance/index" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 mt-4 px-6 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all">
-             Acessar Asaas <ExternalLink size={14}/>
-           </a>
-        </div>
+        
+        {withdrawals.length > 0 ? (
+          <div className="divide-y divide-slate-50">
+            {withdrawals.map((w) => (
+              <div key={w.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${w.status === 'completed' ? 'bg-emerald-100 text-emerald-600' : w.status === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+                    {w.status === 'completed' ? <Check size={20} /> : w.status === 'rejected' ? <X size={20} /> : <Clock size={20} />}
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800">Saque via {w.type}</p>
+                    <p className="text-xs text-slate-400">{w.createdAt?.toDate().toLocaleString('pt-BR')}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-slate-800">R$ {w.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${w.status === 'completed' ? 'text-emerald-500' : w.status === 'rejected' ? 'text-red-500' : 'text-amber-500'}`}>
+                    {w.status === 'completed' ? 'Concluído' : w.status === 'rejected' ? 'Rejeitado' : 'Pendente'}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-10 text-center text-slate-400">
+            <ClipboardList size={48} className="mx-auto mb-4 opacity-20"/>
+            <p className="font-medium">Nenhuma movimentação encontrada.</p>
+          </div>
+        )}
       </div>
+
+      {/* Withdraw Modal */}
+      {isWithdrawModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-[60] flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white/90 backdrop-blur-xl w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-white/20 animate-in zoom-in-95">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <ArrowUpRight className="text-indigo-600" /> Solicitar Saque
+              </h3>
+              <button onClick={() => setIsWithdrawModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-8">
+              <div className="mb-6 text-center">
+                <p className="text-sm text-slate-500 mb-1">Saldo Disponível</p>
+                <p className="text-3xl font-black text-indigo-600">R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Valor do Saque</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">R$</span>
+                    <input 
+                      type="text"
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:bg-white outline-none transition-all text-xl font-bold"
+                      placeholder="0,00"
+                      value={withdrawAmount}
+                      onChange={e => setWithdrawAmount(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-2">O valor será enviado para a chave PIX cadastrada na sua loja.</p>
+                </div>
+
+                <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                  <p className="text-xs text-indigo-700 leading-relaxed">
+                    <strong>Atenção:</strong> Os saques são processados em até 24h úteis. Certifique-se de que sua chave PIX está correta nas configurações da loja.
+                  </p>
+                </div>
+
+                <button 
+                  onClick={handleWithdraw}
+                  disabled={withdrawing || !withdrawAmount || parseFloat(withdrawAmount.replace(',', '.')) <= 0}
+                  className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none mt-4"
+                >
+                  {withdrawing ? <Loader2 className="animate-spin" /> : <Check size={20} />}
+                  Confirmar Solicitação
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -3086,9 +3284,9 @@ const PublicStore = () => {
 
             {/* Cart Modal / Sidebar */}
             {isCartOpen && (
-                <div className="fixed inset-0 z-50 flex justify-end">
-                    <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsCartOpen(false)}></div>
-                    <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+                <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-sm">
+                    <div className="absolute inset-0" onClick={() => setIsCartOpen(false)}></div>
+                    <div className="relative w-full max-w-md bg-white/80 backdrop-blur-xl h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 border-l border-white/20">
                         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <h3 className="font-bold text-lg flex items-center gap-2"><ShoppingBag size={20}/> Seu Carrinho</h3>
                             <button onClick={() => setIsCartOpen(false)}><X size={24} className="text-slate-400 hover:text-slate-600"/></button>
@@ -3151,9 +3349,9 @@ const PublicStore = () => {
 
             {/* PIX Payment Modal */}
             {paymentModalOpen && pixData && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPaymentModalOpen(false)}></div>
-                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col items-center animate-in zoom-in-95 duration-300">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
+                    <div className="absolute inset-0" onClick={() => setPaymentModalOpen(false)}></div>
+                    <div className="relative bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col items-center animate-in zoom-in-95 duration-300 border border-white/20">
                         <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4">
                             <QrCode size={24} />
                         </div>

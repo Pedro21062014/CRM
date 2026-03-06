@@ -211,27 +211,30 @@ async function startServer() {
   app.get("/api/balance", async (req, res) => {
     try {
       if (!ASAAS_API_KEY) {
-        return res.status(500).json({ error: "Chave da API do Asaas não configurada no servidor (.env)." });
+        return res.status(500).json({ error: "Chave da API do Asaas não configurada." });
       }
-
       const response = await fetch(`${ASAAS_URL}/finance/balance`, {
-        headers: {
-          "access_token": ASAAS_API_KEY,
-          "User-Agent": "NovaStore/1.0"
-        }
+        headers: { "access_token": ASAAS_API_KEY, "User-Agent": "NovaStore/1.0" }
       });
-
-      const text = await response.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        return res.status(400).json({ error: `Erro Asaas: ${text}` });
-      }
-
+      const data = await response.json();
       res.json(data);
     } catch (error: any) {
-      console.error("Asaas error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/check-payment/:id", async (req, res) => {
+    try {
+      if (!ASAAS_API_KEY) {
+        return res.status(500).json({ error: "Chave da API do Asaas não configurada." });
+      }
+      const { id } = req.params;
+      const response = await fetch(`${ASAAS_URL}/payments/${id}`, {
+        headers: { "access_token": ASAAS_API_KEY, "User-Agent": "NovaStore/1.0" }
+      });
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });

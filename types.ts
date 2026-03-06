@@ -47,6 +47,7 @@ export interface Client {
 }
 
 export enum OrderStatus {
+  PENDING_PAYMENT = 'pending_payment',
   NEW = 'new',
   PROCESSING = 'processing',
   COMPLETED = 'completed',
@@ -83,6 +84,8 @@ export interface Order {
   rating?: number; // 1 to 5
   review?: string;
   paymentMethod?: string;
+  paymentId?: string; // ID da cobrança no Asaas
+  paymentStatus?: 'pending' | 'paid' | 'failed';
 }
 
 // Store Builder Types
@@ -125,6 +128,7 @@ export interface StoreConfig {
   fullAddress?: string; // Endereço formatado do OpenStreetMap
   isPublished?: boolean; // Se a loja está visível no marketplace
   enableNativePayment?: boolean; // Se a loja aceita pagamento nativo via PIX
+  pixKey?: string; // Chave PIX do lojista para receber os repasses
 }
 
 export interface Coupon {
